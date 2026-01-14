@@ -20,3 +20,20 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.item} ({self.amount}원)"
+
+class MonthlyLog(models.Model):
+    """
+    지난 달의 예산 등을 스냅샷 형태로 저장하는 모델
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='monthly_logs')
+    year = models.IntegerField()
+    month = models.IntegerField()
+    monthly_budget = models.IntegerField(default=0) # 해당 월의 예산 스냅샷
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'year', 'month')
+
+    def __str__(self):
+        return f"{self.user} - {self.year}/{self.month}"

@@ -10,6 +10,8 @@ docker ps : 현재 실행 중인 서버(컨테이너) 목록을 확인.
 
 docker-compose logs -f backend : 백엔드 서버의 실시간 로그를 확인. (오류 추적 시 유용)
 
-docker-compose exec backend python manage.py migrate : 백엔드 DB를 업데이트. (Django 모델 변경 시)
+docker-compose exec backend python manage.py makemigrations : 모델 변경 후 DB 스키마를 변경
 
-docker-compose exec backend python manage.py createsuperuser : 백엔드 관리자 계정을 생성.
+docker-compose exec backend python manage.py migrate : 모델 변경 후 DB를 업데이트
+
+docker-compose exec backend python manage.py createsuperuser : 관리자 계정을 생성
