@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Plus, User, Home } from 'lucide-react';
+import { Bot, Plus, User, Home, Calendar } from 'lucide-react';
 import Link from 'next/link';
 
 export default function BottomNavigation({ onQuickAddClick }) {
@@ -33,10 +33,10 @@ export default function BottomNavigation({ onQuickAddClick }) {
                     <span style={styles.navLabel}>홈</span>
                 </Link>
 
-                {/* 좌측 버튼 2 (향후 추가 예정) */}
-                <div style={styles.navButton}>
-                    {/* 비워둠 */}
-                </div>
+                <Link href="/expense" style={styles.navButton}>
+                    <Calendar size={24} />
+                    <span style={styles.navLabel}>달력</span>
+                </Link>
 
                 {/* 중앙 Quick Add 버튼 */}
                 <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>

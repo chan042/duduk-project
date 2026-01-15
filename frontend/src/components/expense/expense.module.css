@@ -1,0 +1,528 @@
+/* Container */
+.container {
+  padding: 1rem;
+  padding-bottom: 6rem;
+  background-color: var(--background-light);
+  min-height: 100vh;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem;
+  color: var(--text-guide);
+  font-size: 0.875rem;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-guide);
+  font-size: 0.875rem;
+}
+
+.monthNavButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.monthNavButton:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.monthSelector {
+  font-size: 1.5rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.headerSummary {
+  text-align: right;
+  font-size: 0.875rem;
+}
+
+.totalLabel {
+  color: var(--text-guide);
+}
+
+.totalAmount {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.remainingBudget {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* View Toggle */
+.toggleContainer {
+  display: inline-flex;
+  background-color: #e2e8f0;
+  border-radius: 8px;
+  padding: 2px;
+  margin-bottom: 1.5rem;
+}
+
+.toggleButton {
+  border: none;
+  background: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggleButton.active {
+  background-color: var(--primary);
+  color: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* List View */
+.dateGroup {
+  margin-bottom: 1.5rem;
+}
+
+.dateHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding: 0 0.25rem;
+}
+
+.dateText {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.dateTotalAmount {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #e53e3e;
+}
+
+.dayCard {
+  background-color: var(--card-bg);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.transactionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  cursor: pointer;
+}
+
+.transactionRowBorder {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.transactionCard {
+  background-color: var(--card-bg);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.dailyTotalCard {
+  background-color: white;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.transactionIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e6fffa;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1rem;
+  font-size: 1.25rem;
+}
+
+.transactionInfo {
+  flex: 1;
+}
+
+.merchantName {
+  font-weight: 600;
+  color: var(--text-main);
+  display: block;
+}
+
+.categoryName {
+  font-size: 0.75rem;
+  color: var(--text-guide);
+}
+
+.transactionAmount {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+/* Calendar View */
+.calendarWrapper {
+  width: 100%;
+  overflow: hidden;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.weekDay {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-guide);
+  padding: 0.5rem 0;
+}
+
+.calendarDay {
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4px 2px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  color: var(--text-main);
+  position: relative;
+  overflow: hidden;
+}
+
+.calendarDay.today {
+  background-color: transparent;
+}
+
+.calendarDay.selectedDay {
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+
+.dayNumber {
+  font-size: 0.875rem;
+  margin-bottom: 2px;
+}
+
+.dayEmoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.dayAmount {
+  font-size: 0.55rem;
+  margin-top: 1px;
+  font-weight: 600;
+}
+
+.spendingLevelGreen {
+  background-color: rgba(72, 187, 120, 0.15);
+}
+
+.spendingLevelRed {
+  background-color: rgba(239, 68, 68, 0.15);
+}
+
+.spendingLevelYellow {
+  background-color: rgba(236, 201, 75, 0.15);
+}
+
+/* Insight Cards */
+.insightRow {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.insightCard {
+  background-color: var(--card-bg);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.insightCardFull {
+  background-color: var(--card-bg);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.insightIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.insightContent h4 {
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+  color: var(--text-main);
+}
+
+.insightContent p {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+}
+
+.insightHighlight {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.insightWarning {
+  color: #e53e3e;
+  font-weight: 600;
+}
+
+/* Modal */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  background-color: white;
+  width: 90%;
+  max-width: 380px;
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-guide);
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.modalAmountHeader {
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--text-sub);
+  margin-bottom: 0.25rem;
+}
+
+.modalAmount {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--text-main);
+  margin-bottom: 1rem;
+}
+
+.modalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.modalLabel {
+  color: var(--text-sub);
+  font-size: 0.875rem;
+}
+
+.modalValue {
+  font-weight: 500;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.memoInput {
+  border: none;
+  background: transparent;
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-main);
+  outline: none;
+  width: 150px;
+}
+
+.memoInput:focus {
+  border-bottom: 1px solid var(--primary);
+}
+
+.toggleSwitch {
+  width: 44px;
+  height: 24px;
+  background-color: #e2e8f0;
+  border-radius: 12px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.toggleSwitch.active {
+  background-color: var(--primary);
+}
+
+.toggleSwitch::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+}
+
+.toggleSwitch.active::after {
+  transform: translateX(20px);
+}
+
+.modalActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.btn {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.btnSecondary {
+  background-color: #edf2f7;
+  color: var(--text-main);
+}
+
+.btnDanger {
+  background-color: #c53030;
+  color: white;
+}
+
+.calendarHeaderTitle {
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text-main);
+}
+
+.dateMeta {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.dateBudgetInfo {
+  font-size: 0.75rem;
+  color: var(--text-guide);
+  background-color: #f7fafc;
+  padding: 2px 6px;
+  border-radius: 4px;
+}

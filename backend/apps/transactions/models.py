@@ -37,3 +37,29 @@ class MonthlyLog(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.year}/{self.month}"
+
+class DailyBudgetSnapshot(models.Model):
+    """
+    일일 권장 예산 스냅샷
+    - 해당 날짜의 자정 기준으로 계산된 일일 권장 예산을 저장
+    - 한 번 저장되면 변경되지 않음
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='daily_budget_snapshots'
+    )
+    date = models.DateField()  # 스냅샷 날짜
+    daily_budget = models.IntegerField()  # 해당 날짜의 일일 권장 예산
+    monthly_budget = models.IntegerField()  # 계산 시점의 월 예산
+    remaining_budget = models.IntegerField()  # 계산 시점의 잔여 예산
+    remaining_days = models.IntegerField()  # 계산 시점의 잔여 일수
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'date')
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.user} - {self.date}: {self.daily_budget}원"

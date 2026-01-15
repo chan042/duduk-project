@@ -21,7 +21,7 @@ class ParseTransactionView(APIView):
     자연어 텍스트를 입력받아 AI(Gemini)를 통해 구조화된 데이터로 변환하는 뷰
     DB에 저장하지 않고, 분석 결과만 반환합니다.
     """
-    permission_classes = [IsAuthenticated]  # 인증된 사용자만 사용 가능
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         text = request.data.get('text', '')
@@ -41,7 +41,7 @@ class CreateTransactionView(APIView):
     """
     분석된(또는 사용자가 입력한) 데이터를 받아 실제 DB에 지출 내역을 저장하는 뷰
     """
-    permission_classes = [IsAuthenticated]  # 인증된 사용자만 사용 가능
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         data = request.data
@@ -81,9 +81,12 @@ class TransactionListView(APIView):
     - query param으로 year, month가 주어지면 해당 월의 내역만 필터링
     - 응답에 일별 지출 상태(daily_status)를 포함
     """
-    permission_classes = [IsAuthenticated]  # 인증 필요
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         user = request.user
+        
+        from .services import ensure_today_snapshot
+        ensure_today_snapshot(user)
         
         year = request.query_params.get('year')
         month = request.query_params.get('month')
@@ -96,13 +99,14 @@ class TransactionListView(APIView):
         
         # 일별 금액 집계 및 상태 계산
         from .services import get_daily_status
-        daily_status_data, _ = get_daily_status(user, target_year, target_month, transactions)
+        daily_status_data, daily_budget = get_daily_status(user, target_year, target_month, transactions)
         
         serializer = TransactionSerializer(transactions, many=True)
         
         return Response({
             "transactions": serializer.data,
-            "daily_status": daily_status_data
+            "daily_status": daily_status_data,
+            "daily_budget": daily_budget
         })
 class CategoryStatsView(APIView):
     """
@@ -137,7 +141,7 @@ class MonthlyAnalysisView(APIView):
     """
     월간 요약 카드에 들어갈 통계 데이터
     """
-    permission_classes = [IsAuthenticated]  # 인증 필요로 변경
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         user = request.user
         year = request.query_params.get('year')
@@ -173,4 +177,4 @@ class TransactionDetailView(RetrieveUpdateDestroyAPIView):
     """
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
-    permission_classes = [IsAuthenticated]  # 인증 필요로 변경
+    permission_classes = [IsAuthenticated]

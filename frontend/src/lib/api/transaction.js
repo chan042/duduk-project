@@ -30,6 +30,36 @@ export const getTransactions = async () => {
     }
 };
 
+export const getTransactionsByMonth = async (year, month) => {
+    try {
+        const response = await client.get(`/api/transactions/?year=${year}&month=${month}`);
+        return response.data;
+    } catch (error) {
+        console.error('Get Transactions By Month Error:', error);
+        throw error;
+    }
+};
+
+export const updateTransaction = async (id, data) => {
+    try {
+        const response = await client.patch(`/api/transactions/${id}/`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Update Transaction Error:', error);
+        throw error;
+    }
+};
+
+export const deleteTransaction = async (id) => {
+    try {
+        const response = await client.delete(`/api/transactions/${id}/`);
+        return response.data;
+    } catch (error) {
+        console.error('Delete Transaction Error:', error);
+        throw error;
+    }
+};
+
 export const getCategoryStats = async () => {
     try {
         const response = await client.get('/api/transactions/category-stats/');
@@ -40,3 +70,12 @@ export const getCategoryStats = async () => {
     }
 };
 
+export const getMonthlyAnalysis = async (year, month) => {
+    try {
+        const response = await client.get(`/api/transactions/monthly-analysis/?year=${year}&month=${month}`);
+        return response.data;
+    } catch (error) {
+        console.error('Get Monthly Analysis Error:', error);
+        throw error;
+    }
+};
