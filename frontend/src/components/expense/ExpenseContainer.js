@@ -10,7 +10,7 @@ import styles from './expense.module.css';
 import { getTransactionsByMonth, getMonthlyAnalysis, updateTransaction, deleteTransaction } from '@/lib/api/transaction';
 
 export default function ExpenseContainer() {
-    const [viewMode, setViewMode] = useState('list');
+    const [viewMode, setViewMode] = useState('calendar');
     const [selectedTransaction, setSelectedTransaction] = useState(null);
     const [selectedDate, setSelectedDate] = useState(null);
     const [transactions, setTransactions] = useState([]);

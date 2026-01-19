@@ -22,6 +22,11 @@ export default function CalendarView({
     // 해당 월 1일의 요일 (0: 일요일)
     const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1).getDay();
 
+    // 오늘 날짜 계산
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === currentYear && (today.getMonth() + 1) === currentMonth;
+    const todayDate = today.getDate();
+
     // ISO 형식 날짜에서 일(day) 추출
     const parseDateToDay = (dateStr) => {
         const date = new Date(dateStr);
@@ -47,36 +52,60 @@ export default function CalendarView({
 
     const getDayContent = (day) => {
         const status = getDayStatus(day);
-        if (!status) return null;
 
-        const total = status.total_spent || 0;
-        if (total === 0) return null;
-
+        let total = 0;
         let emoji = '😊';
         let level = 'green';
 
-        // 백엔드에서 받은 status 값으로 판단
-        switch (status.status) {
-            case 'money':
+        if (status) {
+            total = status.total_spent || 0;
+            // 백엔드에서 받은 status 값으로 판단
+            switch (status.status) {
+                case 'money':
+                    emoji = '💰';
+                    level = 'green';
+                    break;
+                case 'happy':
+                    emoji = '😊';
+                    level = 'green';
+                    break;
+                case 'sad':
+                    emoji = '😥';
+                    level = 'yellow';
+                    break;
+                case 'angry':
+                    emoji = '😡';
+                    level = 'red';
+                    break;
+                default:
+                    // status가 있지만 구체적인 상태가 없는 경우
+                    if (total === 0) {
+                        emoji = '�';
+                        level = 'green';
+                    } else {
+                        emoji = '�😊';
+                        level = 'green';
+                    }
+            }
+        } else {
+            // status 정보가 없는 경우 (지출이 아예 없는 날 등)
+            // 과거 날짜이면서 지출이 없으면 money(초록) 처리
+            // 미래 날짜는 표시 안 함
+            if (isCurrentMonth && day < todayDate) {
                 emoji = '💰';
                 level = 'green';
-                break;
-            case 'happy':
-                emoji = '😊';
+                return { emoji, amount: '0', level }; // 지출 0원 표시
+            } else if (!isCurrentMonth && new Date(currentYear, currentMonth - 1, day) < today) {
+                // 지난 달인 경우 모든 날짜에 대해 체크
+                emoji = '💰';
                 level = 'green';
-                break;
-            case 'sad':
-                emoji = '😥';
-                level = 'yellow';
-                break;
-            case 'angry':
-                emoji = '😡';
-                level = 'red';
-                break;
-            default:
-                emoji = '😊';
-                level = 'green';
+                return { emoji, amount: '0', level };
+            }
+
+            return null; // 미래 날짜거나 오늘인데 지출 없으면 빈칸
         }
+
+        if (total === 0 && emoji !== '💰') return null; // 지출 0원인데 money 상태 아니면 표시 X
 
         return { emoji, amount: total.toLocaleString(), level };
     };
@@ -137,29 +166,6 @@ export default function CalendarView({
                 })}
             </div>
 
-            {/* 선택된 날짜의 거래 내역 표시 */}
-            {selectedDate && selectedDayTransactions.length > 0 && (
-                <div className={styles.dateGroup}>
-                    <div className={styles.dateHeaderRow}>
-                        <span className={styles.dateText}>{selectedDateStr}</span>
-                        <div className={styles.dateMeta}>
-                            <span className={styles.dateBudgetInfo}>일일 권장 예산 {selectedDayBudget.toLocaleString()}원</span>
-                            <span className={styles.dateTotalAmount}>-{selectedDayTotal.toLocaleString()}원</span>
-                        </div>
-                    </div>
-                    <div className={styles.dayCard}>
-                        {selectedDayTransactions.map((transaction, index) => (
-                            <TransactionItem
-                                key={transaction.id}
-                                transaction={transaction}
-                                onClick={onTransactionClick}
-                                isLast={index === selectedDayTransactions.length - 1}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )}
-
             {/* Insight 카드: 성공/실패 일수만 표시 */}
             <div className={styles.insightRow}>
                 <div className={styles.insightCard}>
@@ -181,6 +187,40 @@ export default function CalendarView({
                     </div>
                 </div>
             </div>
+
+            {/* 지출 내역 BottomSheet로 표시 */}
+            <BottomSheet
+                isOpen={!!selectedDate}
+                onClose={() => onDateClick(null)}
+            >
+                <div className={styles.dateGroup} style={{ marginBottom: 0 }}>
+                    <div className={styles.dateHeaderRow}>
+                        <span className={styles.dateText}>{selectedDateStr}</span>
+                        <div className={styles.dateMeta}>
+                            <span className={styles.dateBudgetInfo}>일일 권장 예산 {selectedDayBudget.toLocaleString()}원</span>
+                            <span className={styles.dateTotalAmount}>-{selectedDayTotal.toLocaleString()}원</span>
+                        </div>
+                    </div>
+                    <div className={styles.dayCard} style={{ boxShadow: 'none', padding: 0 }}>
+                        {selectedDayTransactions.length > 0 ? (
+                            selectedDayTransactions.map((transaction, index) => (
+                                <TransactionItem
+                                    key={transaction.id}
+                                    transaction={transaction}
+                                    onClick={onTransactionClick}
+                                    isLast={index === selectedDayTransactions.length - 1}
+                                />
+                            ))
+                        ) : (
+                            <div className={styles.emptyState} style={{ padding: '2rem 0' }}>
+                                지출 내역이 없습니다.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </BottomSheet>
         </div>
     );
 }
+
+import BottomSheet from './BottomSheet';
