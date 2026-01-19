@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronLeft, Menu, Bell } from 'lucide-react';
+import { User, Bell } from 'lucide-react';
+import Link from 'next/link';
 
 export default function GlobalHeader() {
     const pathname = usePathname();
@@ -21,7 +22,9 @@ export default function GlobalHeader() {
             top: 0,
             zIndex: 10
         }}>
-            <Menu color="var(--text-main)" size={24} />
+            <Link href="/profile" style={{ display: 'flex', alignItems: 'center' }}>
+                <User color="var(--text-main)" size={24} />
+            </Link>
             <h1 style={{
                 color: 'var(--primary)',
                 fontSize: '1.5rem',
