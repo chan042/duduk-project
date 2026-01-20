@@ -1,48 +1,26 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { X, Utensils, Coffee, ShoppingBag, Bus } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import styles from './expense.module.css';
-
-const getCategoryIcon = (category) => {
-    switch (category) {
-        case '식비': return <Utensils size={16} />;
-        case '카페': case '카페/간식': return <Coffee size={16} />;
-        case '쇼핑': return <ShoppingBag size={16} />;
-        case '교통': return <Bus size={16} />;
-        default: return <Utensils size={16} />;
-    }
-};
-
-const CATEGORIES = [
-    '식비',
-    '생활',
-    '카페/간식',
-    '온라인 쇼핑',
-    '패션/쇼핑',
-    '뷰티/미용',
-    '교통',
-    '자동차',
-    '주거/통신',
-    '의료/건강',
-    '문화/여가',
-    '여행/숙박',
-    '교육/학습',
-    '자녀/육아',
-    '반려동물',
-    '경조/선물',
-    '술/유흥',
-    '기타'
-];
+import CalculatorInput from '../common/CalculatorInput';
+import DateWheelPicker from '../common/DateWheelPicker';
+import { getCategoryIcon, CATEGORIES } from '../common/CategoryIcons';
 
 export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, onDelete }) {
     const [memo, setMemo] = useState('');
     const [category, setCategory] = useState('');
     const [merchant, setMerchant] = useState('');
     const [date, setDate] = useState('');
-    const [amount, setAmount] = useState('');
+    const [dateObj, setDateObj] = useState(new Date());
+    const [amount, setAmount] = useState(0);
     const [isFixedExpense, setIsFixedExpense] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Modal States
+    const [showCalculator, setShowCalculator] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
     useEffect(() => {
         if (transaction) {
@@ -55,9 +33,11 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
             // Date handling: extract YYYY-MM-DD
             if (transaction.date) {
                 const d = new Date(transaction.date);
+                setDateObj(d);
                 const isoDate = d.toISOString().split('T')[0];
                 setDate(isoDate);
             } else {
+                setDateObj(new Date());
                 setDate('');
             }
         }
@@ -100,6 +80,17 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
         }
     };
 
+    const handleDateConfirm = (newDate) => {
+        setDateObj(newDate);
+        const isoDate = newDate.toISOString().split('T')[0];
+        setDate(isoDate);
+    };
+
+    const formatDateDisplay = () => {
+        if (!date) return '날짜 선택';
+        return dateObj.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+    };
+
     if (!isOpen || !transaction) return null;
 
     return (
@@ -112,29 +103,35 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
                 </div>
 
                 <div className={styles.modalBody}>
+                    {/* Amount - 클릭 시 계산기 오픈 */}
                     <div className={styles.modalAmountHeader}>결제 금액</div>
-                    <input
-                        type="number"
-                        className={styles.modalAmount}
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none' }}
-                    />
+                    <div
+                        onClick={() => setShowCalculator(true)}
+                        style={{
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '1rem'
+                        }}
+                    >
+                        <span className={styles.modalAmount} style={{ margin: 0 }}>
+                            {parseInt(amount, 10).toLocaleString()}원
+                        </span>
+                        <span style={{ color: 'var(--text-sub)', fontSize: '0.875rem' }}>✎</span>
+                    </div>
 
+                    {/* Category - 클릭 시 카테고리 선택 오픈 */}
                     <div className={styles.modalRow}>
                         <span className={styles.modalLabel}>카테고리</span>
-                        <div className={styles.modalValue}>
-                            {getCategoryIcon(category)}
-                            <select
-                                className={styles.memoInput}
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                                style={{ width: 'auto' }}
-                            >
-                                {CATEGORIES.map(cat => (
-                                    <option key={cat} value={cat}>{cat}</option>
-                                ))}
-                            </select>
+                        <div
+                            className={styles.modalValue}
+                            onClick={() => setShowCategoryPicker(true)}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            {getCategoryIcon(category, 16)}
+                            <span>{category}</span>
+                            <span style={{ marginLeft: '4px', color: 'var(--text-sub)' }}>▼</span>
                         </div>
                     </div>
 
@@ -149,14 +146,23 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
                         />
                     </div>
 
+                    {/* Date - 클릭 시 날짜 휠 피커 오픈 */}
                     <div className={styles.modalRow}>
                         <span className={styles.modalLabel}>날짜</span>
-                        <input
-                            type="date"
-                            className={styles.memoInput}
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                        />
+                        <div
+                            onClick={() => setShowDatePicker(true)}
+                            style={{
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                fontWeight: '500',
+                                color: 'var(--text-main)'
+                            }}
+                        >
+                            <span>{formatDateDisplay()}</span>
+                            <span style={{ color: 'var(--text-sub)' }}>📅</span>
+                        </div>
                     </div>
 
                     <div className={styles.modalRow}>
@@ -196,7 +202,100 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
                     </div>
                 </div>
             </div>
+
+            {/* Calculator Modal */}
+            <CalculatorInput
+                isOpen={showCalculator}
+                onClose={() => setShowCalculator(false)}
+                initialValue={amount}
+                onConfirm={(newAmount) => setAmount(newAmount)}
+            />
+
+            {/* Date Picker Modal */}
+            <DateWheelPicker
+                isOpen={showDatePicker}
+                onClose={() => setShowDatePicker(false)}
+                initialDate={dateObj}
+                onConfirm={handleDateConfirm}
+            />
+
+            {/* Category Picker Modal */}
+            {showCategoryPicker && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'flex-end',
+                        justifyContent: 'center',
+                        zIndex: 2001,
+                    }}
+                    onClick={() => setShowCategoryPicker(false)}
+                >
+                    <div
+                        style={{
+                            backgroundColor: 'white',
+                            borderTopLeftRadius: '24px',
+                            borderTopRightRadius: '24px',
+                            padding: '20px',
+                            width: '100%',
+                            maxWidth: '430px',
+                            maxHeight: '60vh',
+                            overflowY: 'auto',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '16px'
+                        }}>
+                            <span style={{ fontSize: '1.125rem', fontWeight: '600' }}>카테고리 선택</span>
+                            <button
+                                onClick={() => setShowCategoryPicker(false)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {CATEGORIES.map((cat) => (
+                                <div
+                                    key={cat}
+                                    onClick={() => {
+                                        setCategory(cat);
+                                        setShowCategoryPicker(false);
+                                    }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '12px',
+                                        padding: '12px 16px',
+                                        borderRadius: '12px',
+                                        backgroundColor: category === cat ? '#e6fffa' : '#f8f9fa',
+                                        cursor: 'pointer',
+                                        border: category === cat ? '2px solid var(--primary)' : '2px solid transparent',
+                                    }}
+                                >
+                                    {getCategoryIcon(cat, 20)}
+                                    <span style={{
+                                        fontWeight: category === cat ? '600' : '400',
+                                        color: 'var(--text-main)'
+                                    }}>{cat}</span>
+                                    {category === cat && (
+                                        <Check size={18} color="var(--primary)" style={{ marginLeft: 'auto' }} />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
-
