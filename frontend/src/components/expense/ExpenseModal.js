@@ -14,7 +14,26 @@ const getCategoryIcon = (category) => {
     }
 };
 
-const CATEGORIES = ['식비', '카페/간식', '쇼핑', '교통', '기타'];
+const CATEGORIES = [
+    '식비',
+    '생활',
+    '카페/간식',
+    '온라인 쇼핑',
+    '패션/쇼핑',
+    '뷰티/미용',
+    '교통',
+    '자동차',
+    '주거/통신',
+    '의료/건강',
+    '문화/여가',
+    '여행/숙박',
+    '교육/학습',
+    '자녀/육아',
+    '반려동물',
+    '경조/선물',
+    '술/유흥',
+    '기타'
+];
 
 export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, onDelete }) {
     const [memo, setMemo] = useState('');
