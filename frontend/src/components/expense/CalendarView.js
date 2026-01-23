@@ -16,7 +16,8 @@ export default function CalendarView({
     failDays = 0,
     dailyBudget = 0,
     characterType = 'char_cat',
-    dateJoined = null // 사용자 가입일
+    dateJoined = null,
+    onConfirmNoSpending = null // 무지출 확인 콜백 함수
 }) {
     // 해당 월의 일수 계산
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
@@ -32,15 +33,6 @@ export default function CalendarView({
 
     // 가입일 파싱
     const joinedDate = dateJoined ? new Date(dateJoined) : null;
-
-    // 해당 날짜가 가입일 이전인지 확인
-    const isBeforeJoinDate = (day) => {
-        if (!joinedDate) return false;
-        const checkDate = new Date(currentYear, currentMonth - 1, day);
-        // 가입일의 시작 시간으로 비교 (같은 날은 허용)
-        const joinDateStart = new Date(joinedDate.getFullYear(), joinedDate.getMonth(), joinedDate.getDate());
-        return checkDate < joinDateStart;
-    };
 
     // ISO 형식 날짜에서 일(day) 추출
     const parseDateToDay = (dateStr) => {
@@ -65,6 +57,13 @@ export default function CalendarView({
         return dailyStatus[dateStr] || null;
     };
 
+    // 해당 날짜가 과거인지 확인
+    const isPastDate = (day) => {
+        const checkDate = new Date(currentYear, currentMonth - 1, day);
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        return checkDate < todayStart;
+    };
+
     // status에 따라 face 이미지 경로 반환
     const getFaceImage = (status) => {
         const basePath = `/images/characters/${characterType}`;
@@ -83,65 +82,31 @@ export default function CalendarView({
     };
 
     const getDayContent = (day) => {
-        // 가입일 이전 날짜는 상태 표시 안 함
-        if (isBeforeJoinDate(day)) {
+        const status = getDayStatus(day);
+
+        // status가 없으면 상태 표시 안 함
+        if (!status) {
             return null;
         }
 
-        const status = getDayStatus(day);
-        const dayTotal = getDayTotal(day);
-
-        let total = 0;
-        let faceStatus = 'money';
+        const total = status.total_spent || 0;
+        let faceStatus = status.status || 'money';
         let level = 'green';
 
-        if (status) {
-            total = status.total_spent || 0;
-            // 백엔드에서 받은 status 값으로 판단
-            switch (status.status) {
-                case 'money':
-                    faceStatus = 'money';
-                    level = 'green';
-                    break;
-                case 'happy':
-                    faceStatus = 'happy';
-                    level = 'green';
-                    break;
-                case 'sad':
-                    faceStatus = 'sad';
-                    level = 'yellow';
-                    break;
-                case 'angry':
-                    faceStatus = 'angry';
-                    level = 'red';
-                    break;
-                default:
-                    // status가 있지만 구체적인 상태가 없는 경우
-                    if (total === 0) {
-                        faceStatus = 'money';
-                        level = 'green';
-                    } else {
-                        faceStatus = 'happy';
-                        level = 'green';
-                    }
-            }
-        } else {
-            // status 정보가 없는 경우 (지출이 아예 없는 날 등)
-            // 가입일 이후이면서 과거 날짜는 money(초록) 처리
-            // 미래 날짜는 표시 안 함
-            const checkDate = new Date(currentYear, currentMonth - 1, day);
-
-            if (checkDate < today && checkDate.toDateString() !== today.toDateString()) {
-                // 과거 날짜이면서 지출이 없으면 money(초록) 표시
-                faceStatus = 'money';
+        switch (faceStatus) {
+            case 'money':
+            case 'happy':
                 level = 'green';
-                return { faceStatus, amount: '0', level };
-            }
-
-            return null; // 미래 날짜거나 오늘인데 지출 없으면 빈칸
+                break;
+            case 'sad':
+                level = 'yellow';
+                break;
+            case 'angry':
+                level = 'red';
+                break;
+            default:
+                level = 'green';
         }
-
-        if (total === 0 && faceStatus !== 'money') return null;
 
         return { faceStatus, amount: total.toLocaleString(), level };
     };
@@ -167,6 +132,26 @@ export default function CalendarView({
         return status?.daily_budget ?? dailyBudget;
     };
     const selectedDayBudget = getSelectedDayBudget();
+
+    // 선택된 날짜가 무지출 확인이 필요한지 체크
+    const needsNoSpendingConfirm = () => {
+        if (!selectedDate) return false;
+        const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+        const hasTransactions = selectedDayTransactions.length > 0;
+        const hasStatus = !!dailyStatus[dateStr];
+        const isPast = isPastDate(selectedDate);
+
+        // 과거 날짜이면서 지출 내역이 없고 상태도 없는 경우 무지출 확인 필요
+        return isPast && !hasTransactions && !hasStatus;
+    };
+
+    // 무지출 확인 핸들러
+    const handleConfirmNoSpending = () => {
+        if (onConfirmNoSpending && selectedDate) {
+            const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+            onConfirmNoSpending(dateStr);
+        }
+    };
 
     return (
         <div className={styles.calendarWrapper}>
@@ -255,6 +240,16 @@ export default function CalendarView({
                                     isLast={index === selectedDayTransactions.length - 1}
                                 />
                             ))
+                        ) : needsNoSpendingConfirm() ? (
+                            <div className={styles.noSpendingConfirm}>
+                                <p>이 날은 무지출인가요?</p>
+                                <button
+                                    className={styles.noSpendingButton}
+                                    onClick={handleConfirmNoSpending}
+                                >
+                                    무지출 확인
+                                </button>
+                            </div>
                         ) : (
                             <div className={styles.emptyState} style={{ padding: '2rem 0' }}>
                                 지출 내역이 없습니다.

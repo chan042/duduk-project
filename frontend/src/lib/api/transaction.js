@@ -79,3 +79,16 @@ export const getMonthlyAnalysis = async (year, month) => {
         throw error;
     }
 };
+
+export const confirmNoSpending = async (date) => {
+    try {
+        const response = await client.post('/api/transactions/spending-confirmation/', {
+            date,
+            is_no_spending: true
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Confirm No Spending Error:', error);
+        throw error;
+    }
+};

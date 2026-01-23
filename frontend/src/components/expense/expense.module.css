@@ -571,3 +571,37 @@
   border-radius: 2px;
   margin: 8px auto 16px auto;
 }
+
+/* 무지출 확인 */
+.noSpendingConfirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1rem;
+  gap: 1rem;
+}
+
+.noSpendingConfirm p {
+  color: var(--text-sub);
+  font-size: 0.875rem;
+}
+
+.noSpendingButton {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.noSpendingButton:hover {
+  background-color: #2c7a59;
+}
+
+.dateBudgetInfo {
+  font-size: 0.75rem;
+  color: var(--text-guide);
+}

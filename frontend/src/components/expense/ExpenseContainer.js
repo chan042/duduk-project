@@ -8,7 +8,7 @@ import ListView from './ListView';
 import CalendarView from './CalendarView';
 import ExpenseModal from './ExpenseModal';
 import styles from './expense.module.css';
-import { getTransactionsByMonth, getMonthlyAnalysis, updateTransaction, deleteTransaction } from '@/lib/api/transaction';
+import { getTransactionsByMonth, getMonthlyAnalysis, updateTransaction, deleteTransaction, confirmNoSpending } from '@/lib/api/transaction';
 import { getProfile } from '@/lib/api/auth';
 
 export default function ExpenseContainer() {
@@ -152,6 +152,18 @@ export default function ExpenseContainer() {
         }
     };
 
+    // 무지출 확인 핸들러
+    const handleConfirmNoSpending = async (dateStr) => {
+        try {
+            await confirmNoSpending(dateStr);
+            // 확인 후 데이터 새로고침
+            fetchData();
+        } catch (error) {
+            console.error('Failed to confirm no spending:', error);
+            alert('무지출 확인에 실패했습니다.');
+        }
+    };
+
     return (
         <div className={styles.container}>
             <header className={styles.header}>
@@ -194,6 +206,7 @@ export default function ExpenseContainer() {
                     dailyBudget={dailyBudget}
                     characterType={characterType}
                     dateJoined={dateJoined}
+                    onConfirmNoSpending={handleConfirmNoSpending}
                 />
             )}
 

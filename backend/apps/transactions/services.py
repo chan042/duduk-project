@@ -1,11 +1,13 @@
 from django.utils import timezone
 from collections import defaultdict
+from datetime import timedelta
 import calendar
-from .models import MonthlyLog, DailyBudgetSnapshot
+from .models import MonthlyLog, DailyBudgetSnapshot, DailySpendingConfirmation
 
 def get_daily_status(user, year, month, transactions):
     """
     Transactions 쿼리셋을 받아 일별 지출 상태 및 통계를 계산하여 반환
+    - 지출 내역이 없는 날은 무지출 확인 여부에 따라 상태 표시
     """
     daily_stats = defaultdict(int)
 
@@ -13,6 +15,12 @@ def get_daily_status(user, year, month, transactions):
         local_date = timezone.localtime(t.date).date()
         date_str = local_date.strftime('%Y-%m-%d')
         daily_stats[date_str] += t.amount
+
+    # 무지출 확인 날짜 조회
+    confirmations = DailySpendingConfirmation.objects.filter(
+        user=user, date__year=year, date__month=month, is_no_spending=True
+    ).values_list('date', flat=True)
+    confirmed_dates = set(d.strftime('%Y-%m-%d') for d in confirmations)
 
     # 두둑 상태 계산
     daily_status_data = {}
@@ -30,14 +38,31 @@ def get_daily_status(user, year, month, transactions):
         current_date = timezone.datetime(target_year, target_month, day).date()
         date_str = current_date.strftime('%Y-%m-%d')
         
-        # 지출액 (없으면 0)
+        # 미래 날짜는 상태 계산 안함
+        if current_date > today:
+            continue
+        
+        # 지출액
         total_spent = daily_stats.get(date_str, 0)
         
-        # 해당 날짜의 일일 권장 예산 가져오기 (스냅샷 우선)
+        # 지출이 없는 경우
+        if total_spent == 0:
+            # 무지출 확인된 경우에만 상태 표시
+            if date_str in confirmed_dates:
+                daily_budget = get_daily_budget_for_date(user, current_date)
+                daily_status_data[date_str] = {
+                    "total_spent": 0,
+                    "status": "money",
+                    "daily_budget": daily_budget
+                }
+            # 확인되지 않은 경우 상태 표시X
+            continue
+        
+        # 해당 날짜의 일일 권장 예산 가져오기
         daily_budget = get_daily_budget_for_date(user, current_date)
         
         # 상태 계산 로직
-        status_value = 'money' # 기본값
+        status_value = 'money'
         
         if daily_budget <= 0:
             status_value = 'angry' if total_spent > 0 else 'money'
@@ -51,36 +76,12 @@ def get_daily_status(user, year, month, transactions):
                 status_value = 'sad'
             else:
                 status_value = 'angry'
-        pass
-    
-    # 각 날짜별 예산을 개별 조회
-    for date_str, total in daily_stats.items():
-        # date_str을 date 객체로 변환
-        year_str, month_str, day_str = map(int, date_str.split('-'))
-        current_date = timezone.datetime(year_str, month_str, day_str).date()
-        
-        daily_budget = get_daily_budget_for_date(user, current_date)
-        
-        status_value = 'money'
-        if daily_budget <= 0:
-            status_value = 'angry' if total > 0 else 'money'
-        else:
-            ratio = total / daily_budget
-            if ratio <= 0.5:
-                status_value = 'money'
-            elif ratio <= 1.0:
-                status_value = 'happy'
-            elif ratio <= 1.5:
-                status_value = 'sad'
-            else:
-                status_value = 'angry'
                 
         daily_status_data[date_str] = {
-            "total_spent": total,
+            "total_spent": total_spent,
             "status": status_value,
             "daily_budget": daily_budget
         }
-    
 
     # 오늘 날짜 예산 또는 조회 월의 예산을 반환
     representative_daily_budget = 0
@@ -121,6 +122,7 @@ def ensure_today_snapshot(user):
 def create_daily_budget_snapshot(user, target_date):
     """
     특정 날짜의 일일 권장 예산 스냅샷 생성 및 저장
+    해당 날짜 기준으로 이전까지의 지출만 계산
     """
     year = target_date.year
     month = target_date.month
@@ -140,7 +142,7 @@ def create_daily_budget_snapshot(user, target_date):
         monthly_budget = user.monthly_budget if user.monthly_budget else 0
         
 
-    # 어제까지의 지출 계산
+    # 해당 날짜 이전까지의 지출 계산 (그 날 기준)
     from .models import Transaction
     range_start = timezone.datetime(year, month, 1).date()
     
@@ -151,7 +153,7 @@ def create_daily_budget_snapshot(user, target_date):
     )
     spent_until_yesterday = sum(t.amount for t in transactions)
     
-    # 남은 일수 (오늘 포함)
+    # 남은 일수 (해당 날짜 포함)
     _, last_day_of_month = calendar.monthrange(year, month)
     remaining_days = last_day_of_month - target_date.day + 1
     if remaining_days < 1: remaining_days = 1
@@ -160,28 +162,47 @@ def create_daily_budget_snapshot(user, target_date):
     daily_budget = int(remaining_budget / remaining_days)
     
     # 저장
-    DailyBudgetSnapshot.objects.create(
+    DailyBudgetSnapshot.objects.update_or_create(
         user=user,
         date=target_date,
-        daily_budget=daily_budget,
-        monthly_budget=monthly_budget,
-        remaining_budget=remaining_budget,
-        remaining_days=remaining_days
+        defaults={
+            'daily_budget': daily_budget,
+            'monthly_budget': monthly_budget,
+            'remaining_budget': remaining_budget,
+            'remaining_days': remaining_days
+        }
     )
+
+
+def recalculate_snapshots_from_date(user, from_date):
+    """
+    특정 날짜부터 오늘까지의 스냅샷을 재계산
+    지출 내역이 추가/수정/삭제될 때 호출
+    """
+    today = timezone.localdate()
+    current_date = from_date
+    
+    # from_date가 이번 달인 경우에만 재계산
+    if from_date.year != today.year or from_date.month != today.month:
+        # 지난 달 지출 변경은 현재 달에 영향 없음
+        return
+    
+    while current_date <= today:
+        create_daily_budget_snapshot(user, current_date)
+        current_date += timedelta(days=1)
 
 
 def get_daily_budget_for_date(user, target_date):
     """
     특정 날짜의 일일 권장 예산 조회
     1. 스냅샷 확인
-    2. 없으면 동적 계산 (과거 데이터가 없으면 현재 기준으로라도 계산해야 함)
+    2. 없으면 그 날 기준으로 동적 계산
     """
     try:
         snapshot = DailyBudgetSnapshot.objects.get(user=user, date=target_date)
         return snapshot.daily_budget
     except DailyBudgetSnapshot.DoesNotExist:
-        # 스냅샷이 없음 -> 동적 계산
-
+        # 스냅샷이 없음 -> 그 날 기준으로 동적 계산
         year, month = target_date.year, target_date.month
         today = timezone.localdate()
         
@@ -196,17 +217,29 @@ def get_daily_budget_for_date(user, target_date):
         else:
             monthly_budget = user.monthly_budget if user.monthly_budget else 0
         
-        # 해당 월 전체 지출
+        # 그 날 기준으로 이전까지의 지출만 계산
         from .models import Transaction
-        txs = Transaction.objects.filter(user=user, date__year=year, date__month=month)
-        total_spent = sum(t.amount for t in txs)
+        range_start = timezone.datetime(year, month, 1).date()
+        txs = Transaction.objects.filter(
+            user=user, 
+            date__date__gte=range_start,
+            date__date__lt=target_date
+        )
+        spent_until_yesterday = sum(t.amount for t in txs)
         
-        return calculate_target_daily_budget(monthly_budget, year, month, total_spent)
+        # 남은 일수
+        _, last_day = calendar.monthrange(year, month)
+        remaining_days = last_day - target_date.day + 1
+        if remaining_days < 1:
+            remaining_days = 1
+        
+        remaining_budget = monthly_budget - spent_until_yesterday
+        return int(remaining_budget / remaining_days)
 
 
 def calculate_target_daily_budget(monthly_budget, year, month, total_spent_month):
     """
-    권장 일일 예산 계산
+    월 전체의 일일 예산 계산
     """
     today = timezone.localdate()
     _, last_day = calendar.monthrange(year, month)
@@ -221,3 +254,4 @@ def calculate_target_daily_budget(monthly_budget, year, month, total_spent_month
     else:
         # 과거/미래인 경우: 월 예산 / 전체 일수
         return int(monthly_budget / last_day)
+

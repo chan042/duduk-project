@@ -26,7 +26,7 @@ def generate_coaching_if_needed(sender, instance, created, **kwargs):
 
         # !테스트 중에는 1로 수정!
         # 10건 이상이면 코칭 생성
-        if new_transactions.count() >= 1:
+        if new_transactions.count() >= 5:
             # 분석 컨텍스트 (최근 10건)
             context_transactions = Transaction.objects.filter(user=user).order_by('-created_at')[:1]
             transaction_list_str = ""

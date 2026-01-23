@@ -70,6 +70,10 @@ class CreateTransactionView(APIView):
                 is_fixed=data.get('is_fixed', False)
             )
 
+            # 해당 날짜 이후의 스냅샷 재계산
+            from .services import recalculate_snapshots_from_date
+            recalculate_snapshots_from_date(user, transaction.date.date())
+
             return Response({"message": "Transaction created", "id": transaction.id}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -178,3 +182,79 @@ class TransactionDetailView(RetrieveUpdateDestroyAPIView):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        from .services import recalculate_snapshots_from_date
+        recalculate_snapshots_from_date(instance.user, instance.date.date())
+
+    def perform_destroy(self, instance):
+        date = instance.date.date()
+        user = instance.user
+        instance.delete()
+        from .services import recalculate_snapshots_from_date
+        recalculate_snapshots_from_date(user, date)
+
+
+class SpendingConfirmationView(APIView):
+    """
+    무지출 확인 API
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .models import DailySpendingConfirmation
+        from datetime import datetime
+        
+        date_str = request.data.get('date')
+        is_no_spending = request.data.get('is_no_spending', True)
+        
+        if not date_str:
+            return Response({"error": "date is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 해당 날짜에 지출 내역이 있는지 확인
+        has_transactions = Transaction.objects.filter(
+            user=request.user,
+            date__date=target_date
+        ).exists()
+        
+        if has_transactions:
+            return Response({"error": "이 날짜에 지출 내역이 있습니다."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 무지출 확인 생성 또는 업데이트
+        confirmation, created = DailySpendingConfirmation.objects.update_or_create(
+            user=request.user,
+            date=target_date,
+            defaults={'is_no_spending': is_no_spending}
+        )
+        
+        return Response({
+            "message": "무지출 확인 완료",
+            "date": date_str,
+            "is_no_spending": is_no_spending
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def get(self, request):
+        from .models import DailySpendingConfirmation
+        
+        year = request.query_params.get('year')
+        month = request.query_params.get('month')
+        today = timezone.localdate()
+        target_year = int(year) if year else today.year
+        target_month = int(month) if month else today.month
+        
+        confirmations = DailySpendingConfirmation.objects.filter(
+            user=request.user,
+            date__year=target_year,
+            date__month=target_month,
+            is_no_spending=True
+        ).values_list('date', flat=True)
+        
+        return Response({
+            "confirmed_dates": [d.strftime('%Y-%m-%d') for d in confirmations]
+        })

@@ -63,3 +63,24 @@ class DailyBudgetSnapshot(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.date}: {self.daily_budget}원"
+
+
+class DailySpendingConfirmation(models.Model):
+    """
+    무지출 확인 모델
+    - 지출 내역이 없는 날에 대해 사용자가 무지출임을 확인한 경우 저장
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='spending_confirmations'
+    )
+    date = models.DateField()  # 확인한 날짜
+    is_no_spending = models.BooleanField(default=True)  # 무지출 여부
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'date')
+
+    def __str__(self):
+        return f"{self.user} - {self.date}: 무지출 확인"
