@@ -31,11 +31,15 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
             setIsFixedExpense(transaction.is_fixed || false);
 
             // Date handling: extract YYYY-MM-DD
+            // 타임존 문제를 피하기 위해 YYYY-MM-DD 문자열을 직접 파싱
             if (transaction.date) {
-                const d = new Date(transaction.date);
+                // transaction.date가 'YYYY-MM-DD' 또는 'YYYY-MM-DDTHH:mm:ss' 형식일 수 있음
+                const dateStr = transaction.date.split('T')[0]; // YYYY-MM-DD 부분만 추출
+                const [year, month, day] = dateStr.split('-').map(Number);
+                // 로컬 타임존으로 Date 객체 생성 (월은 0부터 시작)
+                const d = new Date(year, month - 1, day);
                 setDateObj(d);
-                const isoDate = d.toISOString().split('T')[0];
-                setDate(isoDate);
+                setDate(dateStr);
             } else {
                 setDateObj(new Date());
                 setDate('');
