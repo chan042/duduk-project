@@ -109,10 +109,10 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick }) 
                     style={styles.startButton}
                     onClick={(e) => {
                         e.stopPropagation();
-                        onStart?.(challenge);
+                        onClick?.(challenge);
                     }}
                 >
-                    시작
+                    시작하기
                 </button>
             )}
 

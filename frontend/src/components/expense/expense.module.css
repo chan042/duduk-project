@@ -77,6 +77,15 @@
   font-weight: 600;
 }
 
+.dailyBudgetLabel {
+  color: var(--text-guide);
+}
+
+.dailyBudgetAmount {
+  font-weight: 600;
+  color: var(--primary);
+}
+
 /* View Toggle */
 .toggleContainer {
   display: inline-flex;

@@ -178,6 +178,7 @@ export default function ExpenseContainer() {
                 </div>
                 <div className={styles.headerSummary}>
                     <div><span className={styles.totalLabel}>지출</span> <span className={styles.totalAmount}>{monthlyStats.totalSpent.toLocaleString()}원</span></div>
+                    <div><span className={styles.dailyBudgetLabel}>일일 권장 예산</span> <span className={styles.dailyBudgetAmount}>{dailyBudget.toLocaleString()}원</span></div>
                 </div>
             </header>
 

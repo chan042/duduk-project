@@ -41,8 +41,8 @@ class ChallengeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Challenge
         fields = [
-            'id', 'type', 'type_display', 'name', 'icon', 'icon_color',
-            'points', 'difficulty', 'difficulty_display', 
+            'id', 'type', 'type_display', 'name', 'description', 'icon', 'icon_color',
+            'points', 'difficulty', 'difficulty_display', 'duration_days',
             'keyword', 'keyword_display'
         ]
 
