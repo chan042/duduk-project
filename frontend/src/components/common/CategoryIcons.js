@@ -43,6 +43,7 @@ export const CATEGORIES = [
     '기타'
 ];
 
+
 // 카테고리별 아이콘 컴포넌트 매핑
 const CATEGORY_ICON_MAP = {
     '식비': Utensils,
@@ -63,6 +64,19 @@ const CATEGORY_ICON_MAP = {
     '경조/선물': Gift,
     '술/유흥': Wine,
     '기타': HelpCircle
+};
+
+// 구버전 카테고리 -> 신버전 카테고리 매핑
+const LEGACY_CATEGORY_MAP = {
+    '쇼핑': '패션/쇼핑',
+    '여가': '문화/여가',
+    '주거': '주거/통신',
+    '통신': '주거/통신',
+    '의료': '의료/건강',
+    '교육': '교육/학습',
+    '육아': '자녀/육아',
+    '여행': '여행/숙박',
+    '미용': '뷰티/미용'
 };
 
 // 카테고리별 색상 매핑
@@ -104,14 +118,27 @@ export function getCategoryIconComponent(category) {
  * @returns {JSX.Element} 아이콘 JSX
  */
 export function getCategoryIcon(category, size = 16, color = null) {
-    const IconComponent = getCategoryIconComponent(category);
-    const iconColor = color || CATEGORY_COLORS[category] || '#94a3b8';
+    const normalizedCategory = normalizeCategory(category);
+    const IconComponent = getCategoryIconComponent(normalizedCategory);
+    const iconColor = color || CATEGORY_COLORS[normalizedCategory] || '#94a3b8';
     return <IconComponent size={size} color={iconColor} />;
+}
+
+/**
+ * 카테고리 이름 정규화 (구버전 -> 신버전)
+ * @param {string} category 
+ * @returns {string} Normalized category name
+ */
+export function normalizeCategory(category) {
+    if (!category) return '기타';
+    if (CATEGORIES.includes(category)) return category;
+    return LEGACY_CATEGORY_MAP[category] || '기타';
 }
 
 export default {
     CATEGORIES,
     CATEGORY_COLORS,
     getCategoryIcon,
-    getCategoryIconComponent
+    getCategoryIconComponent,
+    normalizeCategory
 };

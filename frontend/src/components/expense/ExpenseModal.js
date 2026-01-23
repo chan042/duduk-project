@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, Trash2 } from 'lucide-react';
 import styles from './expense.module.css';
 import CalculatorInput from '../common/CalculatorInput';
 import DateWheelPicker from '../common/DateWheelPicker';
@@ -190,18 +190,19 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
 
                     <div className={styles.modalActions}>
                         <button
-                            className={`${styles.btn} ${styles.btnSecondary}`}
-                            onClick={handleUpdate}
+                            className={styles.btnIcon}
+                            onClick={handleDelete}
                             disabled={isLoading}
+                            aria-label="삭제"
                         >
-                            {isLoading ? '저장 중...' : '수정'}
+                            <Trash2 size={24} />
                         </button>
                         <button
                             className={`${styles.btn} ${styles.btnPrimary}`}
-                            onClick={handleDelete}
+                            onClick={handleUpdate}
                             disabled={isLoading}
                         >
-                            {isLoading ? '삭제 중...' : '삭제'}
+                            {isLoading ? '저장 중...' : '저장'}
                         </button>
                     </div>
                 </div>

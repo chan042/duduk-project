@@ -1,27 +1,88 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
 
+const ITEM_HEIGHT = 40; // 아이템 높이
+
 /**
- * 휠 스타일 날짜 선택 컴포넌트
- * @param {boolean} isOpen - 모달 열림 상태
- * @param {function} onClose - 닫기 핸들러
- * @param {Date} initialDate - 초기 날짜
- * @param {function} onConfirm - 확인 시 콜백 (Date 객체 전달)
+ * 개별 휠 컬럼 컴포넌트
  */
+const WheelColumn = ({ items, value, onChange, suffix }) => {
+    const listRef = useRef(null);
+    const isDragging = useRef(false);
+
+    // 초기 스크롤 위치 설정 및 외부 값 변경 시 동기화
+    useEffect(() => {
+        if (listRef.current) {
+            const selectedIndex = items.indexOf(value);
+            if (selectedIndex !== -1) {
+                // 부드러운 스크롤 없이 즉시 이동 (초기 로드 시 깜빡임 방지)
+                listRef.current.scrollTo({
+                    top: selectedIndex * ITEM_HEIGHT,
+                    behavior: 'auto'
+                });
+            }
+        }
+    }, [items, value]);
+
+    // 스크롤 핸들러 (디바운싱 적용 가능하지만, 실시간 반응성을 위해 직접 계산)
+    const handleScroll = useCallback((e) => {
+        if (!listRef.current) return;
+
+        const scrollTop = listRef.current.scrollTop;
+        const index = Math.round(scrollTop / ITEM_HEIGHT);
+
+        // 범위 체크
+        if (index >= 0 && index < items.length) {
+            const newValue = items[index];
+            if (newValue !== value) {
+                // 스크롤 중에는 값만 업데이트하고 스크롤 위치는 강제하지 않음
+                onChange(newValue);
+            }
+        }
+    }, [items, value, onChange]);
+
+    return (
+        <div style={styles.wheelColumnWrapper}>
+            <ul
+                ref={listRef}
+                style={styles.wheelList}
+                onScroll={handleScroll}
+            >
+                {/* 상단 여백 (중앙 정렬을 위해) */}
+                <li style={{ height: ITEM_HEIGHT * 2, flexShrink: 0 }} />
+
+                {items.map((item) => (
+                    <li
+                        key={item}
+                        style={{
+                            ...styles.wheelItem,
+                            color: item === value ? '#1a1a1a' : '#c7c7c7',
+                            fontWeight: item === value ? '600' : '400',
+                            opacity: item === value ? 1 : 0.5,
+                            transform: item === value ? 'scale(1.1)' : 'scale(1)',
+                        }}
+                    >
+                        {item}{suffix}
+                    </li>
+                ))}
+
+                {/* 하단 여백 */}
+                <li style={{ height: ITEM_HEIGHT * 2, flexShrink: 0 }} />
+            </ul>
+        </div>
+    );
+};
+
 export default function DateWheelPicker({ isOpen, onClose, initialDate = new Date(), onConfirm }) {
     const currentYear = new Date().getFullYear();
     const [selectedYear, setSelectedYear] = useState(initialDate.getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(initialDate.getMonth() + 1);
     const [selectedDay, setSelectedDay] = useState(initialDate.getDate());
 
-    const yearRef = useRef(null);
-    const monthRef = useRef(null);
-    const dayRef = useRef(null);
-
-    // 연도 범위: 현재년도 -5 ~ +5
-    const years = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
+    // 연도 범위: 현재년도 -10 ~ +10
+    const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i);
     const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
     // 해당 월의 일수 계산
@@ -34,6 +95,7 @@ export default function DateWheelPicker({ isOpen, onClose, initialDate = new Dat
         (_, i) => i + 1
     );
 
+    // 모달 열릴 때 초기값 세팅
     useEffect(() => {
         if (isOpen && initialDate) {
             setSelectedYear(initialDate.getFullYear());
@@ -42,7 +104,7 @@ export default function DateWheelPicker({ isOpen, onClose, initialDate = new Dat
         }
     }, [isOpen, initialDate]);
 
-    // 월 변경 시 일수 조정
+    // 월/년 변경 시 일이 범위를 벗어나면 조정
     useEffect(() => {
         const maxDays = getDaysInMonth(selectedYear, selectedMonth);
         if (selectedDay > maxDays) {
@@ -56,64 +118,6 @@ export default function DateWheelPicker({ isOpen, onClose, initialDate = new Dat
         const newDate = new Date(selectedYear, selectedMonth - 1, selectedDay);
         onConfirm(newDate);
         onClose();
-    };
-
-    const handleWheel = (e, type) => {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? 1 : -1;
-
-        if (type === 'year') {
-            const newIndex = years.indexOf(selectedYear) + delta;
-            if (newIndex >= 0 && newIndex < years.length) {
-                setSelectedYear(years[newIndex]);
-            }
-        } else if (type === 'month') {
-            const newMonth = selectedMonth + delta;
-            if (newMonth >= 1 && newMonth <= 12) {
-                setSelectedMonth(newMonth);
-            }
-        } else if (type === 'day') {
-            const maxDays = getDaysInMonth(selectedYear, selectedMonth);
-            const newDay = selectedDay + delta;
-            if (newDay >= 1 && newDay <= maxDays) {
-                setSelectedDay(newDay);
-            }
-        }
-    };
-
-    const renderWheel = (items, selected, onSelect, type, suffix) => {
-        const selectedIndex = items.indexOf(selected);
-        // 표시할 아이템: 선택된 것 기준 앞뒤 2개씩
-        const visibleItems = [];
-        for (let i = -2; i <= 2; i++) {
-            const idx = selectedIndex + i;
-            if (idx >= 0 && idx < items.length) {
-                visibleItems.push({ value: items[idx], offset: i });
-            } else {
-                visibleItems.push({ value: null, offset: i });
-            }
-        }
-
-        return (
-            <div
-                style={styles.wheelColumn}
-                onWheel={(e) => handleWheel(e, type)}
-            >
-                {visibleItems.map(({ value, offset }, i) => (
-                    <div
-                        key={i}
-                        style={{
-                            ...styles.wheelItem,
-                            ...(offset === 0 ? styles.selectedItem : styles.unselectedItem),
-                            opacity: value === null ? 0 : 1,
-                        }}
-                        onClick={() => value !== null && onSelect(value)}
-                    >
-                        {value !== null ? `${value}${suffix}` : ''}
-                    </div>
-                ))}
-            </div>
-        );
     };
 
     return (
@@ -133,9 +137,24 @@ export default function DateWheelPicker({ isOpen, onClose, initialDate = new Dat
                     <div style={styles.selectionHighlight}></div>
 
                     <div style={styles.wheelsRow}>
-                        {renderWheel(years, selectedYear, setSelectedYear, 'year', '년')}
-                        {renderWheel(months, selectedMonth, setSelectedMonth, 'month', '월')}
-                        {renderWheel(days, selectedDay, setSelectedDay, 'day', '일')}
+                        <WheelColumn
+                            items={years}
+                            value={selectedYear}
+                            onChange={setSelectedYear}
+                            suffix="년"
+                        />
+                        <WheelColumn
+                            items={months}
+                            value={selectedMonth}
+                            onChange={setSelectedMonth}
+                            suffix="월"
+                        />
+                        <WheelColumn
+                            items={days}
+                            value={selectedDay}
+                            onChange={setSelectedDay}
+                            suffix="일"
+                        />
                     </div>
                 </div>
 
@@ -144,6 +163,22 @@ export default function DateWheelPicker({ isOpen, onClose, initialDate = new Dat
                     확인
                 </button>
             </div>
+
+            {/* 휠 스크롤바 숨김 처리 및 스크롤 스냅 스타일 */}
+            <style jsx global>{`
+                ul {
+                    list-style: none;
+                    margin: 0;
+                    padding: 0;
+                }
+                .hide-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+                .hide-scrollbar {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
         </div>
     );
 }
@@ -165,21 +200,22 @@ const styles = {
         backgroundColor: 'white',
         borderTopLeftRadius: '24px',
         borderTopRightRadius: '24px',
-        padding: '20px',
+        padding: '24px',
         width: '100%',
         maxWidth: '430px',
         animation: 'slideUp 0.3s ease-out',
+        paddingBottom: '40px',
     },
     header: {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '24px',
+        marginBottom: '20px',
     },
     title: {
-        fontSize: '1.125rem',
-        fontWeight: '600',
-        color: '#1a1a1a',
+        fontSize: '18px',
+        fontWeight: '700',
+        color: '#111',
     },
     closeBtn: {
         background: 'transparent',
@@ -192,62 +228,70 @@ const styles = {
     },
     pickerContainer: {
         position: 'relative',
-        height: '200px',
-        marginBottom: '24px',
+        height: '200px', // 5 items * 40px
+        marginBottom: '30px',
         overflow: 'hidden',
+        display: 'flex',
+        justifyContent: 'center',
     },
     selectionHighlight: {
         position: 'absolute',
         top: '50%',
-        left: '10%',
-        right: '10%',
-        height: '44px',
+        left: '0',
+        right: '0',
+        height: '40px',
         transform: 'translateY(-50%)',
-        backgroundColor: '#f0f0f0',
-        borderRadius: '12px',
+        backgroundColor: '#f5f7f9',
+        borderRadius: '8px',
         zIndex: 0,
+        pointerEvents: 'none',
     },
     wheelsRow: {
         display: 'flex',
-        justifyContent: 'center',
-        gap: '8px',
+        justifyContent: 'space-between',
+        width: '100%',
         height: '100%',
         position: 'relative',
         zIndex: 1,
+        padding: '0 10px',
     },
-    wheelColumn: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
+    wheelColumnWrapper: {
         flex: 1,
-        cursor: 'ns-resize',
-        userSelect: 'none',
+        height: '100%',
+        position: 'relative',
+        overflow: 'hidden',
+    },
+    wheelList: {
+        height: '100%',
+        overflowY: 'auto',
+        scrollSnapType: 'y mandatory',
+        scrollbarWidth: 'none', // Firefox
+        msOverflowStyle: 'none', // IE/Edge
+        '::-webkit-scrollbar': { // Chrome/Safari
+            display: 'none'
+        }
     },
     wheelItem: {
-        padding: '8px 16px',
-        textAlign: 'center',
-        transition: 'all 0.2s ease',
-    },
-    selectedItem: {
-        fontSize: '1.25rem',
-        fontWeight: '700',
-        color: '#1a1a1a',
-    },
-    unselectedItem: {
-        fontSize: '1rem',
-        fontWeight: '400',
-        color: '#999',
+        height: '40px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        scrollSnapAlign: 'center',
+        fontSize: '16px',
+        transition: 'all 0.2s',
+        cursor: 'pointer',
+        userSelect: 'none',
     },
     confirmBtn: {
         width: '100%',
-        backgroundColor: '#14b8a6',
+        backgroundColor: '#57C0A1',
         color: 'white',
         border: 'none',
         borderRadius: '12px',
         padding: '16px',
-        fontSize: '1rem',
-        fontWeight: '600',
+        fontSize: '16px',
+        fontWeight: '700',
         cursor: 'pointer',
+        transition: 'background-color 0.2s',
     },
 };

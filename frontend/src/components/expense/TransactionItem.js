@@ -1,16 +1,6 @@
 import React from 'react';
-import { Utensils, Coffee, ShoppingBag, Bus, AlertCircle } from 'lucide-react';
+import { getCategoryIconComponent, normalizeCategory, CATEGORY_COLORS } from '@/components/common/CategoryIcons';
 import styles from './expense.module.css';
-
-const getIcon = (category) => {
-    switch (category) {
-        case '식비': return <Utensils size={20} />;
-        case '카페': return <Coffee size={20} />;
-        case '쇼핑': return <ShoppingBag size={20} />;
-        case '교통': return <Bus size={20} />;
-        default: return <AlertCircle size={20} />;
-    }
-};
 
 const truncateMemo = (memo, maxLength = 8) => {
     if (!memo) return '';
@@ -21,6 +11,10 @@ const truncateMemo = (memo, maxLength = 8) => {
 export default function TransactionItem({ transaction, onClick, isLast }) {
     const displayMemo = transaction.memo || '';
 
+    const normalizedCategory = normalizeCategory(transaction.category);
+    const IconComponent = getCategoryIconComponent(normalizedCategory);
+    const iconColor = CATEGORY_COLORS[normalizedCategory] || '#94a3b8';
+
     return (
         <div
             className={`${styles.transactionRow} ${isLast ? '' : styles.transactionRowBorder}`}
@@ -28,7 +22,7 @@ export default function TransactionItem({ transaction, onClick, isLast }) {
         >
             <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                 <div className={styles.transactionIcon}>
-                    {getIcon(transaction.category)}
+                    <IconComponent size={20} color={iconColor} />
                 </div>
                 <div className={styles.transactionInfo}>
                     <span className={styles.merchantName}>{transaction.merchant}</span>

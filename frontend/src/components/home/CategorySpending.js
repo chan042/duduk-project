@@ -2,23 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { getCategoryStats } from '@/lib/api/transaction';
+import { CATEGORY_COLORS, normalizeCategory } from '@/components/common/CategoryIcons';
 
-// 카테고리별 색상 매핑
-const CATEGORY_COLORS = {
-    '식비': '#14b8a6',
-    '쇼핑': '#f59e0b',
-    '교통': '#8b5cf6',
-    '여가': '#ec4899',
-    '주거': '#3b82f6',
-    '의료': '#ef4444',
-    '교육': '#10b981',
-    '통신': '#6366f1',
-    '생활': '#06b6d4',
-    '기타': '#9ca3af',
-};
-
-// 기본 색상 팔레트 (카테고리가 많을 경우 사용)
-const DEFAULT_COLORS = [
+// 기본 색상 팔레트 (카테고리 매핑 실패시 사용)
+const FALLBACK_COLORS = [
     '#14b8a6', '#f59e0b', '#8b5cf6', '#ec4899',
     '#3b82f6', '#ef4444', '#10b981', '#6366f1',
     '#f97316', '#06b6d4', '#84cc16', '#d946ef'
@@ -40,14 +27,19 @@ export default function CategorySpending() {
             setLoading(true);
             setError(null);
             const response = await getCategoryStats();
+            console.log('API Response Categories:', response.categories.map(c => c.category)); // Debugging log
 
             // 카테고리별 색상 지정
-            const categoriesWithColors = response.categories.map((cat, index) => ({
-                name: cat.category,
-                amount: cat.amount,
-                percent: cat.percent,
-                color: CATEGORY_COLORS[cat.category] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]
-            }));
+            const categoriesWithColors = response.categories.map((cat, index) => {
+                const normalizedName = normalizeCategory(cat.category);
+                return {
+                    name: normalizedName,
+                    originalName: cat.category, // Keep original for reference if needed
+                    amount: cat.amount,
+                    percent: cat.percent,
+                    color: CATEGORY_COLORS[normalizedName] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]
+                };
+            });
 
             setData(categoriesWithColors);
             setTotal(response.total);

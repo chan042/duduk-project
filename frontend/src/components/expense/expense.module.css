@@ -517,6 +517,27 @@
   color: white;
 }
 
+.btnIcon {
+  flex: 0 0 auto;
+  width: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background-color: white;
+  color: #718096;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnIcon:hover {
+  background-color: #fff5f5;
+  color: #c53030;
+  border-color: #c53030;
+}
+
 .calendarHeaderTitle {
   text-align: center;
   font-size: 1.125rem;
