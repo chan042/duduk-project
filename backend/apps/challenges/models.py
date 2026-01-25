@@ -18,7 +18,7 @@ class Challenge(models.Model):
     SOURCE_CHOICES = [
         ('DUDUK', '두둑 챌린지'),
         ('EVENT', '이벤트 챌린지'),
-        ('AI', 'AI 맞춤 챌린지'),
+        ('USER', '사용자 챌린지'),
     ]
     
     KEYWORD_CHOICES = [
@@ -46,20 +46,13 @@ class Challenge(models.Model):
     event_start = models.DateTimeField(null=True, blank=True)
     event_end = models.DateTimeField(null=True, blank=True)
     
-    # AI 맞춤 챌린지용 (source='AI'일 때만 사용)
+    # 사용자 챌린지용 (source='USER'일 때만 사용)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
         on_delete=models.CASCADE,
-        related_name='ai_challenges'
-    )
-    coaching = models.ForeignKey(
-        'coaching.Coaching',
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
-        related_name='generated_challenges'
+        related_name='custom_challenges'
     )
     
     is_active = models.BooleanField(default=True)  # 챌린지 활성화 여부
@@ -80,9 +73,9 @@ class Challenge(models.Model):
         return self.source in ['DUDUK', 'EVENT']
     
     @property
-    def is_ai_generated(self):
-        """AI가 생성한 개인화 챌린지인지"""
-        return self.source == 'AI'
+    def is_user_created(self):
+        """사용자가 생성한 개인화 챌린지인지"""
+        return self.source == 'USER'
 
     @property
     def is_event_active(self):

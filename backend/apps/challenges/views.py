@@ -11,7 +11,7 @@ from .models import Challenge, UserChallenge
 from .serializers import (
     ChallengeSerializer, ChallengeListSerializer,
     UserChallengeSerializer, UserChallengeCreateSerializer,
-    UserPointsSerializer
+    UserPointsSerializer, UserCreatedChallengeSerializer
 )
 from apps.transactions.models import Transaction
 
@@ -46,10 +46,10 @@ class ChallengeViewSet(viewsets.ReadOnlyModelViewSet):
                 event_start__lte=now,
                 event_end__gte=now
             )
-        elif tab == 'ai':
-            # AI 맞춤 챌린지
+        elif tab == 'user':
+            # 사용자 챌린지
             queryset = queryset.filter(
-                source='AI',
+                source='USER',
                 user=self.request.user
             )
         
@@ -85,6 +85,18 @@ class ChallengeViewSet(viewsets.ReadOnlyModelViewSet):
         
         serializer = UserChallengeSerializer(user_challenge)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'])
+    def create_user_challenge(self, request):
+        """사용자가 직접 챌린지 생성"""
+        serializer = UserCreatedChallengeSerializer(data=request.data)
+        if serializer.is_valid():
+            challenge = serializer.save(user=request.user)
+            return Response(
+                ChallengeSerializer(challenge).data, 
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserChallengeViewSet(viewsets.ModelViewSet):

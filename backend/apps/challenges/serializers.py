@@ -10,9 +10,8 @@ class ChallengeSerializer(serializers.ModelSerializer):
     keyword_display = serializers.CharField(source='get_keyword_display', read_only=True)
     remaining_event_time = serializers.SerializerMethodField()
     is_event_active = serializers.BooleanField(read_only=True)
-    coaching_title = serializers.CharField(source='coaching.title', read_only=True, allow_null=True)
     is_template = serializers.BooleanField(read_only=True)
-    is_ai_generated = serializers.BooleanField(read_only=True)
+    is_user_created = serializers.BooleanField(read_only=True)
     
     class Meta:
         model = Challenge
@@ -21,8 +20,8 @@ class ChallengeSerializer(serializers.ModelSerializer):
             'icon', 'icon_color', 'points', 'difficulty', 'difficulty_display',
             'keyword', 'keyword_display', 'duration_days', 'target_amount', 
             'target_category', 'event_start', 'event_end', 
-            'remaining_event_time', 'is_event_active', 'is_template', 'is_ai_generated',
-            'user', 'coaching', 'coaching_title', 'is_active', 'created_at'
+            'remaining_event_time', 'is_event_active', 'is_template', 'is_user_created',
+            'user', 'is_active', 'created_at'
         ]
 
     def get_remaining_event_time(self, obj):
@@ -42,14 +41,14 @@ class ChallengeListSerializer(serializers.ModelSerializer):
     difficulty_display = serializers.CharField(source='get_difficulty_display', read_only=True)
     keyword_display = serializers.CharField(source='get_keyword_display', read_only=True)
     is_template = serializers.BooleanField(read_only=True)
-    is_ai_generated = serializers.BooleanField(read_only=True)
+    is_user_created = serializers.BooleanField(read_only=True)
     
     class Meta:
         model = Challenge
         fields = [
             'id', 'source', 'source_display', 'name', 'description', 'icon', 'icon_color',
             'points', 'difficulty', 'difficulty_display', 'duration_days',
-            'keyword', 'keyword_display', 'is_template', 'is_ai_generated'
+            'keyword', 'keyword_display', 'is_template', 'is_user_created'
         ]
 
 
@@ -102,3 +101,16 @@ class UserPointsSerializer(serializers.Serializer):
     points = serializers.IntegerField()
     total_points_earned = serializers.IntegerField()
     total_points_used = serializers.IntegerField()
+
+
+class UserCreatedChallengeSerializer(serializers.ModelSerializer):
+    """사용자가 직접 챌린지 생성용 직렬화"""
+    class Meta:
+        model = Challenge
+        fields = ['name', 'description', 'icon', 'icon_color', 
+                  'duration_days', 'target_amount', 'target_category']
+    
+    def create(self, validated_data):
+        validated_data['source'] = 'USER'
+        validated_data['points'] = 50  # 사용자 챌린지 기본 포인트
+        return super().create(validated_data)

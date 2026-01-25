@@ -35,8 +35,7 @@ const transformChallenge = (challenge) => ({
     difficulty: challenge.difficulty_display,
     duration: challenge.duration_days ? `${challenge.duration_days}일` : '진행중',
     category: challenge.keyword ? challenge.keyword.toLowerCase() : 'all',
-    // AI 챌린지용
-    aiReason: challenge.coaching_title ? `${challenge.coaching_title} 분석 기반` : null,
+    isUserCreated: challenge.is_user_created || false,
 });
 
 /**
@@ -99,18 +98,16 @@ export const getMyChallenges = async (status = null) => {
 };
 
 /**
- * AI 맞춤 챌린지 목록 조회
+ * 사용자 챌린지 목록 조회
  */
-export const getAIChallenges = async () => {
+export const getUserChallenges = async () => {
     try {
-        const response = await client.get('/api/challenges/ai/');
-        // response.data가 배열인지 확인
+        const response = await client.get('/api/challenges/list/?tab=user');
         const data = Array.isArray(response.data) ? response.data : [];
         const sorted = sortByDifficulty(data);
         return sorted.map(transformChallenge);
     } catch (error) {
-        console.error('Get AI Challenges Error:', error);
-        // AI 챌린지가 없는 경우 빈 배열 반환
+        console.error('Get User Challenges Error:', error);
         return [];
     }
 };
@@ -125,20 +122,6 @@ export const startChallenge = async (id) => {
         return response.data;
     } catch (error) {
         console.error('Start Challenge Error:', error);
-        throw error;
-    }
-};
-
-/**
- * AI 챌린지 시작
- * @param {number} id - AI 챌린지 ID
- */
-export const startAIChallenge = async (id) => {
-    try {
-        const response = await client.post(`/api/challenges/ai/${id}/start/`);
-        return response.data;
-    } catch (error) {
-        console.error('Start AI Challenge Error:', error);
         throw error;
     }
 };
@@ -166,6 +149,20 @@ export const getUserPoints = async () => {
         return response.data;
     } catch (error) {
         console.error('Get User Points Error:', error);
+        throw error;
+    }
+};
+
+/**
+ * 사용자 챌린지 생성
+ * @param {Object} challengeData - 챌린지 데이터 (name, description, duration_days, target_amount, target_category)
+ */
+export const createUserChallenge = async (challengeData) => {
+    try {
+        const response = await client.post('/api/challenges/list/create_user_challenge/', challengeData);
+        return response.data;
+    } catch (error) {
+        console.error('Create User Challenge Error:', error);
         throw error;
     }
 };
