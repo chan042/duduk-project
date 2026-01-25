@@ -86,8 +86,12 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
 
     const handleDateConfirm = (newDate) => {
         setDateObj(newDate);
-        const isoDate = newDate.toISOString().split('T')[0];
-        setDate(isoDate);
+        // 로컬 타임존을 유지하면서 YYYY-MM-DD 형식으로 변환
+        const year = newDate.getFullYear();
+        const month = String(newDate.getMonth() + 1).padStart(2, '0');
+        const day = String(newDate.getDate()).padStart(2, '0');
+        const localDate = `${year}-${month}-${day}`;
+        setDate(localDate);
     };
 
     const formatDateDisplay = () => {
