@@ -7,6 +7,7 @@ import ViewToggle from './ViewToggle';
 import ListView from './ListView';
 import CalendarView from './CalendarView';
 import ExpenseModal from './ExpenseModal';
+import QuickAddPopup from '@/components/home/QuickAddPopup';
 import styles from './expense.module.css';
 import { getTransactionsByMonth, getMonthlyAnalysis, updateTransaction, deleteTransaction, confirmNoSpending } from '@/lib/api/transaction';
 import { getProfile } from '@/lib/api/auth';
@@ -28,6 +29,8 @@ export default function ExpenseContainer() {
 
     const [selectedTransaction, setSelectedTransaction] = useState(null);
     const [selectedDate, setSelectedDate] = useState(null);
+    const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+    const [selectedDateForQuickAdd, setSelectedDateForQuickAdd] = useState(null);
     const [transactions, setTransactions] = useState([]);
     const [dailyStatus, setDailyStatus] = useState({});
     const [loading, setLoading] = useState(true);
@@ -164,6 +167,30 @@ export default function ExpenseContainer() {
         }
     };
 
+    // QuickAdd 팝업 열기 핸들러
+    const handleQuickAddClick = () => {
+        // 선택된 날짜를 별도 상태로 저장
+        if (selectedDate) {
+            const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+            setSelectedDateForQuickAdd(dateStr);
+        }
+        setSelectedDate(null); // BottomSheet 닫기
+        setIsQuickAddOpen(true);
+    };
+
+    // QuickAdd 팝업 닫기 핸들러
+    const handleQuickAddClose = () => {
+        setIsQuickAddOpen(false);
+        setSelectedDateForQuickAdd(null);
+    };
+
+    // QuickAdd에서 거래 추가 후 핸들러
+    const handleTransactionAdded = () => {
+        fetchData(); // 데이터 새로고침
+        setSelectedDate(null); // 선택된 날짜 초기화
+        setSelectedDateForQuickAdd(null); // QuickAdd용 날짜도 초기화
+    };
+
     return (
         <div className={styles.container}>
             <header className={styles.header}>
@@ -208,6 +235,7 @@ export default function ExpenseContainer() {
                     characterType={characterType}
                     dateJoined={dateJoined}
                     onConfirmNoSpending={handleConfirmNoSpending}
+                    onQuickAddClick={handleQuickAddClick}
                 />
             )}
 
@@ -218,6 +246,14 @@ export default function ExpenseContainer() {
                 onUpdate={handleUpdateTransaction}
                 onDelete={handleDeleteTransaction}
             />
+
+            {isQuickAddOpen && (
+                <QuickAddPopup
+                    onClose={handleQuickAddClose}
+                    onTransactionAdded={handleTransactionAdded}
+                    selectedDate={selectedDateForQuickAdd}
+                />
+            )}
         </div>
     );
 }

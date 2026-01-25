@@ -6,7 +6,7 @@ import CalculatorInput from '../common/CalculatorInput';
 import DateWheelPicker from '../common/DateWheelPicker';
 import { getCategoryIcon, CATEGORIES } from '../common/CategoryIcons';
 
-export default function TransactionConfirm({ initialData, onSave }) {
+export default function TransactionConfirm({ initialData, onSave, selectedDate }) {
     const [isRecurring, setIsRecurring] = useState(true);
 
     // Form State
@@ -14,7 +14,10 @@ export default function TransactionConfirm({ initialData, onSave }) {
     const [category, setCategory] = useState(initialData?.category || '기타');
     const [item, setItem] = useState(initialData?.item || '');
     const [store, setStore] = useState(initialData?.store || '');
-    const [rawDate, setRawDate] = useState(initialData?.date ? new Date(initialData.date) : new Date());
+    // selectedDate가 있으면 그것을 우선 사용, 없으면 initialData의 date, 그것도 없으면 오늘 날짜
+    const [rawDate, setRawDate] = useState(
+        selectedDate ? new Date(selectedDate) : (initialData?.date ? new Date(initialData.date) : new Date())
+    );
 
     // Modal States
     const [showCalculator, setShowCalculator] = useState(false);
@@ -28,10 +31,12 @@ export default function TransactionConfirm({ initialData, onSave }) {
             setCategory(initialData.category || '기타');
             setItem(initialData.item || '');
             setStore(initialData.store || '');
-            // 날짜 처리: 문자열이 오면 Date 객체로 변환
-            setRawDate(initialData.date ? new Date(initialData.date) : new Date());
+            // 날짜 처리: selectedDate가 있으면 우선, 없으면 initialData의 date 사용
+            setRawDate(
+                selectedDate ? new Date(selectedDate) : (initialData.date ? new Date(initialData.date) : new Date())
+            );
         }
-    }, [initialData]);
+    }, [initialData, selectedDate]);
 
     const dateDisplay = rawDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
 

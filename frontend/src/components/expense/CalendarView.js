@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Plus } from 'lucide-react';
 import Image from 'next/image';
 import TransactionItem from './TransactionItem';
 import styles from './expense.module.css';
@@ -17,7 +17,8 @@ export default function CalendarView({
     dailyBudget = 0,
     characterType = 'char_cat',
     dateJoined = null,
-    onConfirmNoSpending = null // 무지출 확인 콜백 함수
+    onConfirmNoSpending = null, // 무지출 확인 콜백 함수
+    onQuickAddClick = null // QuickAdd 팝업 열기 콜백 함수
 }) {
     // 해당 월의 일수 계산
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
@@ -256,6 +257,17 @@ export default function CalendarView({
                             </div>
                         )}
                     </div>
+
+                    {/* QuickAdd 버튼 */}
+                    {onQuickAddClick && (
+                        <button
+                            className={styles.quickAddButton}
+                            onClick={onQuickAddClick}
+                        >
+                            <span className={styles.quickAddIcon}>+</span>
+                            <span>지출 추가하기</span>
+                        </button>
+                    )}
                 </div>
             </BottomSheet>
         </div>

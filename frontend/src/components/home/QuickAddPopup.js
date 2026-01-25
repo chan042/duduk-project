@@ -8,7 +8,7 @@ import ImageMatching from './ImageMatching';
 import TransactionConfirm from './TransactionConfirm';
 import { parseTransaction, createTransaction } from '../../lib/api/transaction';
 
-export default function QuickAddPopup({ onClose, onTransactionAdded }) {
+export default function QuickAddPopup({ onClose, onTransactionAdded, selectedDate }) {
     const [step, setStep] = useState('input'); // 'input' | 'confirm'
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -135,7 +135,7 @@ export default function QuickAddPopup({ onClose, onTransactionAdded }) {
                         </button>
                     </>
                 ) : (
-                    <TransactionConfirm initialData={parsedData} onSave={handleSave} />
+                    <TransactionConfirm initialData={parsedData} onSave={handleSave} selectedDate={selectedDate} />
                 )}
 
                 <style jsx global>{`
