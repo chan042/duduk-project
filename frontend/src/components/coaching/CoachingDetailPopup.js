@@ -90,12 +90,23 @@ export default function CoachingDetailPopup({ isOpen, onClose, data }) {
                         </span>
                     </div>
 
+                    {/* Main Content */}
+                    <p style={{
+                        fontSize: '1rem',
+                        color: '#2d3748',
+                        lineHeight: '1.6',
+                        marginBottom: '1.5rem',
+                        whiteSpace: 'pre-wrap'
+                    }}>
+                        {data.description}
+                    </p>
+
                     {/* Analysis Box */}
                     <div style={{
                         backgroundColor: '#fffbeb', // Light yellow bg
                         padding: '1.25rem',
                         borderRadius: '12px',
-                        marginBottom: '1.5rem'
+                        marginBottom: '2rem'
                     }}>
                         <h4 style={{
                             fontSize: '0.9rem',
@@ -113,17 +124,6 @@ export default function CoachingDetailPopup({ isOpen, onClose, data }) {
                             {data.analysis}
                         </p>
                     </div>
-
-                    {/* Main Content */}
-                    <p style={{
-                        fontSize: '1rem',
-                        color: '#2d3748',
-                        lineHeight: '1.6',
-                        marginBottom: '2rem',
-                        whiteSpace: 'pre-wrap'
-                    }}>
-                        {data.description}
-                    </p>
 
                     {/* Button */}
                     <button style={{

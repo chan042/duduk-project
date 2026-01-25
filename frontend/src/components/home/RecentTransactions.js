@@ -61,60 +61,63 @@ export default function RecentTransactions() {
                         아직 지출 내역이 없습니다.
                     </div>
                 ) : (
-                    transactions.map((t) => {
-                        const normalizedCategory = normalizeCategory(t.category);
-                        const Icon = getCategoryIconComponent(normalizedCategory);
-                        // Using fixed teal color for RecentTransactions design consistency, or use specific color if desired by user.
-                        // User requirement: "Same category is displayed with same icon and color"
-                        // But originally this component used a fixed teal theme (bg #ccfbf1, icon #14b8a6).
-                        // If we use CATEGORY_COLORS, we might break the designated "Recent Items" look.
-                        // However, user explicitly asked for "same icon and color".
-                        // Compromise: Use the correct ICON but keep the teal styling for this specific widget to prevent visual breakage, 
-                        // UNLESS user strictly wants colorful icons here too. 
-                        // Reviewing request: "Same category is displayed with same icon and color in all screens".
-                        // Okay, I will try to respect the color too. But the background circle is hardcoded teal.
-                        // I will set the icon color to the category color. The background will remain teal-ish or I should make it neutral?
-                        // Let's keep the background as is for now and just change the icon color.
-                        const iconColor = CATEGORY_COLORS[normalizedCategory] || '#14b8a6';
+                    transactions
+                        .sort((a, b) => new Date(b.date) - new Date(a.date)) // 최근 날짜 순으로 정렬
+                        .slice(0, 5) // 최근 5개만 선택
+                        .map((t) => {
+                            const normalizedCategory = normalizeCategory(t.category);
+                            const Icon = getCategoryIconComponent(normalizedCategory);
+                            // Using fixed teal color for RecentTransactions design consistency, or use specific color if desired by user.
+                            // User requirement: "Same category is displayed with same icon and color"
+                            // But originally this component used a fixed teal theme (bg #ccfbf1, icon #14b8a6).
+                            // If we use CATEGORY_COLORS, we might break the designated "Recent Items" look.
+                            // However, user explicitly asked for "same icon and color".
+                            // Compromise: Use the correct ICON but keep the teal styling for this specific widget to prevent visual breakage, 
+                            // UNLESS user strictly wants colorful icons here too. 
+                            // Reviewing request: "Same category is displayed with same icon and color in all screens".
+                            // Okay, I will try to respect the color too. But the background circle is hardcoded teal.
+                            // I will set the icon color to the category color. The background will remain teal-ish or I should make it neutral?
+                            // Let's keep the background as is for now and just change the icon color.
+                            const iconColor = CATEGORY_COLORS[normalizedCategory] || '#14b8a6';
 
-                        return (
-                            <div key={t.id} style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                backgroundColor: 'white',
-                                padding: '1.25rem',
-                                borderRadius: 'var(--radius-md)',
-                                boxShadow: 'var(--shadow-sm)',
-                                transition: 'transform 0.1s ease',
-                                cursor: 'pointer'
-                            }}>
-                                <div style={{
-                                    backgroundColor: '#f7f9fa', // Changed to neutral to support colored icons
-                                    padding: '0.85rem',
-                                    borderRadius: '50%',
-                                    marginRight: '1.25rem',
+                            return (
+                                <div key={t.id} style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center'
+                                    backgroundColor: 'white',
+                                    padding: '1.25rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    boxShadow: 'var(--shadow-sm)',
+                                    transition: 'transform 0.1s ease',
+                                    cursor: 'pointer'
                                 }}>
-                                    <Icon size={22} color={iconColor} strokeWidth={2} />
-                                </div>
+                                    <div style={{
+                                        backgroundColor: '#f7f9fa', // Changed to neutral to support colored icons
+                                        padding: '0.85rem',
+                                        borderRadius: '50%',
+                                        marginRight: '1.25rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}>
+                                        <Icon size={22} color={iconColor} strokeWidth={2} />
+                                    </div>
 
-                                <div style={{ flex: 1 }}>
-                                    <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-                                        {t.store || t.item || '알 수 없음'}
-                                    </h3>
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-sub)', fontWeight: '500' }}>
-                                        {formatDate(t.date)} | {t.category}
-                                    </p>
-                                </div>
+                                    <div style={{ flex: 1 }}>
+                                        <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+                                            {t.store || t.item || '알 수 없음'}
+                                        </h3>
+                                        <p style={{ fontSize: '0.85rem', color: 'var(--text-sub)', fontWeight: '500' }}>
+                                            {formatDate(t.date)} | {t.category}
+                                        </p>
+                                    </div>
 
-                                <span style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-main)' }}>
-                                    {t.amount.toLocaleString()}원
-                                </span>
-                            </div>
-                        );
-                    })
+                                    <span style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-main)' }}>
+                                        {t.amount.toLocaleString()}원
+                                    </span>
+                                </div>
+                            );
+                        })
                 )}
             </div>
         </div>
