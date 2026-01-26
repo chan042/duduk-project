@@ -99,9 +99,6 @@ cd duduk-project
 프로젝트 루트 경로에 `.env` 파일을 생성하고 아래 내용을 채워주세요.
 
 
-
-```
-
 ### 3. 프로젝트 실행
 
 Docker Compose를 이용하여 백엔드, 프론트엔드, 데이터베이스를 한 번에 실행합니다.
@@ -115,6 +112,8 @@ docker-compose up --build
 
 * **Frontend**: [http://localhost:3000](https://www.google.com/search?q=http://localhost:3000)
 * **Backend API**: [http://localhost:8000](https://www.google.com/search?q=http://localhost:8000)
+
+<br>
 
 ## 📂 프로젝트 구조 (Project Structure)
 
