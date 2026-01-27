@@ -5,6 +5,7 @@
  * - AuthProvider로 앱 전체를 감싸서 인증 상태를 전역으로 관리합니다.
  */
 import './globals.css'
+import Script from 'next/script'
 import { AuthProvider } from '@/contexts/AuthContext'
 
 export const metadata = {
@@ -16,6 +17,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ko" suppressHydrationWarning>
       <body>
+        <Script
+          src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_JS_KEY}&libraries=services&autoload=false`}
+          strategy="afterInteractive"
+        />
         <AuthProvider>
           {children}
         </AuthProvider>

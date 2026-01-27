@@ -4,6 +4,7 @@ import { Wallet, Edit2, ChevronRight, Search, MapPin, Calendar, Check, ChevronDo
 import { useState, useEffect } from 'react';
 import CalculatorInput from '../common/CalculatorInput';
 import DateWheelPicker from '../common/DateWheelPicker';
+import KakaoLocationPicker from '../common/KakaoLocationPicker';
 import { getCategoryIcon, CATEGORIES } from '../common/CategoryIcons';
 
 export default function TransactionConfirm({ initialData, onSave, selectedDate }) {
@@ -19,10 +20,19 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate }
         selectedDate ? new Date(selectedDate) : (initialData?.date ? new Date(initialData.date) : new Date())
     );
 
+    // Location State
+    const [location, setLocation] = useState({
+        address: initialData?.address || '',
+        placeName: initialData?.store || '',
+        lat: null,
+        lng: null
+    });
+
     // Modal States
     const [showCalculator, setShowCalculator] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
 
     // initialData가 변경되면(AI 분석 완료 시) Form 상태 업데이트
     useEffect(() => {
@@ -35,6 +45,13 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate }
             setRawDate(
                 selectedDate ? new Date(selectedDate) : (initialData.date ? new Date(initialData.date) : new Date())
             );
+            // 위치 정보 초기화
+            setLocation({
+                address: initialData.address || '',
+                placeName: initialData.store || '',
+                lat: null,
+                lng: null
+            });
         }
     }, [initialData, selectedDate]);
 
@@ -133,39 +150,56 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate }
                 {/* Location Search */}
                 <div>
                     <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-main)', marginBottom: '0.5rem' }}>장소 검색</label>
-                    <div style={{
-                        backgroundColor: '#f8f9fa',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '0.85rem 1rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        marginBottom: '0.75rem'
-                    }}>
+                    <div
+                        onClick={() => setShowLocationPicker(true)}
+                        style={{
+                            backgroundColor: '#f8f9fa',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '12px',
+                            padding: '0.85rem 1rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            marginBottom: '0.75rem',
+                            cursor: 'pointer'
+                        }}
+                    >
                         <Search size={18} color="var(--text-sub)" />
-                        <input
-                            type="text"
-                            defaultValue={store ? `${store}` : ''}
-                            style={{ width: '100%', border: 'none', outline: 'none', fontSize: '1rem', color: 'var(--text-main)', background: 'transparent' }}
-                        />
+                        <span style={{
+                            flex: 1,
+                            fontSize: '1rem',
+                            color: location.placeName || location.address ? 'var(--text-main)' : '#a0aec0'
+                        }}>
+                            {location.placeName || location.address || '장소를 검색하세요'}
+                        </span>
+                        <ChevronRight size={18} color="var(--text-sub)" />
                     </div>
 
-                    {/* Map Placeholder */}
-                    <div style={{
-                        width: '100%',
-                        height: '140px',
-                        backgroundColor: '#e2e8f0',
-                        borderRadius: '16px',
-                        overflow: 'hidden',
-                        position: 'relative',
-                        backgroundImage: 'url(https://assets.codepen.io/3/internal/avatars/users/default.png?fit=crop&format=auto&height=512&version=1&width=512)', // Placeholder image or gradient
-                        backgroundSize: 'cover'
-                    }}>
-                        {/* Simple Map Mockup Gradient */}
-                        <div style={{ width: '100%', height: '100%', background: 'linear-gradient(120deg, #e0f2f1 0%, #b2dfdb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {/* Map Preview - 클릭 시 위치 선택 모달 오픈 */}
+                    <div
+                        onClick={() => setShowLocationPicker(true)}
+                        style={{
+                            width: '100%',
+                            height: '140px',
+                            backgroundColor: '#e2e8f0',
+                            borderRadius: '16px',
+                            overflow: 'hidden',
+                            position: 'relative',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <div style={{
+                            width: '100%',
+                            height: '100%',
+                            background: 'linear-gradient(120deg, #e0f2f1 0%, #b2dfdb 100%)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px'
+                        }}>
                             <div style={{ position: 'relative' }}>
-                                <MapPin size={32} color="var(--text-main)" fill="white" />
+                                <MapPin size={32} color="var(--primary)" fill="white" />
                                 <div style={{
                                     position: 'absolute',
                                     bottom: '-4px',
@@ -177,6 +211,21 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate }
                                     borderRadius: '50%'
                                 }}></div>
                             </div>
+                            {location.address ? (
+                                <span style={{
+                                    fontSize: '0.875rem',
+                                    color: 'var(--text-main)',
+                                    fontWeight: '500',
+                                    textAlign: 'center',
+                                    padding: '0 16px'
+                                }}>
+                                    {location.address}
+                                </span>
+                            ) : (
+                                <span style={{ fontSize: '0.875rem', color: '#718096' }}>
+                                    탭하여 위치 선택
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -235,7 +284,7 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate }
 
             {/* Save Button */}
             <button
-                onClick={() => onSave({ amount, category, item, store, date: rawDate.toISOString(), is_fixed: isRecurring })}
+                onClick={() => onSave({ amount, category, item, store, date: rawDate.toISOString(), is_fixed: isRecurring, address: location.placeName && location.address ? `${location.placeName} | ${location.address}` : (location.placeName || location.address) })}
                 style={{
                     width: '100%',
                     padding: '1rem',
@@ -266,6 +315,15 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate }
                 onClose={() => setShowDatePicker(false)}
                 initialDate={rawDate}
                 onConfirm={(newDate) => setRawDate(newDate)}
+            />
+
+            {/* Location Picker Modal */}
+            <KakaoLocationPicker
+                isOpen={showLocationPicker}
+                onClose={() => setShowLocationPicker(false)}
+                onConfirm={(newLocation) => setLocation(newLocation)}
+                initialAddress={location.address}
+                initialPlaceName={store}
             />
 
             {/* Category Picker Modal */}

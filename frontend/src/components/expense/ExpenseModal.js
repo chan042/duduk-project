@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { X, Check, Trash2 } from 'lucide-react';
+import { X, Check, Trash2, Search, MapPin, ChevronRight } from 'lucide-react';
 import styles from './expense.module.css';
 import CalculatorInput from '../common/CalculatorInput';
 import DateWheelPicker from '../common/DateWheelPicker';
+import KakaoLocationPicker from '../common/KakaoLocationPicker';
 import { getCategoryIcon, CATEGORIES } from '../common/CategoryIcons';
 
 export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, onDelete }) {
@@ -16,11 +17,14 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
     const [amount, setAmount] = useState(0);
     const [isFixedExpense, setIsFixedExpense] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [address, setAddress] = useState('');
+    const [placeName, setPlaceName] = useState('');
 
     // Modal States
     const [showCalculator, setShowCalculator] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
 
     useEffect(() => {
         if (transaction) {
@@ -29,6 +33,17 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
             setMerchant(transaction.merchant || '');
             setAmount(transaction.amount || 0);
             setIsFixedExpense(transaction.is_fixed || false);
+            // 저장된 address에서 placeName과 detailedAddress 파싱
+            // 형식: "장소명 | 상세주소" 또는 "주소만"
+            const savedAddress = transaction.address || '';
+            if (savedAddress.includes(' | ')) {
+                const [pName, dAddr] = savedAddress.split(' | ');
+                setPlaceName(pName);
+                setAddress(dAddr);
+            } else {
+                setPlaceName('');
+                setAddress(savedAddress);
+            }
 
             // Date handling: extract YYYY-MM-DD
             // 타임존 문제를 피하기 위해 YYYY-MM-DD 문자열을 직접 파싱
@@ -58,7 +73,8 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
                 amount: parseInt(amount, 10),
                 store: merchant, // Backend uses 'store' field for merchant name
                 date: date,
-                is_fixed: isFixedExpense
+                is_fixed: isFixedExpense,
+                address: placeName && address ? `${placeName} | ${address}` : (placeName || address)
             });
             onClose();
         } catch (error) {
@@ -184,6 +200,65 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
                         />
                     </div>
 
+                    {/* Location */}
+                    {/* Location */}
+                    <div className={styles.modalRow} style={{ alignItems: 'flex-start' }}>
+                        <span className={styles.modalLabel} style={{ marginTop: '6px' }}>장소</span>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                            {(placeName || address) ? (
+                                <>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <MapPin size={16} color="var(--primary)" />
+                                        <span style={{
+                                            fontWeight: '600',
+                                            fontSize: '1rem',
+                                            color: 'var(--text-main)'
+                                        }}>
+                                            {placeName}
+                                        </span>
+                                    </div>
+                                    {address && (
+                                        <div style={{
+                                            fontSize: '0.85rem',
+                                            color: '#718096',
+                                            textAlign: 'right'
+                                        }}>
+                                            {address}
+                                        </div>
+                                    )}
+                                    <div
+                                        onClick={() => setShowLocationPicker(true)}
+                                        style={{
+                                            fontSize: '0.85rem',
+                                            color: 'var(--text-sub)',
+                                            cursor: 'pointer',
+                                            marginTop: '6px',
+                                            textDecoration: 'underline',
+                                            padding: '4px 0'
+                                        }}
+                                    >
+                                        수정
+                                    </div>
+                                </>
+                            ) : (
+                                <div
+                                    onClick={() => setShowLocationPicker(true)}
+                                    style={{
+                                        color: '#a0aec0',
+                                        cursor: 'pointer',
+                                        fontSize: '0.95rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '4px 0'
+                                    }}
+                                >
+                                    장소를 선택하세요 <ChevronRight size={16} />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     <div className={styles.modalRow}>
                         <span className={styles.modalLabel}>고정 지출에 추가</span>
                         <div
@@ -226,6 +301,18 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
                 onClose={() => setShowDatePicker(false)}
                 initialDate={dateObj}
                 onConfirm={handleDateConfirm}
+            />
+
+            {/* Location Picker Modal */}
+            <KakaoLocationPicker
+                isOpen={showLocationPicker}
+                onClose={() => setShowLocationPicker(false)}
+                onConfirm={(location) => {
+                    setPlaceName(location.placeName || '');
+                    setAddress(location.address || '');
+                }}
+                initialAddress={address}
+                initialPlaceName={placeName || merchant}
             />
 
             {/* Category Picker Modal */}

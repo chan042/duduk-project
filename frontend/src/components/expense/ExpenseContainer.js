@@ -62,7 +62,8 @@ export default function ExpenseContainer() {
                 category: t.category,
                 amount: t.amount,
                 memo: t.memo,
-                is_fixed: t.is_fixed
+                is_fixed: t.is_fixed,
+                address: t.address || ''
             }));
 
             setTransactions(formatted);
