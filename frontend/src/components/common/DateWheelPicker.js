@@ -48,6 +48,7 @@ const WheelColumn = ({ items, value, onChange, suffix }) => {
             <ul
                 ref={listRef}
                 style={styles.wheelList}
+                className="hide-scrollbar"
                 onScroll={handleScroll}
             >
                 {/* 상단 여백 (중앙 정렬을 위해) */}
@@ -267,9 +268,6 @@ const styles = {
         scrollSnapType: 'y mandatory',
         scrollbarWidth: 'none', // Firefox
         msOverflowStyle: 'none', // IE/Edge
-        '::-webkit-scrollbar': { // Chrome/Safari
-            display: 'none'
-        }
     },
     wheelItem: {
         height: '40px',

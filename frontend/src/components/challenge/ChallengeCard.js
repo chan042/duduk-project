@@ -2,8 +2,9 @@
  * [파일 역할]
  * - 챌린지 카드 컴포넌트
  * - 리스트 형태로 개별 챌린지 아이템 표시
+ * - 새로운 UserChallenge 모델에 맞게 progress 객체 처리
  */
-import { ShoppingCart, Utensils, Wallet, Coffee, MapPin, FileText, Target, Dumbbell, Zap, Sparkles } from 'lucide-react';
+import { ShoppingCart, Utensils, Wallet, Coffee, MapPin, FileText, Target, Dumbbell, Zap, Sparkles, Camera, Edit3 } from 'lucide-react';
 
 // 아이콘 컴포넌트 매핑
 const getIcon = (iconName, color) => {
@@ -24,26 +25,86 @@ const getIcon = (iconName, color) => {
 
 // 난이도 스타일
 const getDifficultyStyle = (difficulty) => {
-    switch (difficulty) {
+    const diffLower = difficulty?.toLowerCase();
+    switch (diffLower) {
         case '쉬움':
+        case 'easy':
             return { color: '#16A34A' };
         case '보통':
-            return { color: '#F59E0B' };
+        case 'medium':
+            return { color: '#EAB308' };
         case '어려움':
+        case 'hard':
             return { color: '#DC2626' };
         default:
             return { color: '#6B7280' };
     }
 };
 
-// 난이도 라벨 매핑
+// 난이도 라벨 매핑 (EASY/MEDIUM/HARD로 통일)
 const getDifficultyLabel = (difficulty) => {
-    switch (difficulty) {
-        case '쉬움': return 'EASY';
-        case '보통': return 'MEDIUM';
-        case '어려움': return 'HARD';
-        default: return 'MEDIUM';
+    const diffLower = difficulty?.toLowerCase();
+    switch (diffLower) {
+        case '쉬움':
+        case 'easy':
+            return 'EASY';
+        case '보통':
+        case 'medium':
+            return 'MEDIUM';
+        case '어려움':
+        case 'hard':
+            return 'HARD';
+        default:
+            return 'MEDIUM';
     }
+};
+
+// progress 객체에서 percentage 추출
+const getProgressPercent = (progress) => {
+    if (!progress) return 0;
+    if (typeof progress === 'number') return progress;
+    if (typeof progress === 'object') {
+        if (progress.current !== undefined && progress.target > 0) {
+            return (progress.current / progress.target) * 100;
+        }
+        return progress.percentage || 0;
+    }
+    return 0;
+};
+
+// progress 객체에서 실제 수치 텍스트 추출
+const getProgressText = (progress, durationDays) => {
+    if (!progress || typeof progress !== 'object') return null;
+
+    const type = progress.type;
+
+    if (type === 'amount' || type === 'compare' || type === 'random_budget') {
+        // 금액형: 현재 금액 / 목표 금액
+        const current = progress.current || 0;
+        const target = progress.target || 0;
+        return `${current.toLocaleString()}원 / ${target.toLocaleString()}원`;
+    } else if (type === 'daily_check') {
+        // 기간형(일일 체크): 현재 경과일 / 전체 기간
+        const checkedDays = progress.checked_days || progress.checkedDays || 0;
+        const totalDays = progress.total_days || progress.totalDays || durationDays || 0;
+        return `${checkedDays}일 / ${totalDays}일`;
+    } else if (type === 'photo') {
+        // 횟수형(사진 인증): 현재 횟수 / 목표 횟수
+        const photoCount = progress.photo_count || progress.photoCount || 0;
+        const requiredCount = progress.required_count || progress.requiredCount || 1;
+        return `${photoCount}회 / ${requiredCount}회`;
+    } else if (type === 'zero_spend') {
+        // 무지출형: 현재 지출액
+        const current = progress.current || 0;
+        return current === 0 ? '무지출 유지 중!' : `${current.toLocaleString()}원 지출`;
+    } else if (type === 'daily_rule') {
+        // 일별 규칙형: 성공 일수 / 전체 일수
+        const successDays = progress.success_days || 0;
+        const totalDays = progress.total_days || durationDays || 7;
+        return `${successDays}일 / ${totalDays}일 성공`;
+    }
+
+    return null;
 };
 
 export default function ChallengeCard({ challenge, onStart, onRetry, onClick, isOngoing }) {
@@ -55,9 +116,11 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
 
     const handleButtonClick = (e) => {
         e.stopPropagation();
-        if (isOngoing || challenge.progress !== undefined) {
+        const progressPercent = getProgressPercent(challenge.progress);
+
+        if (isOngoing || progressPercent > 0 || challenge.status === 'active') {
             onClick?.(challenge);
-        } else if (challenge.failedDate) {
+        } else if (challenge.failedDate || challenge.status === 'failed') {
             onRetry?.(challenge);
         } else {
             onClick?.(challenge);
@@ -66,25 +129,35 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
 
     // 버튼 텍스트 결정
     const getButtonText = () => {
-        if (isOngoing || challenge.progress !== undefined) {
+        const progressPercent = getProgressPercent(challenge.progress);
+
+        if (isOngoing || challenge.status === 'active') {
             return '진행중';
         }
-        if (challenge.failedDate) {
+        if (challenge.failedDate || challenge.status === 'failed') {
             return '재도전';
         }
-        return '참여하기';
+        if (challenge.status === 'completed') {
+            return '완료';
+        }
+        return '시작하기';
     };
 
     // 버튼 스타일 결정
     const getButtonStyle = () => {
-        if (isOngoing || challenge.progress !== undefined) {
+        if (isOngoing || challenge.status === 'active') {
             return styles.statusButton;
         }
-        if (challenge.failedDate) {
+        if (challenge.failedDate || challenge.status === 'failed') {
             return { ...styles.joinButton, backgroundColor: '#EF4444' };
+        }
+        if (challenge.status === 'completed') {
+            return { ...styles.statusButton, borderColor: '#10B981', color: '#10B981' };
         }
         return styles.joinButton;
     };
+
+    const progressPercent = getProgressPercent(challenge.progress);
 
     return (
         <div style={styles.card} onClick={handleCardClick}>
@@ -106,8 +179,26 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
                     }}>
                         {getDifficultyLabel(challenge.difficulty)}
                     </span>
-                    {challenge.category && (
+                    {challenge.category && challenge.category !== 'all' && (
                         <span style={styles.categoryTag}>#{challenge.category}</span>
+                    )}
+                    {challenge.sourceType && (
+                        <span style={styles.sourceTag}>
+                            {challenge.sourceType === 'ai' ? '🤖 AI' :
+                                challenge.sourceType === 'custom' ? '✨ 커스텀' : ''}
+                        </span>
+                    )}
+                    {/* 사진 인증 필요 표시 */}
+                    {challenge.requiresPhoto && (
+                        <span style={styles.photoTag}>
+                            <Camera size={10} />
+                        </span>
+                    )}
+                    {/* 사용자 입력 필요 표시 */}
+                    {challenge.userInputs && challenge.userInputs.length > 0 && (
+                        <span style={styles.inputTag}>
+                            <Edit3 size={10} />
+                        </span>
                     )}
                 </div>
 
@@ -115,18 +206,30 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
                 <div style={styles.title}>{challenge.title}</div>
 
                 {/* 설명 또는 진행률 */}
-                {isOngoing || challenge.progress !== undefined ? (
+                {(isOngoing || challenge.status === 'active') && (
                     <div style={styles.progressInfo}>
+                        <div style={styles.progressBarContainer}>
+                            <div style={{
+                                ...styles.progressBarFill,
+                                width: `${Math.min(100, progressPercent)}%`
+                            }} />
+                        </div>
+                        {getProgressText(challenge.progressData || challenge.progress, challenge.durationDays) && (
+                            <span style={styles.progressText}>
+                                {getProgressText(challenge.progressData || challenge.progress, challenge.durationDays)}
+                            </span>
+                        )}
                         {challenge.daysLeft !== undefined && (
                             <span style={styles.daysLeft}>D-{challenge.daysLeft}</span>
                         )}
                     </div>
-                ) : (
-                    <div style={styles.description}>
-                        {challenge.description?.substring(0, 30) ||
-                            `예상 절약액 ${challenge.estimatedSavings?.toLocaleString() || 0}원`}
-                    </div>
                 )}
+
+                <div style={styles.description}>
+                    {challenge.description?.substring(0, 30) ||
+                        challenge.successDescription?.substring(0, 30) ||
+                        `${challenge.durationDays || challenge.duration || 7}일 챌린지`}
+                </div>
 
                 {/* AI 추천 이유 */}
                 {challenge.aiReason && (
@@ -140,12 +243,12 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
             {/* 오른쪽: 포인트 + 버튼 */}
             <div style={styles.rightContainer}>
                 {/* 진행중 표시 */}
-                {(isOngoing || challenge.progress !== undefined) && (
+                {(isOngoing || challenge.status === 'active') && (
                     <span style={styles.ongoingBadge}>ONGOING</span>
                 )}
 
                 {/* 포인트 */}
-                <div style={styles.points}>{challenge.points}P</div>
+                <div style={styles.points}>{challenge.points || challenge.basePoints || 0}P</div>
 
                 {/* 액션 버튼 */}
                 <button
@@ -198,6 +301,30 @@ const styles = {
         fontSize: '0.7rem',
         color: '#9CA3AF',
     },
+    sourceTag: {
+        fontSize: '0.65rem',
+        color: '#6366F1',
+    },
+    photoTag: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '18px',
+        height: '18px',
+        borderRadius: '50%',
+        backgroundColor: '#DBEAFE',
+        color: '#3B82F6',
+    },
+    inputTag: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '18px',
+        height: '18px',
+        borderRadius: '50%',
+        backgroundColor: '#FEF3C7',
+        color: '#F59E0B',
+    },
     title: {
         fontSize: '0.95rem',
         fontWeight: '600',
@@ -215,6 +342,25 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
+    },
+    progressBarContainer: {
+        flex: 1,
+        height: '4px',
+        backgroundColor: '#E5E7EB',
+        borderRadius: '2px',
+        overflow: 'hidden',
+        maxWidth: '80px',
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: '#10B981',
+        borderRadius: '2px',
+        transition: 'width 0.3s ease',
+    },
+    progressText: {
+        fontSize: '0.7rem',
+        color: 'var(--text-sub)',
+        whiteSpace: 'nowrap',
     },
     daysLeft: {
         fontSize: '0.75rem',

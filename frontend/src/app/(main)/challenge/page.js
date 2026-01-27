@@ -17,22 +17,24 @@ import ChallengeDetailModal from '@/components/challenge/ChallengeDetailModal';
 
 // API
 import {
-    getChallenges,
+    getChallengeTemplates,
     getMyChallenges,
     getUserChallenges,
     startChallenge,
+    retryChallenge,
     cancelChallenge,
     getUserPoints,
     createUserChallenge,
 } from '@/lib/api/challenge';
-import { getCoachingAdvice } from '@/lib/api/coaching';
+
 
 // 탭 정의
 const challengeTabs = [
     { id: 'all', label: '전체' },
     { id: 'user', label: '사용자 챌린지' },
     { id: 'ongoing', label: '참여중' },
-    { id: 'completed', label: '완료된 항목' },
+    { id: 'completed', label: '완료' },
+    { id: 'failed', label: '실패' },
 ];
 
 export default function ChallengePage() {
@@ -43,7 +45,7 @@ export default function ChallengePage() {
     const [ongoingChallenges, setOngoingChallenges] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [latestCoaching, setLatestCoaching] = useState(null);
+
 
     // 포인트 조회
     const fetchUserPoints = useCallback(async () => {
@@ -55,17 +57,7 @@ export default function ChallengePage() {
         }
     }, []);
 
-    // 코칭 조회 (AI Insight용)
-    const fetchCoaching = useCallback(async () => {
-        try {
-            const data = await getCoachingAdvice();
-            if (data && data.length > 0) {
-                setLatestCoaching(data[0]);
-            }
-        } catch (err) {
-            console.error('코칭 조회 실패:', err);
-        }
-    }, []);
+
 
     // 챌린지 데이터 로드
     const fetchChallenges = useCallback(async () => {
@@ -77,40 +69,44 @@ export default function ChallengePage() {
 
             switch (activeTab) {
                 case 'all':
-                    // 전체 탭: 모든 챌린지 + 진행중인 챌린지 분리
-                    const allChallenges = await getChallenges('duduk');
-                    ongoing = await getMyChallenges('in_progress');
+                    // 전체 탭: 모든 템플릿 + 진행중인 챌린지 분리
+                    const allTemplates = await getChallengeTemplates('duduk');
+                    ongoing = await getMyChallenges('active');
 
-                    // 진행중인 챌린지 ID 목록
-                    const ongoingIds = ongoing.map(c => c.challenge_id || c.id);
+                    // 진행중인 챌린지의 템플릿 ID 목록
+                    const ongoingTemplateIds = ongoing.map(c => c.templateId);
 
-                    // 진행중이 아닌 챌린지만 필터링
-                    data = allChallenges.filter(c => !ongoingIds.includes(c.id));
+                    // 진행중이 아닌 템플릿만 필터링
+                    data = allTemplates.filter(t => !ongoingTemplateIds.includes(t.id));
                     setOngoingChallenges(ongoing);
                     break;
 
                 case 'user':
-                    // 사용자 챌린지 탭: 사용자가 만든 챌린지
+                    // 사용자 챌린지 탭: 사용자가 만든 챌린지, AI 맞춤 챌린지
                     data = await getUserChallenges();
                     setOngoingChallenges([]);
                     break;
 
                 case 'ongoing':
                     // 참여중 탭
-                    data = await getMyChallenges('in_progress');
+                    data = await getMyChallenges('active');
                     setOngoingChallenges([]);
                     break;
 
                 case 'completed':
-                    // 완료된 항목 탭: 성공 + 실패
-                    const completed = await getMyChallenges('completed');
-                    const failed = await getMyChallenges('failed');
-                    data = [...completed, ...failed];
+                    // 완료된 항목 탭: 성공만
+                    data = await getMyChallenges('completed');
+                    setOngoingChallenges([]);
+                    break;
+
+                case 'failed':
+                    // 실패 탭
+                    data = await getMyChallenges('failed');
                     setOngoingChallenges([]);
                     break;
 
                 default:
-                    data = await getChallenges('duduk');
+                    data = await getChallengeTemplates('duduk');
                     setOngoingChallenges([]);
             }
             setChallenges(data);
@@ -127,8 +123,7 @@ export default function ChallengePage() {
     // 초기 로드
     useEffect(() => {
         fetchUserPoints();
-        fetchCoaching();
-    }, [fetchUserPoints, fetchCoaching]);
+    }, [fetchUserPoints]);
 
     // 탭 변경 시 데이터 로드
     useEffect(() => {
@@ -143,9 +138,28 @@ export default function ChallengePage() {
         setSelectedChallenge(null);
     };
 
-    const handleStartChallenge = async (challenge) => {
+    const handleCancelChallenge = async (challenge) => {
         try {
-            await startChallenge(challenge.id);
+            await cancelChallenge(challenge.id);
+            await fetchChallenges();
+            await fetchUserPoints();
+            setSelectedChallenge(null);
+            alert('챌린지가 중단되었습니다.');
+        } catch (err) {
+            console.error('챌린지 중단 실패:', err);
+            alert('챌린지 중단에 실패했습니다.');
+        }
+    };
+
+    const handlePhotoUpload = async (challenge) => {
+        // 추후 구현 필요
+        alert('사진 업로드 기능은 준비 중입니다.');
+    };
+
+    const handleStartChallenge = async (challenge, userInputs = {}) => {
+        try {
+            // 템플릿 기반 챌린지 시작
+            await startChallenge(challenge.id, userInputs);
             // 성공 시 데이터 새로고침
             await fetchChallenges();
             await fetchUserPoints();
@@ -153,25 +167,27 @@ export default function ChallengePage() {
             alert('챌린지가 시작되었습니다!');
         } catch (err) {
             console.error('챌린지 시작 실패:', err);
-            alert(err.response?.data?.error || '챌린지 시작에 실패했습니다.');
+            alert(err.response?.data?.error || err.response?.data?.detail || '챌린지 시작에 실패했습니다.');
         }
     };
 
     const handleRetryChallenge = async (challenge) => {
         try {
-            await startChallenge(challenge.id);
+            // 재도전 API 호출 (Template 리스트에서는 userChallengeId, My Challenge 리스트에서는 id 사용)
+            const challengeId = challenge.userChallengeId || challenge.id;
+            await retryChallenge(challengeId);
             await fetchChallenges();
             await fetchUserPoints();
             setSelectedChallenge(null);
             alert('챌린지를 재도전합니다!');
         } catch (err) {
             console.error('재도전 실패:', err);
-            alert(err.response?.data?.error || '재도전에 실패했습니다.');
+            alert(err.response?.data?.error || err.response?.data?.detail || '재도전에 실패했습니다.');
         }
     };
 
     const handleCreateChallenge = async () => {
-        // 기본 챌린지 데이터로 생성 (추후 모달 추가 가능)
+        // 기본 챌린지 데이터로 생성 (추후 모달 추가)
         const defaultChallenge = {
             name: '나만의 챌린지',
             description: '내가 만든 챌린지입니다',
@@ -179,7 +195,7 @@ export default function ChallengePage() {
             icon_color: '#6366F1',
             duration_days: 7,
             target_amount: 0,
-            target_category: '',
+            target_categories: [],
         };
 
         try {
@@ -189,7 +205,7 @@ export default function ChallengePage() {
             alert('사용자 챌린지가 생성되었습니다!');
         } catch (err) {
             console.error('챌린지 생성 실패:', err);
-            alert(err.response?.data?.error || '챌린지 생성에 실패했습니다.');
+            alert(err.response?.data?.error || err.response?.data?.detail || '챌린지 생성에 실패했습니다.');
         }
     };
 
@@ -202,7 +218,7 @@ export default function ChallengePage() {
                 onTabChange={setActiveTab}
             />
 
-            {/* 직접 만들기 버튼 (이미지 참고) */}
+            {/* 직접 만들기 버튼 */}
             <div style={styles.createRow}>
                 <button style={styles.createButton} onClick={handleCreateChallenge}>
                     <Plus size={16} />
@@ -292,28 +308,7 @@ export default function ChallengePage() {
                 </>
             )}
 
-            {/* AI Insight 섹션 */}
-            <div style={styles.aiInsightSection}>
-                <div style={styles.aiInsightHeader}>
-                    <span style={styles.aiInsightTitle}>AI Insight</span>
-                    <Sparkles size={20} color="#10B981" />
-                </div>
-                <p style={styles.aiInsightSubtitle}>이번 달 소비 패턴 분석 결과</p>
-                <div style={styles.aiInsightContent}>
-                    {latestCoaching ? (
-                        <p style={styles.aiInsightText}>
-                            "{latestCoaching.analysis?.substring(0, 80) || latestCoaching.coaching_content?.substring(0, 80)}..."
-                        </p>
-                    ) : (
-                        <p style={styles.aiInsightText}>
-                            "소비 데이터를 분석하여 맞춤 챌린지를 추천해드릴게요!"
-                        </p>
-                    )}
-                </div>
-                <button style={styles.aiInsightButton} onClick={handleCreateChallenge}>
-                    챌린지 생성하기
-                </button>
-            </div>
+
 
             {/* 하단 여백 (BottomNavigation 위) */}
             <div style={{ height: '100px' }}></div>
@@ -325,6 +320,8 @@ export default function ChallengePage() {
                     onClose={handleCloseModal}
                     onStart={handleStartChallenge}
                     onRetry={handleRetryChallenge}
+                    onCancel={handleCancelChallenge}
+                    onPhotoUpload={handlePhotoUpload}
                 />
             )}
         </div>
@@ -400,50 +397,5 @@ const styles = {
         color: 'white',
         cursor: 'pointer',
     },
-    // AI Insight 섹션 스타일
-    aiInsightSection: {
-        marginTop: '1.5rem',
-        padding: '1.25rem',
-        backgroundColor: '#1F2937',
-        borderRadius: '16px',
-        color: 'white',
-    },
-    aiInsightHeader: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '4px',
-    },
-    aiInsightTitle: {
-        fontSize: '1rem',
-        fontWeight: '600',
-    },
-    aiInsightSubtitle: {
-        fontSize: '0.8rem',
-        color: '#9CA3AF',
-        marginBottom: '1rem',
-    },
-    aiInsightContent: {
-        backgroundColor: '#374151',
-        borderRadius: '12px',
-        padding: '1rem',
-        marginBottom: '1rem',
-    },
-    aiInsightText: {
-        fontSize: '0.85rem',
-        color: '#E5E7EB',
-        lineHeight: '1.5',
-        margin: 0,
-    },
-    aiInsightButton: {
-        width: '100%',
-        padding: '12px',
-        borderRadius: '12px',
-        border: 'none',
-        backgroundColor: '#10B981',
-        color: 'white',
-        fontSize: '0.9rem',
-        fontWeight: '600',
-        cursor: 'pointer',
-    },
+
 };

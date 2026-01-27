@@ -1,18 +1,20 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    ChallengeViewSet, 
+    ChallengeTemplateViewSet,
     UserChallengeViewSet,
+    ChallengeDailyLogViewSet,
     UserPointsView,
-    ChallengeProgressUpdateView
+    ChallengeStatsView,
 )
 
 router = DefaultRouter()
-router.register(r'list', ChallengeViewSet, basename='challenge')
+router.register(r'templates', ChallengeTemplateViewSet, basename='challenge-template')
 router.register(r'my', UserChallengeViewSet, basename='user-challenge')
+router.register(r'daily-logs', ChallengeDailyLogViewSet, basename='challenge-daily-log')
 
 urlpatterns = [
     path('', include(router.urls)),
     path('points/', UserPointsView.as_view(), name='user-points'),
-    path('progress-update/', ChallengeProgressUpdateView.as_view(), name='challenge-progress-update'),
+    path('stats/', ChallengeStatsView.as_view(), name='challenge-stats'),
 ]
