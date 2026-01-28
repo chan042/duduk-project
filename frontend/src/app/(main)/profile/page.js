@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, Trash2, User, Mail, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { deleteAccount, updateProfile } from '@/lib/api/auth';
 export default function ProfilePage() {
     const { user, logout, loading, refreshUser } = useAuth();
     const router = useRouter();

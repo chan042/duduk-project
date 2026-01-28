@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import QuickAddInput from './QuickAddInput';
 import ReceiptScan from './ReceiptScan';
@@ -13,6 +13,27 @@ export default function QuickAddPopup({ onClose, onTransactionAdded, selectedDat
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [parsedData, setParsedData] = useState(null);
+
+    // 배경 스크롤 방지
+    useEffect(() => {
+        // 현재 스크롤 위치 저장
+        const scrollY = window.scrollY;
+
+        // body 스크롤 방지
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = '100%';
+
+        // cleanup: 컴포넌트 언마운트 시 스크롤 복원
+        return () => {
+            document.body.style.overflow = '';
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.width = '';
+            window.scrollTo(0, scrollY);
+        };
+    }, []);
 
     const handleRecordClick = async () => {
         if (!inputText.trim()) {
