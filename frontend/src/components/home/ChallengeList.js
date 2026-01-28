@@ -1,23 +1,94 @@
 "use client";
 
-import { Coffee, Utensils, ChevronRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { ChevronRight } from 'lucide-react';
+import ChallengeCard from '@/components/challenge/ChallengeCard';
+import { getMyChallenges } from '@/lib/api/challenge';
 
 export default function ChallengeList() {
+    const router = useRouter();
+    const [challenges, setChallenges] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchChallenges = async () => {
+            try {
+                const data = await getMyChallenges('active');
+                setChallenges(data);
+            } catch (error) {
+                console.error('Failed to fetch challenges:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchChallenges();
+    }, []);
+
+    const handleMoreClick = () => {
+        router.push('/challenge');
+    };
+
+    const handleCardClick = (challenge) => {
+        router.push('/challenge');
+    };
+
+    if (!isLoading && challenges.length === 0) {
+        return (
+            <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}>
+                    <h2 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-main)' }}>도전 중인 챌린지</h2>
+                    <button
+                        onClick={handleMoreClick}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '0.85rem',
+                            color: 'var(--text-sub)',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                        }}>
+                        더보기 <ChevronRight size={14} />
+                    </button>
+                </div>
+                <div style={{
+                    padding: '2rem 1rem',
+                    textAlign: 'center',
+                    color: 'var(--text-sub)',
+                    fontSize: '0.9rem',
+                    backgroundColor: 'var(--background-light)',
+                    borderRadius: 'var(--radius-md)',
+                    margin: '0 0.5rem',
+                    border: '1px dashed rgba(0,0,0,0.1)'
+                }}>
+                    도전 중인 챌린지가 없습니다.<br />
+                    <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>새로운 챌린지에 도전해보세요!</span>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}>
                 <h2 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-main)' }}>도전 중인 챌린지</h2>
-                <button style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-sub)',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem'
-                }}>
+                <button
+                    onClick={handleMoreClick}
+                    style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '0.85rem',
+                        color: 'var(--text-sub)',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                    }}>
                     더보기 <ChevronRight size={14} />
                 </button>
             </div>
@@ -57,101 +128,23 @@ export default function ChallengeList() {
                     maskImage: 'linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)',
                     WebkitMaskImage: 'linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)'
                 }}>
-                    {/* Card 1 */}
-                    <div style={{
-                        minWidth: '220px',
-                        backgroundColor: 'white',
-                        borderRadius: 'var(--radius-md)',
-                        padding: '1rem',
-                        boxShadow: 'var(--shadow-sm)',
-                        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                        cursor: 'pointer',
-                        border: '1px solid rgba(0,0,0,0.02)'
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                            <div>
-                                <span style={{
-                                    fontSize: '0.7rem',
-                                    color: 'var(--primary)',
-                                    fontWeight: '700',
-                                    display: 'inline-block',
-                                    marginBottom: '0.25rem',
-                                    backgroundColor: '#ccfbf1',
-                                    padding: '0.2rem 0.5rem',
-                                    borderRadius: '8px'
-                                }}>
-                                    진행 중
-                                </span>
-                                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--text-main)' }}>커피값 아끼기</h3>
-                            </div>
-                            <div style={{
-                                backgroundColor: '#f0fdfa',
-                                padding: '0.5rem',
-                                borderRadius: '50%',
-                                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.03)'
-                            }}>
-                                <Coffee size={18} color="var(--primary)" strokeWidth={2} />
-                            </div>
+                    {challenges.map(challenge => (
+                        <div key={challenge.id} style={{ minWidth: '310px' }}>
+                            <ChallengeCard
+                                challenge={challenge}
+                                onClick={handleCardClick}
+                                isOngoing={true}
+                            />
                         </div>
+                    ))}
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
-                            <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>₩35,000</span>
-                            <span style={{ color: 'var(--text-sub)' }}>/ ₩70,000</span>
-                        </div>
-
-                        <div style={{ width: '100%', height: '6px', backgroundColor: '#edf2f7', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.5rem' }}>
-                            <div style={{ width: '50%', height: '100%', backgroundColor: 'var(--primary)', borderRadius: '3px' }}></div>
-                        </div>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)' }}>목표: 30일 중 15일 달성</p>
-                    </div>
-
-                    {/* Card 2 */}
-                    <div style={{
-                        minWidth: '220px',
-                        backgroundColor: 'white',
-                        borderRadius: 'var(--radius-md)',
-                        padding: '1rem',
-                        boxShadow: 'var(--shadow-sm)',
-                        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                        cursor: 'pointer',
-                        border: '1px solid rgba(0,0,0,0.02)'
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                            <div>
-                                <span style={{
-                                    fontSize: '0.7rem',
-                                    color: 'var(--primary)',
-                                    fontWeight: '700',
-                                    display: 'inline-block',
-                                    marginBottom: '0.25rem',
-                                    backgroundColor: '#ccfbf1',
-                                    padding: '0.2rem 0.5rem',
-                                    borderRadius: '8px'
-                                }}>
-                                    진행 중
-                                </span>
-                                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--text-main)' }}>배달음식 줄이기</h3>
-                            </div>
-                            <div style={{
-                                backgroundColor: '#f0fdfa',
-                                padding: '0.5rem',
-                                borderRadius: '50%',
-                                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.03)'
-                            }}>
-                                <Utensils size={18} color="var(--primary)" strokeWidth={2} />
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
-                            <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>₩45,000</span>
-                            <span style={{ color: 'var(--text-sub)' }}>/ ₩150,000</span>
-                        </div>
-
-                        <div style={{ width: '100%', height: '6px', backgroundColor: '#edf2f7', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.5rem' }}>
-                            <div style={{ width: '30%', height: '100%', backgroundColor: 'var(--primary)', borderRadius: '3px' }}></div>
-                        </div>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)' }}>목표: 4회 중 2회 이용</p>
-                    </div>
+                    {/* Loading Skeletons if loading */}
+                    {isLoading && (
+                        <>
+                            <div style={{ minWidth: '310px', height: '140px', backgroundColor: 'white', borderRadius: '16px', opacity: 0.5 }}></div>
+                            <div style={{ minWidth: '310px', height: '140px', backgroundColor: 'white', borderRadius: '16px', opacity: 0.5 }}></div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

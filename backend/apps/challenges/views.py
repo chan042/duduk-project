@@ -240,6 +240,7 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
                 "type": "compare",
                 "current": 0,
                 "compare_base": compare_base,
+                "target": compare_base,
                 "compare_label": success_conditions.get('compare_label', '비교 기준'),
                 "difference": 0,
                 "percentage": 0,

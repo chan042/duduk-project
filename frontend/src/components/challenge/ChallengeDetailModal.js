@@ -330,7 +330,7 @@ export default function ChallengeDetailModal({ challenge, onClose, onStart, onRe
                                     onClose();
                                 }}
                             >
-                                챌린지 시작하기
+                                챌린지 도전하기
                             </button>
                         )}
                         {isFailed && (

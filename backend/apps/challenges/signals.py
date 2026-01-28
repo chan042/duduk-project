@@ -159,6 +159,7 @@ def _update_compare_progress(user_challenge, total_spent, success_conditions):
         "type": "compare",
         "current": total_spent,
         "compare_base": compare_base,
+        "target": compare_base,
         "compare_label": compare_label,
         "difference": difference,
         "percentage": percentage,

@@ -346,6 +346,7 @@ class UserChallengeCreateSerializer(serializers.Serializer):
                 "type": "compare",
                 "current": 0,
                 "compare_base": compare_base,
+                "target": compare_base,
                 "compare_label": compare_label,
                 "difference": 0,
                 "percentage": 0,
@@ -386,7 +387,14 @@ class UserChallengeCreateSerializer(serializers.Serializer):
 
         if compare_type == 'last_month_week':
             # 나와의 싸움: 지난달 특정 주차의 지출
-            compare_week = user_input_values.get('compare_week', 1)
+            try:
+                compare_week = int(user_input_values.get('compare_week', 1))
+            except (ValueError, TypeError):
+                compare_week = 1
+            
+            # 1~4주차로 제한
+            compare_week = max(1, min(compare_week, 4))
+            
             last_month = now.month - 1 if now.month > 1 else 12
             last_month_year = now.year if now.month > 1 else now.year - 1
 
@@ -397,16 +405,20 @@ class UserChallengeCreateSerializer(serializers.Serializer):
             last_day = min(first_day + 6, days_in_month)
 
             from datetime import date
-            start_date = date(last_month_year, last_month, first_day)
-            end_date = date(last_month_year, last_month, last_day)
+            try:
+                start_date = date(last_month_year, last_month, first_day)
+                end_date = date(last_month_year, last_month, last_day)
 
-            total = Transaction.objects.filter(
-                user=user,
-                date__date__gte=start_date,
-                date__date__lte=end_date
-            ).aggregate(total=Sum('amount'))['total'] or 0
-
-            return total
+                total = Transaction.objects.filter(
+                    user=user,
+                    date__date__gte=start_date,
+                    date__date__lte=end_date
+                ).aggregate(total=Sum('amount'))['total'] or 0
+                
+                return total
+            except ValueError:
+                # 날짜 계산 오류 시 0 반환
+                return 0
 
         elif compare_type == 'fixed_expense':
             # 고정비 다이어트: 지난달 고정비

@@ -32,7 +32,7 @@ import {
 const challengeTabs = [
     { id: 'all', label: '전체' },
     { id: 'user', label: '사용자 챌린지' },
-    { id: 'ongoing', label: '참여중' },
+    { id: 'ongoing', label: '도전중' },
     { id: 'completed', label: '완료' },
     { id: 'failed', label: '실패' },
 ];

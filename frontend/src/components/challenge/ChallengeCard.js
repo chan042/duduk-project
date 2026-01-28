@@ -132,7 +132,7 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
         const progressPercent = getProgressPercent(challenge.progress);
 
         if (isOngoing || challenge.status === 'active') {
-            return '진행중';
+            return '도전중';
         }
         if (challenge.failedDate || challenge.status === 'failed') {
             return '재도전';
@@ -140,7 +140,7 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
         if (challenge.status === 'completed') {
             return '완료';
         }
-        return '시작하기';
+        return '도전하기';
     };
 
     // 버튼 스타일 결정
