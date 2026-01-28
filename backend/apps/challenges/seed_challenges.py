@@ -32,7 +32,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 350,
         "has_penalty": False,
         "duration_days": 7,
-        "is_versus": False,
         "success_conditions": {
             "type": "amount_limit",
             "target_amount": 30000,
@@ -72,7 +71,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 100,
         "has_penalty": False,
         "duration_days": 7,
-        "is_versus": False,
         "success_conditions": {
             "type": "compare",
             "compare_type": "last_month_week",
@@ -120,7 +118,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 450,
         "has_penalty": False,
         "duration_days": 3,
-        "is_versus": False,
         "success_conditions": {
             "type": "zero_spend",
             "target_amount": 0,
@@ -161,7 +158,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 200,
         "has_penalty": False,
         "duration_days": 7,
-        "is_versus": False,
         "success_conditions": {
             "type": "amount_limit_with_photo",
             "target_amount": None,
@@ -215,7 +211,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 500,
         "has_penalty": False,
         "duration_days": 7,
-        "is_versus": False,
         "success_conditions": {
             "type": "zero_spend",
             "target_amount": 0,
@@ -255,7 +250,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 100,
         "has_penalty": False,
         "duration_days": 7,
-        "is_versus": False,
         "success_conditions": {
             "type": "photo_verification",
             "required_photos": 1,
@@ -295,7 +289,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 100,
         "has_penalty": False,
         "duration_days": 3,
-        "is_versus": False,
         "success_conditions": {
             "type": "photo_verification",
             "required_photos": 1,
@@ -336,7 +329,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 200,
         "has_penalty": False,
         "duration_days": 30,
-        "is_versus": False,
         "success_conditions": {
             "type": "compare",
             "compare_type": "fixed_expense",
@@ -376,7 +368,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 300,
         "has_penalty": False,
         "duration_days": 7,
-        "is_versus": False,
         "success_conditions": {
             "type": "amount_range",
             "target_amount": None,
@@ -428,7 +419,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 350,
         "has_penalty": False,
         "duration_days": 30,
-        "is_versus": False,
         "success_conditions": {
             "type": "daily_check",
             "required_days": 30,
@@ -468,7 +458,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 300,
         "has_penalty": False,
         "duration_days": 7,
-        "is_versus": False,
         "success_conditions": {
             "type": "daily_rule",
             "daily_rules": {},
@@ -533,7 +522,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "base_points": 350,
         "has_penalty": False,
         "duration_days": 60,
-        "is_versus": False,
         "success_conditions": {
             "type": "compare",
             "compare_type": "next_month_category",
@@ -597,7 +585,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
         },
         "bonus_points": 1500,
         "duration_days": 7,
-        "is_versus": False,
         "success_conditions": {
             "type": "random_budget",
             "comparison": "lte"
