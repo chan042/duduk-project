@@ -21,7 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
                   'job', 'hobbies', 'self_development_field', 
                   'marital_status', 'has_children', 'birth_date',
                   'age', 'monthly_budget', 'spending_to_improve', 'is_profile_complete',
-                  'character_type', 'character_name', 'date_joined']
+                  'character_type', 'character_name', 'profile_image', 'date_joined']
         read_only_fields = ['id', 'email', 'date_joined']
 
 

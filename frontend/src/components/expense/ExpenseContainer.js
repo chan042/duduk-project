@@ -194,37 +194,47 @@ export default function ExpenseContainer() {
 
     return (
         <div className={styles.container}>
-            <header className={styles.header}>
+            <div className={styles.headerCard}>
                 <div className={styles.monthSelector}>
                     <button onClick={goToPrevMonth} className={styles.monthNavButton}>
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={24} />
                     </button>
-                    <span>{currentYear}년 {currentMonth}월</span>
+                    <span className={styles.monthTitle}>{currentYear}년 {currentMonth}월</span>
                     <button onClick={goToNextMonth} className={styles.monthNavButton}>
-                        <ChevronRight size={20} />
+                        <ChevronRight size={24} />
                     </button>
                 </div>
-                <div className={styles.headerSummary}>
-                    <div><span className={styles.totalLabel}>지출</span> <span className={styles.totalAmount}>{monthlyStats.totalSpent.toLocaleString()}원</span></div>
-                    {Number(dailyBudget) < 0 ? (
-                        <div><span className={styles.budgetWarning}>예산 초과 ({Math.abs(Number(dailyBudget)).toLocaleString()}원)</span></div>
-                    ) : (
-                        <div><span className={styles.dailyBudgetLabel}>일일 권장 예산</span> <span className={styles.dailyBudgetAmount}>{Number(dailyBudget).toLocaleString()}원</span></div>
-                    )}
-                </div>
-            </header>
 
-            <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
+                <div className={styles.dashboardSummary}>
+                    <span className={styles.totalLabel}>이번 달 총 지출</span>
+                    <span className={styles.totalAmountLarge}>{monthlyStats.totalSpent.toLocaleString()}원</span>
+                </div>
+
+                <div className={styles.budgetStatusRow}>
+                    {Number(dailyBudget) < 0 ? (
+                        <div className={styles.budgetPillWarning}>
+                            예산 초과 {Math.abs(Number(dailyBudget)).toLocaleString()}원
+                        </div>
+                    ) : (
+                        <div className={styles.budgetPillNormal}>
+                            일일 예산 {Number(dailyBudget).toLocaleString()}원
+                        </div>
+                    )}
+                    <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
+                </div>
+            </div>
 
             {loading ? (
                 <div className={styles.loadingContainer}>로딩 중...</div>
             ) : viewMode === 'list' ? (
-                <ListView
-                    transactions={transactions}
-                    onTransactionClick={setSelectedTransaction}
-                    currentYear={currentYear}
-                    currentMonth={currentMonth}
-                />
+                <div className={styles.listViewWrapper}>
+                    <ListView
+                        transactions={transactions}
+                        onTransactionClick={setSelectedTransaction}
+                        currentYear={currentYear}
+                        currentMonth={currentMonth}
+                    />
+                </div>
             ) : (
                 <CalendarView
                     transactions={transactions}

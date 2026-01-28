@@ -69,6 +69,23 @@ export const updateProfile = async (data) => {
 };
 
 /**
+ * 프로필 이미지 수정 API
+ * @param {File} file - 업로드할 이미지 파일
+ * @returns {Promise<object>} 수정된 프로필 정보
+ */
+export const updateProfileImage = async (file) => {
+    const formData = new FormData();
+    formData.append('profile_image', file);
+
+    const response = await client.patch('/api/users/profile/', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+    return response.data;
+};
+
+/**
  * 토큰 갱신 API
  * @param {string} refreshToken - 리프레시 토큰
  * @returns {Promise<{access: string}>} 새로운 액세스 토큰

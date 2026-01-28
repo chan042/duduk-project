@@ -1,21 +1,12 @@
 "use client";
 
 import { usePathname } from 'next/navigation';
-import { User, Bell, Coins } from 'lucide-react';
+import { User, Bell } from 'lucide-react';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { getUserPoints } from '@/lib/api/challenge';
+
 
 export default function GlobalHeader() {
     const pathname = usePathname();
-    const [points, setPoints] = useState(0);
-
-    useEffect(() => {
-        if (pathname === '/challenge') {
-            getUserPoints().then(data => setPoints(data.points)).catch(console.error);
-        }
-    }, [pathname]);
-
     const isHome = pathname === '/';
 
     const getHeaderContent = () => {
@@ -27,32 +18,21 @@ export default function GlobalHeader() {
                     </Link>
                 ),
                 title: 'Duduk',
-                right: <Bell color="var(--text-main)" size={24} />
-            };
-        }
-
-        if (pathname === '/challenge') {
-            return {
-                title: '챌린지',
                 right: (
-                    <div style={styles.pointsBadge}>
-                        <Coins size={16} color="var(--primary)" />
-                        <span style={styles.pointsText}>{points.toLocaleString()}P</span>
-                    </div>
+                    <Link href="/notification" style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                        <Bell color="var(--text-main)" size={24} />
+                        <div style={styles.notificationBadge} />
+                    </Link>
                 )
             };
         }
 
-        if (pathname === '/coaching') {
-            return { title: 'AI 코칭' };
-        }
-
-        if (pathname === '/expense') {
-            return { title: '달력' };
-        }
-
         if (pathname === '/profile') {
             return { title: '프로필' };
+        }
+
+        if (pathname === '/notification') {
+            return { title: '알림' };
         }
 
         return null;
@@ -143,5 +123,15 @@ const styles = {
         fontSize: '0.875rem',
         fontWeight: '600',
         color: 'var(--primary)',
+    },
+    notificationBadge: {
+        position: 'absolute',
+        top: '-1px',
+        right: '1px',
+        width: '8px',
+        height: '8px',
+        backgroundColor: '#ff4d4f',
+        borderRadius: '50%',
+        border: '1.5px solid var(--background-light)',
     }
 };

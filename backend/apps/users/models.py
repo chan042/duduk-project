@@ -46,6 +46,9 @@ class User(AbstractUser):
         null=True,
         verbose_name='캐릭터 이름'
     )
+    
+    # 프로필 이미지
+    profile_image = models.ImageField(upload_to='profile_images/', null=True, blank=True, verbose_name='프로필 이미지')
 
     # 온보딩 정보 수집 필드
     age = models.IntegerField(null=True, blank=True, verbose_name='나이')
