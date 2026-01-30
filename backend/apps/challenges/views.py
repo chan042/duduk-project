@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from django.utils import timezone
-from django.db.models import Sum
+from django.db.models import Sum, OuterRef, Subquery
 
 from .models import ChallengeTemplate, UserChallenge, ChallengeDailyLog
 from .serializers import (
@@ -12,8 +12,11 @@ from .serializers import (
     UserChallengeSerializer, UserChallengeListSerializer,
     UserChallengeCreateSerializer, CustomChallengeCreateSerializer,
     ChallengeDailyLogSerializer,
-    UserPointsSerializer
+    UserPointsSerializer,
+    AIChallengGenerateSerializer, AIChallengePreviewSerializer, AIChallengeStartSerializer,
+    CoachingChallengeGenerateSerializer, CoachingChallengePreviewSerializer, CoachingChallengeStartSerializer
 )
+from external.gemini.client import GeminiClient
 
 
 class ChallengeTemplateViewSet(viewsets.ReadOnlyModelViewSet):
@@ -46,6 +49,18 @@ class ChallengeTemplateViewSet(viewsets.ReadOnlyModelViewSet):
                 event_end_at__gte=now
             )
         
+        # 사용자별 챌린지 정보 Annotate
+        if self.request.user.is_authenticated:
+            latest_challenge = UserChallenge.objects.filter(
+                user=self.request.user,
+                template=OuterRef('pk')
+            ).order_by('-created_at')
+
+            queryset = queryset.annotate(
+                my_challenge_id=Subquery(latest_challenge.values('id')[:1]),
+                my_challenge_status=Subquery(latest_challenge.values('status')[:1])
+            )
+
         return queryset.order_by('display_order', '-created_at')
 
 
@@ -112,10 +127,196 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         user_challenge = serializer.save()
-        
+
         return Response(
             UserChallengeSerializer(user_challenge).data,
             status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=False, methods=['post'])
+    def generate_ai(self, request):
+        """
+        AI 챌린지 생성 (미리보기)
+
+        사용자가 입력한 제목, 상세내용, 난이도를 바탕으로
+        Gemini가 챌린지를 생성합니다. 저장되지 않고 미리보기만 반환합니다.
+        """
+        serializer = AIChallengGenerateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        title = serializer.validated_data['title']
+        details = serializer.validated_data.get('details', '')
+        difficulty = serializer.validated_data['difficulty']
+
+        # 사용자 지출 요약 생성
+        user_spending_summary = self._get_user_spending_summary(request.user)
+
+        # Gemini로 챌린지 생성
+        gemini_client = GeminiClient()
+        generated_challenge = gemini_client.generate_challenge(
+            title=title,
+            details=details,
+            difficulty=difficulty,
+            user_spending_summary=user_spending_summary
+        )
+
+        if not generated_challenge:
+            return Response(
+                {'error': 'AI 챌린지 생성에 실패했습니다. 다시 시도해주세요.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # 미리보기 데이터 직렬화
+        preview_serializer = AIChallengePreviewSerializer(data=generated_challenge)
+        if preview_serializer.is_valid():
+            return Response(preview_serializer.data, status=status.HTTP_200_OK)
+        else:
+            # 유효성 검사 실패해도 원본 데이터 반환
+            return Response(generated_challenge, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'])
+    def start_ai(self, request):
+        """
+        AI 챌린지 시작 (수정 후 저장)
+        generate_ai로 생성된 챌린지를 사용자가 수정한 후 시작합니다.
+        """
+        serializer = AIChallengeStartSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        user_challenge = serializer.save()
+
+        return Response(
+            UserChallengeSerializer(user_challenge).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    def _get_user_spending_summary(self, user):
+        """사용자 최근 지출 요약 생성"""
+        try:
+            from apps.transactions.models import Transaction
+            from django.db.models import Sum
+            from datetime import timedelta
+
+            now = timezone.now()
+            month_ago = now - timedelta(days=30)
+
+            # 최근 30일 카테고리별 지출
+            transactions = Transaction.objects.filter(
+                user=user,
+                date__gte=month_ago
+            ).values('category').annotate(
+                total=Sum('amount')
+            ).order_by('-total')[:5]
+
+            if not transactions:
+                return None
+
+            summary_lines = ["최근 30일 주요 지출:"]
+            for t in transactions:
+                category = t['category'] or '기타'
+                total = t['total'] or 0
+                summary_lines.append(f"- {category}: {total:,}원")
+
+            return "\n".join(summary_lines)
+        except Exception:
+            return None
+
+    @action(detail=False, methods=['post'])
+    def generate_from_coaching(self, request):
+        """
+        코칭 기반 AI 챌린지 생성
+
+        생성된 코칭 카드를 바탕으로 Gemini가 챌린지를 생성합니다.
+        저장되지 않고 미리보기만 반환합니다.
+        """
+        serializer = CoachingChallengeGenerateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        coaching_id = serializer.validated_data['coaching_id']
+        difficulty = serializer.validated_data['difficulty']
+
+        # 코칭 데이터 조회
+        from apps.coaching.models import Coaching
+        try:
+            coaching = Coaching.objects.get(id=coaching_id, user=request.user)
+        except Coaching.DoesNotExist:
+            return Response(
+                {'error': '코칭을 찾을 수 없습니다.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # 코칭 데이터를 dict로 변환
+        coaching_data = {
+            'id': coaching.id,
+            'title': coaching.title,
+            'subject': coaching.subject,
+            'analysis': coaching.analysis,
+            'coaching_content': coaching.coaching_content,
+            'estimated_savings': coaching.estimated_savings
+        }
+
+        # Gemini로 챌린지 생성
+        gemini_client = GeminiClient()
+        generated_challenge = gemini_client.generate_challenge_from_coaching(
+            coaching_data=coaching_data,
+            difficulty=difficulty
+        )
+
+        if not generated_challenge:
+            return Response(
+                {'error': 'AI 챌린지 생성에 실패했습니다. 다시 시도해주세요.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        # 미리보기 데이터 직렬화
+        preview_serializer = CoachingChallengePreviewSerializer(data=generated_challenge)
+        if preview_serializer.is_valid():
+            return Response(preview_serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(generated_challenge, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'])
+    def start_from_coaching(self, request):
+        """
+        코칭 기반 AI 챌린지 시작 (수정 후 저장)
+
+        generate_from_coaching으로 생성된 챌린지를 사용자가 수정한 후 시작합니다.
+        """
+        serializer = CoachingChallengeStartSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        user_challenge = serializer.save()
+
+        return Response(
+            UserChallengeSerializer(user_challenge).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'])
+    def start(self, request, pk=None):
+        """저장된 챌린지 시작"""
+        user_challenge = self.get_object()
+        
+        if user_challenge.status != 'ready':
+            return Response(
+                {'error': '대기 중인 챌린지만 시작할 수 있습니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        from datetime import timedelta
+        now = timezone.now()
+        user_challenge.status = 'active'
+        user_challenge.started_at = now
+        user_challenge.ends_at = now + timedelta(days=user_challenge.duration_days)
+        user_challenge.save()
+        
+        return Response(
+            UserChallengeSerializer(user_challenge).data,
+            status=status.HTTP_200_OK
         )
 
     @action(detail=True, methods=['post'])
@@ -137,7 +338,7 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def retry(self, request, pk=None):
-        """챌린지 재도전 - 실패/완료한 챌린지를 진행중으로 변경"""
+        """챌린지 재도전"""
         user_challenge = self.get_object()
 
         if user_challenge.status == 'active':
@@ -168,7 +369,7 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
         user_challenge.bonus_earned = False
         user_challenge.completed_at = None
 
-        # progress 초기화 (챌린지 유형별)
+        # progress 초기화
         user_challenge.progress = self._create_retry_progress(user_challenge)
 
         # 랜덤 예산 챌린지: 새 랜덤 예산 생성

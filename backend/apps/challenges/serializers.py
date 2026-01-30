@@ -45,9 +45,9 @@ class ChallengeTemplateListSerializer(serializers.ModelSerializer):
     difficulty_display = serializers.CharField(source='get_difficulty_display', read_only=True)
     is_event_active = serializers.BooleanField(read_only=True)
     
-    # 사용자별 상태 정보 추가
-    user_status = serializers.SerializerMethodField()
-    user_challenge_id = serializers.SerializerMethodField()
+    # 사용자별 상태 정보
+    my_challenge_status = serializers.CharField(read_only=True, required=False)
+    my_challenge_id = serializers.IntegerField(read_only=True, required=False)
 
     class Meta:
         model = ChallengeTemplate
@@ -58,33 +58,8 @@ class ChallengeTemplateListSerializer(serializers.ModelSerializer):
             'requires_photo', 'requires_daily_check', 'photo_description',
             'user_inputs', 'success_description',
             'display_config', 'is_event_active', 'display_order',
-            'user_status', 'user_challenge_id'
+            'my_challenge_status', 'my_challenge_id'
         ]
-
-    def get_user_status(self, obj):
-        user = self.context.get('request').user
-        if not user.is_authenticated:
-            return None
-            
-        # 가장 최근의 해당 템플릿 챌린지 조회
-        latest_challenge = UserChallenge.objects.filter(
-            user=user,
-            template=obj
-        ).order_by('-created_at').first()
-        
-        return latest_challenge.status if latest_challenge else None
-
-    def get_user_challenge_id(self, obj):
-        user = self.context.get('request').user
-        if not user.is_authenticated:
-            return None
-            
-        latest_challenge = UserChallenge.objects.filter(
-            user=user,
-            template=obj
-        ).order_by('-created_at').first()
-        
-        return latest_challenge.id if latest_challenge else None
 
 
 class UserChallengeSerializer(serializers.ModelSerializer):
@@ -576,3 +551,283 @@ class UserPointsSerializer(serializers.Serializer):
     points = serializers.IntegerField()
     total_points_earned = serializers.IntegerField()
     total_points_used = serializers.IntegerField()
+
+
+class AIChallengGenerateSerializer(serializers.Serializer):
+    """AI 챌린지 생성 요청용 직렬화"""
+    title = serializers.CharField(max_length=100)
+    details = serializers.CharField(max_length=300, required=False, allow_blank=True)
+    difficulty = serializers.ChoiceField(choices=['easy', 'medium', 'hard'])
+
+
+class AIChallengePreviewSerializer(serializers.Serializer):
+    """AI가 생성한 챌린지 미리보기 직렬화"""
+    name = serializers.CharField()
+    description = serializers.CharField()
+    icon = serializers.CharField()
+    icon_color = serializers.CharField()
+    difficulty = serializers.CharField()
+    duration_days = serializers.IntegerField()
+    base_points = serializers.IntegerField()
+    estimated_savings = serializers.IntegerField()
+    success_conditions = serializers.ListField(child=serializers.CharField())
+    target_amount = serializers.IntegerField(allow_null=True, required=False)
+    target_categories = serializers.ListField(child=serializers.CharField(), required=False)
+
+
+class AIChallengeStartSerializer(serializers.Serializer):
+    """AI 챌린지 시작(수정 후 저장) 직렬화"""
+    name = serializers.CharField(max_length=100)
+    description = serializers.CharField(required=False, allow_blank=True)
+    icon = serializers.CharField(max_length=50, default='target')
+    icon_color = serializers.CharField(max_length=20, default='#4CAF50')
+    difficulty = serializers.ChoiceField(choices=['easy', 'medium', 'hard'])
+    duration_days = serializers.IntegerField(min_value=1, max_value=365)
+    base_points = serializers.IntegerField(min_value=0)
+    estimated_savings = serializers.IntegerField(min_value=0, default=0)
+    success_conditions = serializers.ListField(child=serializers.CharField())
+    target_amount = serializers.IntegerField(required=False, allow_null=True)
+    target_categories = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list
+    )
+
+    def validate_target_categories(self, value):
+        for category in value:
+            if category != 'all' and category not in ALL_CATEGORIES:
+                raise serializers.ValidationError(f"유효하지 않은 카테고리입니다: {category}")
+        return value
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        now = timezone.now()
+
+        target_amount = validated_data.pop('target_amount', None)
+        target_categories = validated_data.pop('target_categories', [])
+        success_conditions_list = validated_data.pop('success_conditions', [])
+        estimated_savings = validated_data.pop('estimated_savings', 0)
+
+        # success_conditions JSON 생성
+        success_conditions = {
+            "type": "amount_limit" if target_amount else "custom",
+            "target_amount": target_amount or 0,
+            "categories": target_categories or ["all"],
+            "comparison": "lte",
+            "conditions_list": success_conditions_list
+        }
+
+        # display_config 생성
+        progress_type = "amount" if target_amount else "custom"
+        display_config = {
+            "progress_type": progress_type,
+            "primary_metric": {
+                "label": "사용 금액",
+                "unit": "원",
+                "format": "currency",
+                "show_target": bool(target_amount),
+                "target_label": "목표"
+            },
+            "show_progress_bar": True,
+            "success_conditions_display": success_conditions_list
+        }
+
+        # 초기 progress 생성
+        if target_amount:
+            progress = {
+                "type": "amount",
+                "current": 0,
+                "target": target_amount,
+                "percentage": 0,
+                "is_on_track": True,
+                "remaining": target_amount
+            }
+        else:
+            progress = {
+                "type": "custom",
+                "current": 0,
+                "percentage": 0,
+                "is_on_track": True,
+                "checked_conditions": []
+            }
+
+        # 성공 설명 생성
+        success_description = f"{validated_data['duration_days']}일간 목표 달성 시 성공!"
+        if estimated_savings > 0:
+            success_description += f" (예상 절약: {estimated_savings:,}원)"
+
+        user_challenge = UserChallenge.objects.create(
+            user=user,
+            source_type='ai',
+            name=validated_data['name'],
+            description=validated_data.get('description', ''),
+            icon=validated_data.get('icon', 'target'),
+            icon_color=validated_data.get('icon_color', '#4CAF50'),
+            difficulty=validated_data.get('difficulty', 'medium'),
+            duration_days=validated_data['duration_days'],
+            started_at=now,
+            ends_at=now + timedelta(days=validated_data['duration_days']),
+            success_conditions=success_conditions,
+            user_input_values={
+                'target_amount': target_amount,
+                'target_categories': target_categories
+            },
+            system_generated_values={
+                'estimated_savings': estimated_savings,
+                'success_conditions_list': success_conditions_list,
+                'generated_by': 'gemini'
+            },
+            display_config=display_config,
+            progress=progress,
+            base_points=validated_data['base_points'],
+            success_description=success_description,
+            status='ready',
+        )
+
+        return user_challenge
+
+
+class CoachingChallengeGenerateSerializer(serializers.Serializer):
+    """코칭 기반 AI 챌린지 생성 요청용 직렬화"""
+    coaching_id = serializers.IntegerField()
+    difficulty = serializers.ChoiceField(choices=['easy', 'medium', 'hard'])
+
+
+class CoachingChallengePreviewSerializer(serializers.Serializer):
+    """코칭 기반 AI 챌린지 미리보기 직렬화"""
+    name = serializers.CharField()
+    description = serializers.CharField()
+    icon = serializers.CharField()
+    icon_color = serializers.CharField()
+    difficulty = serializers.CharField()
+    duration_days = serializers.IntegerField()
+    base_points = serializers.IntegerField()
+    estimated_savings = serializers.IntegerField()
+    success_conditions = serializers.ListField(child=serializers.CharField())
+    target_amount = serializers.IntegerField(allow_null=True, required=False)
+    target_categories = serializers.ListField(child=serializers.CharField(), required=False)
+    coaching_id = serializers.IntegerField(allow_null=True, required=False)
+
+
+class CoachingChallengeStartSerializer(serializers.Serializer):
+    """코칭 기반 AI 챌린지 시작(수정 후 저장) 직렬화"""
+    coaching_id = serializers.IntegerField(required=False, allow_null=True)
+    name = serializers.CharField(max_length=100)
+    description = serializers.CharField(required=False, allow_blank=True)
+    icon = serializers.CharField(max_length=50, default='target')
+    icon_color = serializers.CharField(max_length=20, default='#4CAF50')
+    difficulty = serializers.ChoiceField(choices=['easy', 'medium', 'hard'])
+    duration_days = serializers.IntegerField(min_value=1, max_value=365)
+    base_points = serializers.IntegerField(min_value=0)
+    estimated_savings = serializers.IntegerField(min_value=0, default=0)
+    success_conditions = serializers.ListField(child=serializers.CharField())
+    target_amount = serializers.IntegerField(required=False, allow_null=True)
+    target_categories = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list
+    )
+
+    def validate_target_categories(self, value):
+        for category in value:
+            if category != 'all' and category not in ALL_CATEGORIES:
+                raise serializers.ValidationError(f"유효하지 않은 카테고리입니다: {category}")
+        return value
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        now = timezone.now()
+
+        coaching_id = validated_data.pop('coaching_id', None)
+        target_amount = validated_data.pop('target_amount', None)
+        target_categories = validated_data.pop('target_categories', [])
+        success_conditions_list = validated_data.pop('success_conditions', [])
+        estimated_savings = validated_data.pop('estimated_savings', 0)
+
+        # 코칭 객체 조회
+        source_coaching = None
+        if coaching_id:
+            from apps.coaching.models import Coaching
+            try:
+                source_coaching = Coaching.objects.get(id=coaching_id, user=user)
+            except Coaching.DoesNotExist:
+                pass
+
+        # success_conditions JSON 생성
+        success_conditions = {
+            "type": "amount_limit" if target_amount else "custom",
+            "target_amount": target_amount or 0,
+            "categories": target_categories or ["all"],
+            "comparison": "lte",
+            "conditions_list": success_conditions_list
+        }
+
+        # display_config 생성
+        progress_type = "amount" if target_amount else "custom"
+        display_config = {
+            "progress_type": progress_type,
+            "primary_metric": {
+                "label": "사용 금액",
+                "unit": "원",
+                "format": "currency",
+                "show_target": bool(target_amount),
+                "target_label": "목표"
+            },
+            "show_progress_bar": True,
+            "success_conditions_display": success_conditions_list
+        }
+
+        # 초기 progress 생성
+        if target_amount:
+            progress = {
+                "type": "amount",
+                "current": 0,
+                "target": target_amount,
+                "percentage": 0,
+                "is_on_track": True,
+                "remaining": target_amount
+            }
+        else:
+            progress = {
+                "type": "custom",
+                "current": 0,
+                "percentage": 0,
+                "is_on_track": True,
+                "checked_conditions": []
+            }
+
+        # 성공 설명 생성
+        success_description = f"{validated_data['duration_days']}일간 목표 달성 시 성공!"
+        if estimated_savings > 0:
+            success_description += f" (예상 절약: {estimated_savings:,}원)"
+
+        user_challenge = UserChallenge.objects.create(
+            user=user,
+            source_type='ai',
+            source_coaching=source_coaching,  # 코칭 연결
+            name=validated_data['name'],
+            description=validated_data.get('description', ''),
+            icon=validated_data.get('icon', 'target'),
+            icon_color=validated_data.get('icon_color', '#4CAF50'),
+            difficulty=validated_data.get('difficulty', 'medium'),
+            duration_days=validated_data['duration_days'],
+            started_at=now,
+            ends_at=now + timedelta(days=validated_data['duration_days']),
+            success_conditions=success_conditions,
+            user_input_values={
+                'target_amount': target_amount,
+                'target_categories': target_categories
+            },
+            system_generated_values={
+                'estimated_savings': estimated_savings,
+                'success_conditions_list': success_conditions_list,
+                'generated_by': 'gemini_coaching'
+            },
+            display_config=display_config,
+            progress=progress,
+            base_points=validated_data['base_points'],
+            success_description=success_description,
+            status='ready',
+        )
+
+        return user_challenge

@@ -14,6 +14,8 @@ import { Plus, Sparkles } from 'lucide-react';
 import ChallengeTabs from '@/components/challenge/ChallengeTabs';
 import ChallengeCard from '@/components/challenge/ChallengeCard';
 import ChallengeDetailModal from '@/components/challenge/ChallengeDetailModal';
+import CustomChallengeModal from '@/components/challenge/CustomChallengeModal';
+import AIGeneratedChallengeModal from '@/components/challenge/AIGeneratedChallengeModal';
 
 // API
 import {
@@ -25,7 +27,12 @@ import {
     cancelChallenge,
     getUserPoints,
     createUserChallenge,
+    generateAIChallenge,
+    startAIChallenge,
+    deleteChallenge,
+    startSavedChallenge,
 } from '@/lib/api/challenge';
+
 
 
 // 탭 정의
@@ -45,6 +52,15 @@ export default function ChallengePage() {
     const [ongoingChallenges, setOngoingChallenges] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // 커스텀 챌린지 모달 상태
+    const [showCustomModal, setShowCustomModal] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    // AI 생성 챌린지 미리보기 모달 상태
+    const [showAIPreviewModal, setShowAIPreviewModal] = useState(false);
+    const [aiGeneratedChallenge, setAiGeneratedChallenge] = useState(null);
+    const [isSavingAI, setIsSavingAI] = useState(false);
 
 
     // 포인트 조회
@@ -155,15 +171,20 @@ export default function ChallengePage() {
         // 추후 구현 필요
         alert('사진 업로드 기능은 준비 중입니다.');
     };
-
+    // 챌린지 시작
     const handleStartChallenge = async (challenge, userInputs = {}) => {
         try {
-            // 템플릿 기반 챌린지 시작
-            await startChallenge(challenge.id, userInputs);
-            // 성공 시 데이터 새로고침
+            // 저장된 챌린지 시작
+            if (challenge.status === 'ready') {
+                await startSavedChallenge(challenge.id);
+            } else {
+                // 템플릿 기반 챌린지 시작
+                await startChallenge(challenge.id, userInputs);
+            }
+
             await fetchChallenges();
-            await fetchUserPoints();
-            setSelectedChallenge(null);
+            setActiveTab('ongoing');
+            handleCloseModal();
             alert('챌린지가 시작되었습니다!');
         } catch (err) {
             console.error('챌린지 시작 실패:', err);
@@ -173,7 +194,7 @@ export default function ChallengePage() {
 
     const handleRetryChallenge = async (challenge) => {
         try {
-            // 재도전 API 호출 (Template 리스트에서는 userChallengeId, My Challenge 리스트에서는 id 사용)
+            // 재도전 API 호출
             const challengeId = challenge.userChallengeId || challenge.id;
             await retryChallenge(challengeId);
             await fetchChallenges();
@@ -186,26 +207,55 @@ export default function ChallengePage() {
         }
     };
 
-    const handleCreateChallenge = async () => {
-        // 기본 챌린지 데이터로 생성 (추후 모달 추가)
-        const defaultChallenge = {
-            name: '나만의 챌린지',
-            description: '내가 만든 챌린지입니다',
-            icon: 'sparkles',
-            icon_color: '#6366F1',
-            duration_days: 7,
-            target_amount: 0,
-            target_categories: [],
-        };
+    const handleCreateChallenge = () => {
+        // 커스텀 챌린지 모달 열기
+        setShowCustomModal(true);
+    };
 
+    // AI 챌린지 생성
+    const handleGenerateAIChallenge = async (title, details, difficulty) => {
+        setIsGenerating(true);
         try {
-            await createUserChallenge(defaultChallenge);
-            await fetchChallenges();
-            setActiveTab('user');
-            alert('사용자 챌린지가 생성되었습니다!');
+            const generated = await generateAIChallenge(title, details, difficulty);
+            setAiGeneratedChallenge(generated);
+            setShowCustomModal(false);
+            setShowAIPreviewModal(true);
         } catch (err) {
-            console.error('챌린지 생성 실패:', err);
-            alert(err.response?.data?.error || err.response?.data?.detail || '챌린지 생성에 실패했습니다.');
+            console.error('AI 챌린지 생성 실패:', err);
+            alert(err.response?.data?.error || 'AI 챌린지 생성에 실패했습니다.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    // AI 챌린지 저장
+    const handleSaveAIChallenge = async (editedData) => {
+        setIsSavingAI(true);
+        try {
+            await startAIChallenge(editedData);
+            await fetchChallenges();
+            setShowAIPreviewModal(false);
+            setAiGeneratedChallenge(null);
+            setActiveTab('user');
+            alert('챌린지가 저장되었습니다!');
+        } catch (err) {
+            console.error('챌린지 저장 실패:', err);
+            alert(err.response?.data?.error || '챌린지 저장에 실패했습니다.');
+        } finally {
+            setIsSavingAI(false);
+        }
+    };
+
+    // 챌린지 삭제
+    const handleDeleteChallenge = async (challenge) => {
+        try {
+            await deleteChallenge(challenge.id);
+            await fetchChallenges();
+            setSelectedChallenge(null);
+            alert('챌린지가 삭제되었습니다.');
+        } catch (err) {
+            console.error('챌린지 삭제 실패:', err);
+            alert(err.response?.data?.error || '챌린지 삭제에 실패했습니다.');
         }
     };
 
@@ -321,9 +371,30 @@ export default function ChallengePage() {
                     onStart={handleStartChallenge}
                     onRetry={handleRetryChallenge}
                     onCancel={handleCancelChallenge}
+                    onDelete={handleDeleteChallenge}
                     onPhotoUpload={handlePhotoUpload}
                 />
             )}
+
+            {/* 커스텀 챌린지 생성 모달 */}
+            <CustomChallengeModal
+                isOpen={showCustomModal}
+                onClose={() => setShowCustomModal(false)}
+                onGenerate={handleGenerateAIChallenge}
+                isLoading={isGenerating}
+            />
+
+            {/* AI 생성 챌린지 미리보기 모달 */}
+            <AIGeneratedChallengeModal
+                isOpen={showAIPreviewModal}
+                onClose={() => {
+                    setShowAIPreviewModal(false);
+                    setAiGeneratedChallenge(null);
+                }}
+                challengeData={aiGeneratedChallenge}
+                onSave={handleSaveAIChallenge}
+                isSaving={isSavingAI}
+            />
         </div>
     );
 }

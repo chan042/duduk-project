@@ -145,3 +145,217 @@ class GeminiClient:
         except Exception as e:
             print(f"AI Coaching Error: {e}")
             return None
+
+    def generate_challenge(self, title, details, difficulty, user_spending_summary=None):
+        """
+        사용자 입력을 바탕으로 맞춤 챌린지를 생성합니다.
+
+        Args:
+            title: 챌린지 제목 (예: "스마트 커피 줄이기")
+            details: 상세 내용 (예: "매일 만보 걷기")
+            difficulty: 난이도 (easy, medium, hard)
+            user_spending_summary: 사용자 지출 요약 (선택)
+
+        Returns:
+            생성된 챌린지 정보 (JSON)
+        """
+        if not self.model:
+            return None
+
+        difficulty_map = {
+            'easy': {'duration_range': '3-7', 'points_range': '100-200', 'desc': 'EASY'},
+            'medium': {'duration_range': '7-14', 'points_range': '200-350', 'desc': 'MEDIUM'},
+            'hard': {'duration_range': '14-30', 'points_range': '350-500', 'desc': 'HARD'}
+        }
+
+        diff_info = difficulty_map.get(difficulty, difficulty_map['medium'])
+
+        spending_context = ""
+        if user_spending_summary:
+            spending_context = f"""
+        [사용자 소비 패턴]
+        {user_spending_summary}
+        """
+
+        prompt = f"""
+        [역할]
+        당신은 '두둑' 서비스의 AI 챌린지 설계자입니다.
+        사용자가 입력한 제목과 상세 내용을 바탕으로 실천 가능하고 동기부여가 되는 챌린지를 생성합니다.
+
+        [사용자 입력]
+        - 제목: {title}
+        - 상세 내용: {details}
+        - 난이도: {diff_info['desc']}
+        {spending_context}
+
+        [챌린지 설계 규칙]
+        1. 난이도에 맞게 기간과 포인트를 설정하세요:
+           - 기간: {diff_info['duration_range']}일 범위
+           - 포인트: {diff_info['points_range']}P 범위
+        2. 성공 조건은 1-2개로 구체적이고 측정 가능하게 작성하세요.
+        3. 예상 절약 금액은 현실적으로 계산하세요 (없으면 0).
+        4. 챌린지 설명은 친근하고 동기부여가 되는 말투로 작성하세요.
+        5. 아이콘은 챌린지 주제에 맞게 선택하세요.
+
+        [사용 가능한 아이콘]
+        coffee, utensils, shopping-bag, car, home, heart, book,
+        piggy-bank, target, flame, star, zap, gift, smile,
+        trending-down, wallet, leaf, sun, moon, cloud
+
+        [카테고리 목록]
+        식비, 생활, 카페/간식, 온라인 쇼핑, 패션/쇼핑, 뷰티/미용,
+        교통, 자동차, 주거/통신, 의료/건강, 문화/여가, 여행/숙박,
+        교육/학습, 자녀/육아, 반려동물, 경조/선물, 술/유흥, 기타
+
+        [반환 형식]
+        반드시 아래 JSON 형식으로만 반환하세요:
+        {{
+            "name": "챌린지 이름 (20자 이내)",
+            "description": "챌린지 설명 (100자 이내, 친근한 말투)",
+            "icon": "아이콘 이름",
+            "icon_color": "HEX 색상코드 (예: #4CAF50)",
+            "duration_days": 기간(숫자),
+            "base_points": 포인트(숫자),
+            "estimated_savings": 예상 절약 금액(숫자, 없으면 0),
+            "success_conditions": [
+                "성공 조건 1",
+                "성공 조건 2"
+            ],
+            "target_amount": 목표 금액(숫자, 해당시),
+            "target_categories": ["관련 카테고리1", "관련 카테고리2"]
+        }}
+
+        JSON 외에 다른 말은 하지 마세요.
+        """
+
+        try:
+            response = self.model.generate_content(prompt)
+            cleaned_text = response.text.replace("```json", "").replace("```", "").strip()
+            result = json.loads(cleaned_text)
+
+            # 필수 필드 기본값 설정
+            result.setdefault('name', title)
+            result.setdefault('description', details)
+            result.setdefault('icon', 'target')
+            result.setdefault('icon_color', '#4CAF50')
+            result.setdefault('duration_days', 7)
+            result.setdefault('base_points', 100)
+            result.setdefault('estimated_savings', 0)
+            result.setdefault('success_conditions', [])
+            result.setdefault('target_amount', None)
+            result.setdefault('target_categories', [])
+
+            result['difficulty'] = difficulty
+
+            return result
+        except Exception as e:
+            print(f"AI Challenge Generation Error: {e}")
+            return None
+
+    def generate_challenge_from_coaching(self, coaching_data, difficulty='medium'):
+        """
+        코칭 카드 데이터를 바탕으로 맞춤 챌린지를 생성합니다.
+
+        Args:
+            coaching_data: 코칭 정보 dict
+                - title: 코칭 제목
+                - subject: 코칭 주제
+                - analysis: 소비 분석
+                - coaching_content: 코칭 내용
+                - estimated_savings: 예상 절약액
+            difficulty: 난이도 (easy, medium, hard)
+
+        Returns:
+            생성된 챌린지 정보 (JSON)
+        """
+        if not self.model:
+            return None
+
+        difficulty_map = {
+            'easy': {'duration_range': '3-7', 'points_range': '100-200', 'desc': 'EASY'},
+            'medium': {'duration_range': '7-14', 'points_range': '200-350', 'desc': 'MEDIUM'},
+            'hard': {'duration_range': '14-30', 'points_range': '350-500', 'desc': 'HARD'}
+        }
+
+        diff_info = difficulty_map.get(difficulty, difficulty_map['medium'])
+
+        prompt = f"""
+        [역할]
+        당신은 '두둑' 서비스의 AI 챌린지 설계자입니다.
+        AI 소비 코칭 분석 결과를 바탕으로 사용자가 실천할 수 있는 챌린지를 생성합니다.
+
+        [코칭 분석 결과]
+        - 코칭 제목: {coaching_data.get('title', '')}
+        - 코칭 주제: {coaching_data.get('subject', '')}
+        - 소비 분석: {coaching_data.get('analysis', '')}
+        - 코칭 내용: {coaching_data.get('coaching_content', '')}
+        - 예상 절약액: {coaching_data.get('estimated_savings', 0)}원
+
+        [선택된 난이도]
+        {diff_info['desc']}
+
+        [챌린지 설계 규칙]
+        1. 코칭 내용을 실천할 수 있는 구체적인 챌린지로 변환하세요.
+        2. 난이도에 맞게 기간과 포인트를 설정하세요:
+           - 기간: {diff_info['duration_range']}일 범위
+           - 포인트: {diff_info['points_range']}P 범위
+        3. 성공 조건은 1-2개로 구체적이고 측정 가능하게 작성하세요.
+        4. 코칭의 예상 절약액을 참고하여 현실적인 목표 금액을 설정하세요.
+        5. 챌린지 설명은 친근하고 동기부여가 되는 말투로 작성하세요.
+        6. 아이콘은 챌린지 주제에 맞게 선택하세요.
+
+        [사용 가능한 아이콘]
+        coffee, utensils, shopping-bag, car, home, heart, book,
+        piggy-bank, target, flame, star, zap, gift, smile,
+        trending-down, wallet, leaf, sun, moon, cloud
+
+        [카테고리 목록]
+        식비, 생활, 카페/간식, 온라인 쇼핑, 패션/쇼핑, 뷰티/미용,
+        교통, 자동차, 주거/통신, 의료/건강, 문화/여가, 여행/숙박,
+        교육/학습, 자녀/육아, 반려동물, 경조/선물, 술/유흥, 기타
+
+        [반환 형식]
+        반드시 아래 JSON 형식으로만 반환하세요:
+        {{
+            "name": "챌린지 이름 (20자 이내)",
+            "description": "챌린지 설명 (100자 이내, 친근한 말투)",
+            "icon": "아이콘 이름",
+            "icon_color": "HEX 색상코드 (예: #4CAF50)",
+            "duration_days": 기간(숫자),
+            "base_points": 포인트(숫자),
+            "estimated_savings": 예상 절약 금액(숫자),
+            "success_conditions": [
+                "성공 조건 1",
+                "성공 조건 2"
+            ],
+            "target_amount": 목표 금액(숫자, 해당시),
+            "target_categories": ["관련 카테고리1", "관련 카테고리2"]
+        }}
+
+        JSON 외에 다른 말은 하지 마세요.
+        """
+
+        try:
+            response = self.model.generate_content(prompt)
+            cleaned_text = response.text.replace("```json", "").replace("```", "").strip()
+            result = json.loads(cleaned_text)
+
+            # 필수 필드 기본값 설정
+            result.setdefault('name', coaching_data.get('title', '코칭 기반 챌린지'))
+            result.setdefault('description', coaching_data.get('coaching_content', '')[:100])
+            result.setdefault('icon', 'target')
+            result.setdefault('icon_color', '#4CAF50')
+            result.setdefault('duration_days', 7)
+            result.setdefault('base_points', 150)
+            result.setdefault('estimated_savings', coaching_data.get('estimated_savings', 0))
+            result.setdefault('success_conditions', [])
+            result.setdefault('target_amount', None)
+            result.setdefault('target_categories', [])
+
+            result['difficulty'] = difficulty
+            result['coaching_id'] = coaching_data.get('id')
+
+            return result
+        except Exception as e:
+            print(f"AI Challenge from Coaching Error: {e}")
+            return None

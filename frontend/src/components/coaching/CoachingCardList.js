@@ -6,7 +6,7 @@ import DislikeReasonPopup from './DislikeReasonPopup';
 import CoachingDetailPopup from './CoachingDetailPopup';
 import { getCoachingAdvice, submitFeedback } from '@/lib/api/coaching';
 
-export default function CoachingCardList({ cards, loading }) {
+export default function CoachingCardList({ cards, loading, onStartChallenge }) {
     // 부모 컴포넌트로부터 cards와 loading 상태를 props로 받습니다.
     // liked, disliked 상태는 로컬에서 관리하거나 필요시 부모로 올릴 수 있습니다.
     const [likedCards, setLikedCards] = useState(new Set());
@@ -287,6 +287,7 @@ export default function CoachingCardList({ cards, loading }) {
                     isOpen={!!selectedCard}
                     onClose={() => setSelectedCard(null)}
                     data={selectedCard}
+                    onStartChallenge={onStartChallenge}
                 />
             )}
         </div>

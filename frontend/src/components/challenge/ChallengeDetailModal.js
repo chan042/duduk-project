@@ -79,7 +79,7 @@ const getProgressData = (progress) => {
     return { percentage: 0, type: null };
 };
 
-export default function ChallengeDetailModal({ challenge, onClose, onStart, onRetry, onCancel, onPhotoUpload }) {
+export default function ChallengeDetailModal({ challenge, onClose, onStart, onRetry, onCancel, onDelete, onPhotoUpload }) {
     const [inputValues, setInputValues] = useState({});
     const [openCategorySelect, setOpenCategorySelect] = useState(null);
     const fileInputRef = useRef(null);
@@ -166,18 +166,35 @@ export default function ChallengeDetailModal({ challenge, onClose, onStart, onRe
                     {/* 타이틀 */}
                     <h2 style={styles.title}>{challenge.title}</h2>
 
-                    {/* 포인트 & 기간 */}
+                    {/* 포인트 & 기간 (Duduk/Event) */}
+                    {/* 포인트 & 기간 & 예상 절약 (Custom/AI) */}
                     <div style={styles.infoRow}>
                         <div style={styles.points}>
                             <span style={styles.pointsValue}>{challenge.points || challenge.basePoints || 0}</span>
                             <span style={styles.pointsLabel}>P</span>
                         </div>
                         {(challenge.duration || challenge.durationDays) && (
-                            <div style={styles.duration}>
-                                <Clock size={14} color="var(--text-sub)" />
-                                <span>{challenge.duration || `${challenge.durationDays}일`}</span>
-                            </div>
+                            <>
+                                <div style={styles.divider}></div>
+                                <div style={styles.duration}>
+                                    <Clock size={14} color="var(--text-sub)" />
+                                    <span>{challenge.duration || `${challenge.durationDays}일`}</span>
+                                </div>
+                            </>
                         )}
+                        {/* Custom/AI 챌린지일 경우 예상 절약 금액 표시 */}
+                        {(challenge.sourceType === 'custom' || challenge.sourceType === 'ai') &&
+                            (challenge.estimatedSavings || challenge.systemGeneratedValues?.estimated_savings) && (
+                                <>
+                                    <div style={styles.divider}></div>
+                                    <div style={styles.savings}>
+                                        <Wallet size={14} color="var(--text-sub)" />
+                                        <span>
+                                            {(challenge.estimatedSavings || challenge.systemGeneratedValues?.estimated_savings)?.toLocaleString()}원 절약
+                                        </span>
+                                    </div>
+                                </>
+                            )}
                     </div>
 
                     {/* AI 추천 이유 */}
@@ -193,7 +210,7 @@ export default function ChallengeDetailModal({ challenge, onClose, onStart, onRe
                         {challenge.description || challenge.successDescription || '이 챌린지에 대한 상세 설명이 없습니다.'}
                     </p>
 
-                    {/* 사용자 입력 필드 (필수 입력값이 있는 경우) */}
+                    {/* 사용자 입력 필드 */}
                     {!isActive && !isFailed && !isCompleted && challenge.userInputs && challenge.userInputs.length > 0 && (
                         <div style={styles.inputSection}>
                             {challenge.userInputs.map((input) => (
@@ -268,7 +285,7 @@ export default function ChallengeDetailModal({ challenge, onClose, onStart, onRe
                         </div>
                     )}
 
-                    {/* 진행률 (도전 중인 경우) */}
+                    {/* 진행률 */}
                     {isActive && progressData.percentage !== undefined && (
                         <div style={styles.progressSection}>
                             <div style={styles.progressHeader}>
@@ -314,24 +331,38 @@ export default function ChallengeDetailModal({ challenge, onClose, onStart, onRe
                     {/* 버튼 */}
                     <div style={styles.buttonContainer}>
                         {!isActive && !isFailed && !isCompleted && (
-                            <button
-                                style={styles.startButton}
-                                onClick={() => {
-                                    // 필수 입력값 검증
-                                    if (challenge.userInputs) {
-                                        for (const input of challenge.userInputs) {
-                                            if (input.required && !inputValues[input.key]) {
-                                                alert(`${input.label}을(를) 입력해주세요.`);
-                                                return;
+                            <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                                {/* 모든 저장된 챌린지는 삭제 버튼 + 도전 버튼 */}
+                                <button
+                                    style={styles.deleteButton}
+                                    onClick={() => {
+                                        if (window.confirm('정말로 이 챌린지를 삭제하시겠습니까?')) {
+                                            onDelete?.(challenge);
+                                            onClose();
+                                        }
+                                    }}
+                                >
+                                    삭제
+                                </button>
+                                <button
+                                    style={styles.startButton}
+                                    onClick={() => {
+                                        // 필수 입력값 검증
+                                        if (challenge.userInputs) {
+                                            for (const input of challenge.userInputs) {
+                                                if (input.required && !inputValues[input.key]) {
+                                                    alert(`${input.label}을(를) 입력해주세요.`);
+                                                    return;
+                                                }
                                             }
                                         }
-                                    }
-                                    onStart?.(challenge, inputValues);
-                                    onClose();
-                                }}
-                            >
-                                챌린지 도전하기
-                            </button>
+                                        onStart?.(challenge, inputValues);
+                                        onClose();
+                                    }}
+                                >
+                                    도전
+                                </button>
+                            </div>
                         )}
                         {isFailed && (
                             <button
@@ -480,8 +511,17 @@ const styles = {
     infoRow: {
         display: 'flex',
         alignItems: 'center',
-        gap: '16px',
-        marginBottom: '12px',
+        justifyContent: 'center',
+        gap: '12px',
+        marginBottom: '16px',
+        backgroundColor: '#F9FAFB',
+        padding: '12px',
+        borderRadius: '12px',
+    },
+    divider: {
+        width: '1px',
+        height: '12px',
+        backgroundColor: '#D1D5DB',
     },
     points: {
         display: 'flex',
@@ -587,6 +627,7 @@ const styles = {
         marginTop: '8px',
     },
     startButton: {
+        flex: 1,
         width: '100%',
         padding: '14px',
         borderRadius: '12px',
@@ -597,6 +638,41 @@ const styles = {
         fontWeight: '600',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '4px',
+    },
+    editButton: {
+        flex: 1,
+        padding: '14px',
+        borderRadius: '12px',
+        backgroundColor: '#F3F4F6',
+        color: 'var(--text-main)',
+        border: 'none',
+        fontSize: '1rem',
+        fontWeight: '600',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+    },
+    deleteButton: {
+        flex: 1,
+        padding: '14px',
+        borderRadius: '12px',
+        backgroundColor: '#FEE2E2',
+        color: '#DC2626',
+        border: 'none',
+        fontSize: '1rem',
+        fontWeight: '600',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+    },
+    savings: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        fontSize: '0.875rem',
+        color: 'var(--text-sub)',
     },
     retryButton: {
         width: '100%',

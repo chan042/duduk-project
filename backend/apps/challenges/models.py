@@ -122,6 +122,7 @@ class UserChallenge(models.Model):
     ]
     
     STATUS_CHOICES = [
+        ('ready', '시작 대기'),
         ('active', '진행 중'),
         ('completed', '완료'),
         ('failed', '실패'),

@@ -21,9 +21,22 @@ class CoachingFeedback(models.Model):
     AI 코칭에 대한 사용자의 피드백 (좋아요/싫어요 및 이유)
     """
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='feedbacks')
-    is_liked = models.BooleanField(default=True) # True: 좋아요, False: 싫어요
-    dislike_reason = models.TextField(blank=True, null=True) # 싫어요 선택 시 이유
+    coaching = models.ForeignKey(
+        Coaching,
+        on_delete=models.CASCADE,
+        related_name='feedbacks',
+        verbose_name='코칭',
+        null=True,
+        blank=True
+    )
+    is_liked = models.BooleanField(default=True)  # True: 좋아요, False: 싫어요
+    dislike_reason = models.TextField(blank=True, null=True)  # 싫어요 선택 시 이유
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        verbose_name = '코칭 피드백'
+        verbose_name_plural = '코칭 피드백 목록'
+
     def __str__(self):
-        return f"{self.user.username} - {'Like' if self.is_liked else 'Dislike'}"
+        coaching_title = self.coaching.title if self.coaching else '알 수 없음'
+        return f"{self.user.username} - {coaching_title} - {'좋아요' if self.is_liked else '싫어요'}"

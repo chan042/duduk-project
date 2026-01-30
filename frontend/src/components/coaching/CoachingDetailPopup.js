@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { X, Coffee, ShoppingBag, MapPin, Droplets, Zap, Lightbulb } from 'lucide-react';
 
-export default function CoachingDetailPopup({ isOpen, onClose, data }) {
+export default function CoachingDetailPopup({ isOpen, onClose, data, onStartChallenge }) {
     // Prevent background scrolling when popup is open
     useEffect(() => {
         if (isOpen) {
@@ -154,7 +154,12 @@ export default function CoachingDetailPopup({ isOpen, onClose, data }) {
                         fontSize: '1rem',
                         fontWeight: 'bold',
                         cursor: 'pointer'
-                    }} onClick={onClose}>
+                    }} onClick={() => {
+                        if (onStartChallenge) {
+                            onStartChallenge(data);
+                        }
+                        onClose();
+                    }}>
                         챌린지 시작하기
                     </button>
                 </div>

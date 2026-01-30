@@ -20,7 +20,7 @@ const iconColorMap = {
     default: '#F3F4F6'
 };
 
-// 난이도 정렬 순서 (쉬움 → 보통 → 어려움)
+// 난이도 정렬 순서
 const difficultyOrder = { '쉬움': 1, '보통': 2, '어려움': 3, 'EASY': 1, 'MEDIUM': 2, 'HARD': 3 };
 
 /**
@@ -55,9 +55,9 @@ const transformTemplate = (template) => ({
     eventStartAt: template.event_start_at,
     eventEndAt: template.event_end_at,
     eventBannerUrl: template.event_banner_url,
-    // 사용자 상태 정보 (Backend injected)
-    status: template.user_status,
-    userChallengeId: template.user_challenge_id,
+    // 사용자 상태 정보
+    status: template.my_challenge_status,
+    userChallengeId: template.my_challenge_id,
 });
 
 /**
@@ -116,7 +116,7 @@ const transformUserChallenge = (uc) => {
 };
 
 /**
- * 챌린지 목록 정렬 (쉬움 → 보통 → 어려움)
+ * 챌린지 목록 정렬
  */
 const sortByDifficulty = (challenges) => {
     return [...challenges].sort((a, b) => {
@@ -164,15 +164,14 @@ export const getChallenges = async (tab = 'duduk') => {
 };
 
 /**
- * 내 챌린지 목록 조회 (진행중/성공/실패)
- * @param {string} status - 'in_progress' | 'active' | 'completed' | 'failed' | 'finished'
+ * 내 챌린지 목록 조회
+ * @param {string} status
  */
 export const getMyChallenges = async (status = null) => {
     try {
         let url = '/api/challenges/my/';
 
         if (status) {
-            // 상태 매핑: 기존 프론트엔드 → 백엔드
             const statusMap = {
                 'in_progress': 'active',
                 'active': 'active',
@@ -232,7 +231,7 @@ export const getUserChallenges = async () => {
 /**
  * 템플릿 기반 챌린지 시작
  * @param {number} templateId - 템플릿 ID
- * @param {object} userInputValues - 사용자 입력값 (선택)
+ * @param {object} userInputValues - 사용자 입력값
  */
 export const startChallenge = async (templateId, userInputValues = {}) => {
     try {
@@ -249,7 +248,7 @@ export const startChallenge = async (templateId, userInputValues = {}) => {
 
 /**
  * 챌린지 취소
- * @param {number} id - UserChallenge ID
+ * @param {number} id
  */
 export const cancelChallenge = async (id) => {
     try {
@@ -276,7 +275,7 @@ export const retryChallenge = async (id) => {
 };
 
 /**
- * 일일 체크 (미라클 두둑 등)
+ * 일일 체크
  * @param {number} id
  */
 export const checkDaily = async (id) => {
@@ -368,3 +367,102 @@ export const createUserChallenge = async (challengeData) => {
         throw error;
     }
 };
+
+/**
+ * AI 챌린지 생성
+ * @param {string} title
+ * @param {string} details
+ * @param {string} difficulty
+ */
+export const generateAIChallenge = async (title, details, difficulty) => {
+    try {
+        const response = await client.post('/api/challenges/my/generate_ai/', {
+            title,
+            details,
+            difficulty,
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Generate AI Challenge Error:', error);
+        throw error;
+    }
+};
+
+/**
+ * AI 챌린지 시작
+ * @param {object} challengeData
+ */
+export const startAIChallenge = async (challengeData) => {
+    try {
+        const response = await client.post('/api/challenges/my/start_ai/', challengeData);
+        return transformUserChallenge(response.data);
+    } catch (error) {
+        console.error('Start AI Challenge Error:', error);
+        throw error;
+    }
+};
+
+/**
+ * 코칭 기반 AI 챌린지 생성
+ * @param {number} coachingId
+ * @param {string} difficulty
+ */
+export const generateChallengeFromCoaching = async (coachingId, difficulty = 'medium') => {
+    try {
+        const response = await client.post('/api/challenges/my/generate_from_coaching/', {
+            coaching_id: coachingId,
+            difficulty,
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Generate Challenge from Coaching Error:', error);
+        throw error;
+    }
+};
+
+/**
+ * 코칭 기반 AI 챌린지 시작
+ * @param {number} coachingId - 코칭 ID
+ * @param {object} challengeData
+ */
+export const startChallengeFromCoaching = async (coachingId, challengeData) => {
+    try {
+        const response = await client.post('/api/challenges/my/start_from_coaching/', {
+            coaching_id: coachingId,
+            ...challengeData,
+        });
+        return transformUserChallenge(response.data);
+    } catch (error) {
+        console.error('Start Challenge from Coaching Error:', error);
+        throw error;
+    }
+};
+
+/**
+ * 챌린지 삭제
+ * @param {number} id
+ */
+export const deleteChallenge = async (id) => {
+    try {
+        const response = await client.delete(`/api/challenges/my/${id}/`);
+        return response.data;
+    } catch (error) {
+        console.error('Delete Challenge Error:', error);
+        throw error;
+    }
+};
+
+/**
+ * 저장된 챌린지 시작
+ * @param {number} id
+ */
+export const startSavedChallenge = async (id) => {
+    try {
+        const response = await client.post(`/api/challenges/my/${id}/start/`);
+        return transformUserChallenge(response.data);
+    } catch (error) {
+        console.error('Start Saved Challenge Error:', error);
+        throw error;
+    }
+};
+
