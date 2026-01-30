@@ -32,8 +32,8 @@ const styles = {
     tabContainer: {
         display: 'flex',
         gap: '8px',
-        marginBottom: '1rem',
         flexWrap: 'wrap',
+        justifyContent: 'center',
     },
     tabButton: {
         padding: '8px 14px',

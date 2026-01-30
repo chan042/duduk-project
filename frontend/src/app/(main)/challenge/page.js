@@ -8,7 +8,7 @@
  * - AI Insight 섹션 추가
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Sparkles } from 'lucide-react';
+import { Plus, Sparkles, Store } from 'lucide-react';
 
 // 컴포넌트
 import ChallengeTabs from '@/components/challenge/ChallengeTabs';
@@ -38,7 +38,8 @@ import {
 // 탭 정의
 const challengeTabs = [
     { id: 'all', label: '전체' },
-    { id: 'user', label: '사용자 챌린지' },
+    { id: 'duduk', label: '두둑' },
+    { id: 'user', label: '사용자' },
     { id: 'ongoing', label: '도전중' },
     { id: 'completed', label: '완료' },
     { id: 'failed', label: '실패' },
@@ -85,16 +86,25 @@ export default function ChallengePage() {
 
             switch (activeTab) {
                 case 'all':
-                    // 전체 탭: 모든 템플릿 + 진행중인 챌린지 분리
+                    // 전체 탭: 모든 템플릿 + 사용자 챌린지 + 진행중인 챌린지 분리
                     const allTemplates = await getChallengeTemplates('duduk');
+                    const userChallengesAll = await getUserChallenges();
                     ongoing = await getMyChallenges('active');
 
                     // 진행중인 챌린지의 템플릿 ID 목록
                     const ongoingTemplateIds = ongoing.map(c => c.templateId);
 
-                    // 진행중이 아닌 템플릿만 필터링
-                    data = allTemplates.filter(t => !ongoingTemplateIds.includes(t.id));
+                    // 진행중이 아닌 템플릿만 필터링 (두둑 + 사용자 챌린지)
+                    const filteredTemplates = allTemplates.filter(t => !ongoingTemplateIds.includes(t.id));
+                    const filteredUserChallenges = userChallengesAll.filter(c => !ongoingTemplateIds.includes(c.templateId) && c.status !== 'active');
+                    data = [...filteredTemplates, ...filteredUserChallenges];
                     setOngoingChallenges(ongoing);
+                    break;
+
+                case 'duduk':
+                    // 두둑 탭: 두둑 템플릿만
+                    data = await getChallengeTemplates('duduk');
+                    setOngoingChallenges([]);
                     break;
 
                 case 'user':
@@ -261,12 +271,25 @@ export default function ChallengePage() {
 
     return (
         <div style={styles.container}>
-            {/* 탭 네비게이션 */}
-            <ChallengeTabs
-                tabs={challengeTabs}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-            />
+            {/* 헤더 섹션 (Calendar UI 스타일) */}
+            <div style={styles.headerCard}>
+                {/* 우상단: 상점 버튼 */}
+                <button style={styles.storeButton}>
+                    <Store size={22} color="var(--primary)" />
+                </button>
+
+                {/* 중앙: 포인트 표시 */}
+                <div style={styles.pointsDisplay}>
+                    <span style={styles.pointsText}>{userPoints.toLocaleString()}P</span>
+                </div>
+
+                {/* 하단: 탭 네비게이션 */}
+                <ChallengeTabs
+                    tabs={challengeTabs}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                />
+            </div>
 
             {/* 직접 만들기 버튼 */}
             <div style={styles.createRow}>
@@ -303,7 +326,7 @@ export default function ChallengePage() {
                             <div style={styles.cardList}>
                                 {ongoingChallenges.map((challenge) => (
                                     <ChallengeCard
-                                        key={`ongoing-${challenge.id}`}
+                                        key={challenge.uniqueId || `ongoing-${challenge.id}`}
                                         challenge={challenge}
                                         onClick={handleCardClick}
                                         onStart={handleStartChallenge}
@@ -322,7 +345,7 @@ export default function ChallengePage() {
                             <div style={styles.cardList}>
                                 {challenges.map((challenge) => (
                                     <ChallengeCard
-                                        key={challenge.id}
+                                        key={challenge.uniqueId || challenge.id}
                                         challenge={challenge}
                                         onClick={handleCardClick}
                                         onStart={handleStartChallenge}
@@ -338,7 +361,7 @@ export default function ChallengePage() {
                         <div style={styles.cardList}>
                             {challenges.map((challenge) => (
                                 <ChallengeCard
-                                    key={challenge.id}
+                                    key={challenge.uniqueId || challenge.id}
                                     challenge={challenge}
                                     onClick={handleCardClick}
                                     onStart={handleStartChallenge}
@@ -401,36 +424,81 @@ export default function ChallengePage() {
 
 const styles = {
     container: {
-        padding: '1rem',
+        background: 'var(--background-light)',
         minHeight: '100vh',
-        backgroundColor: 'var(--background-light)',
+        padding: '0.25rem', // Calendar UI와 비슷하게 패딩 축소
+        paddingBottom: '6rem',
+    },
+    headerCard: {
+        backgroundColor: 'white',
+        borderBottomLeftRadius: '20px',
+        borderBottomRightRadius: '20px',
+        padding: '1rem',
+        paddingTop: '0.5rem',
+        margin: '-0.25rem -0.25rem 1rem -0.25rem',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        minHeight: '220px', // Calendar 헤더와 높이 맞춤 (권장 예산/총 지출 영역 포함 높이 고려)
+        justifyContent: 'space-between', // 포인트를 중앙에, 탭을 하단에 배치
+        position: 'relative',
+    },
+    pointsDisplay: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '12px',
+        flex: 1,
+    },
+    pointsText: {
+        fontSize: '2.5rem',
+        fontWeight: '700',
+        color: 'var(--primary)',
+    },
+    storeButton: {
+        position: 'absolute',
+        top: '12px',
+        right: '12px',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        padding: '8px',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'background-color 0.2s ease',
     },
     createRow: {
         display: 'flex',
         justifyContent: 'flex-end',
-        marginBottom: '1rem',
+        marginBottom: '0.5rem',
+        paddingRight: '0.5rem',
     },
     createButton: {
         display: 'flex',
         alignItems: 'center',
         gap: '4px',
         padding: '8px 12px',
-        borderRadius: '20px',
         border: 'none',
-        backgroundColor: 'transparent',
+        backgroundColor: 'transparent', // 배경 제거
         color: 'var(--primary)',
         fontSize: '0.85rem',
         fontWeight: '600',
         cursor: 'pointer',
+        // 그림자 제거
     },
     section: {
         marginBottom: '1.5rem',
+        padding: '0 1rem',
     },
     sectionTitle: {
         fontSize: '1rem',
         fontWeight: '600',
         color: 'var(--text-main)',
         marginBottom: '0.75rem',
+        paddingLeft: '0.25rem',
     },
     cardList: {
         display: 'flex',

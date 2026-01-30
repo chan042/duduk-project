@@ -3,10 +3,12 @@
  * - 챌린지 카드 컴포넌트
  * - 리스트 형태로 개별 챌린지 아이템 표시
  * - 새로운 UserChallenge 모델에 맞게 progress 객체 처리
+ * - 난이도별 두둑 캐릭터 얼굴 아이콘 표시
  */
 import { ShoppingCart, Utensils, Wallet, Coffee, MapPin, FileText, Target, Dumbbell, Zap, Sparkles, Camera, Edit3 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
-// 아이콘 컴포넌트 매핑
+// 아이콘 컴포넌트 매핑 (fallback용)
 const getIcon = (iconName, color) => {
     const iconProps = { size: 24, color };
     switch (iconName) {
@@ -21,6 +23,33 @@ const getIcon = (iconName, color) => {
         case 'sparkles': return <Sparkles {...iconProps} />;
         default: return <Zap {...iconProps} />;
     }
+};
+
+// 난이도별 캐릭터 얼굴 이미지 경로 반환
+const getCharacterFace = (difficulty, characterType) => {
+    // characterType은 'char_ham', 'char_cat' 등의 형태로 저장됨
+    const charType = characterType || 'char_ham';
+    const diffLower = difficulty?.toLowerCase();
+
+    let faceName = 'face_happy'; // 기본값
+    switch (diffLower) {
+        case '쉬움':
+        case 'easy':
+            faceName = 'face_basic';
+            break;
+        case '보통':
+        case 'medium':
+            faceName = 'face_happy';
+            break;
+        case '어려움':
+        case 'hard':
+            faceName = 'face_money';
+            break;
+        default:
+            faceName = 'face_happy';
+    }
+
+    return `/images/characters/${charType}/${faceName}.png`;
 };
 
 // 난이도 스타일
@@ -50,12 +79,12 @@ const getDifficultyLabel = (difficulty) => {
             return 'EASY';
         case '보통':
         case 'medium':
-            return 'MEDIUM';
+            return 'NORMAL';
         case '어려움':
         case 'hard':
             return 'HARD';
         default:
-            return 'MEDIUM';
+            return 'NORMAL';
     }
 };
 
@@ -108,6 +137,9 @@ const getProgressText = (progress, durationDays) => {
 };
 
 export default function ChallengeCard({ challenge, onStart, onRetry, onClick, isOngoing }) {
+    const { user } = useAuth();
+    const characterType = user?.character_type || 'ham';
+
     const handleCardClick = (e) => {
         // 버튼 클릭은 전파하지 않음
         if (e.target.tagName === 'BUTTON') return;
@@ -152,7 +184,7 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
             return { ...styles.joinButton, backgroundColor: '#EF4444' };
         }
         if (challenge.status === 'completed') {
-            return { ...styles.statusButton, borderColor: '#10B981', color: '#10B981' };
+            return { ...styles.statusButton, borderColor: 'var(--primary)', color: 'var(--primary)' };
         }
         return styles.joinButton;
     };
@@ -161,12 +193,13 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
 
     return (
         <div style={styles.card} onClick={handleCardClick}>
-            {/* 왼쪽: 아이콘 */}
-            <div style={{
-                ...styles.iconContainer,
-                backgroundColor: challenge.color || '#E0F2FE',
-            }}>
-                {getIcon(challenge.icon, challenge.iconColor || '#0EA5E9')}
+            {/* 왼쪽: 캐릭터 얼굴 아이콘 */}
+            <div style={styles.iconContainer}>
+                <img
+                    src={getCharacterFace(challenge.difficulty, characterType)}
+                    alt="character"
+                    style={styles.characterImage}
+                />
             </div>
 
             {/* 가운데: 정보 */}
@@ -248,7 +281,14 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
                 )}
 
                 {/* 포인트 */}
-                <div style={styles.points}>{challenge.points || challenge.basePoints || 0}P</div>
+                <div style={styles.points}>
+                    {(challenge.progressType === 'random_budget' ||
+                        challenge.displayConfig?.progress_type === 'random_budget' ||
+                        challenge.successConditions?.type === 'random_budget') &&
+                        (challenge.points === 0 || challenge.points === undefined || challenge.points === null)
+                        ? '?P'
+                        : `${challenge.points || challenge.basePoints || 0}P`}
+                </div>
 
                 {/* 액션 버튼 */}
                 <button
@@ -282,6 +322,12 @@ const styles = {
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
+        overflow: 'hidden',
+    },
+    characterImage: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
     },
     infoContainer: {
         flex: 1,
@@ -353,7 +399,7 @@ const styles = {
     },
     progressBarFill: {
         height: '100%',
-        backgroundColor: '#10B981',
+        backgroundColor: 'var(--primary)',
         borderRadius: '2px',
         transition: 'width 0.3s ease',
     },
@@ -364,7 +410,7 @@ const styles = {
     },
     daysLeft: {
         fontSize: '0.75rem',
-        color: '#10B981',
+        color: 'var(--primary)',
         fontWeight: '600',
     },
     aiReason: {
@@ -385,7 +431,7 @@ const styles = {
     ongoingBadge: {
         fontSize: '0.65rem',
         fontWeight: '600',
-        color: '#10B981',
+        color: 'var(--primary)',
     },
     points: {
         fontSize: '1rem',
@@ -396,7 +442,7 @@ const styles = {
         padding: '6px 16px',
         borderRadius: '4px',
         border: 'none',
-        backgroundColor: '#10B981',
+        backgroundColor: 'var(--primary)',
         color: 'white',
         fontSize: '0.75rem',
         fontWeight: '600',
@@ -406,9 +452,9 @@ const styles = {
     statusButton: {
         padding: '5px 12px',
         borderRadius: '4px',
-        border: '2px solid #10B981',
+        border: '2px solid var(--primary)',
         backgroundColor: 'white',
-        color: '#10B981',
+        color: 'var(--primary)',
         fontSize: '0.7rem',
         fontWeight: '600',
         cursor: 'pointer',

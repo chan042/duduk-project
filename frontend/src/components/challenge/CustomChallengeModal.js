@@ -8,24 +8,34 @@ import { useState } from 'react';
 import { X, Sparkles } from 'lucide-react';
 
 export default function CustomChallengeModal({ isOpen, onClose, onGenerate, isLoading }) {
-    const [title, setTitle] = useState('');
     const [details, setDetails] = useState('');
-    const [difficulty, setDifficulty] = useState('medium');
+    const [difficulty, setDifficulty] = useState('');
+
+    // 모달 닫을 때 입력값 초기화
+    const handleClose = () => {
+        setDetails('');
+        setDifficulty('');
+        onClose();
+    };
 
     if (!isOpen) return null;
 
     const handleOverlayClick = (e) => {
         if (e.target === e.currentTarget) {
-            onClose();
+            handleClose();
         }
     };
 
     const handleGenerate = () => {
-        if (!title.trim()) {
-            alert('챌린지 제목을 입력해주세요.');
+        if (!details.trim()) {
+            alert('챌린지 상세 내용을 입력해주세요.');
             return;
         }
-        onGenerate(title.trim(), details.trim(), difficulty);
+        if (!difficulty) {
+            alert('난이도를 선택해주세요.');
+            return;
+        }
+        onGenerate('', details.trim(), difficulty);
     };
 
     const getDifficultyStyle = (diff) => {
@@ -71,25 +81,14 @@ export default function CustomChallengeModal({ isOpen, onClose, onGenerate, isLo
                 {/* 헤더 */}
                 <div style={styles.header}>
                     <h2 style={styles.headerTitle}>나만의 챌린지 만들기</h2>
-                    <button style={styles.closeButton} onClick={onClose}>
+                    <button style={styles.closeButton} onClick={handleClose}>
                         <X size={24} />
                     </button>
                 </div>
 
                 {/* 콘텐츠 */}
                 <div style={styles.content}>
-                    {/* Title 입력 */}
-                    <div style={styles.inputGroup}>
-                        <label style={styles.label}>TITLE</label>
-                        <input
-                            type="text"
-                            style={styles.input}
-                            placeholder="챌린지 제목을 입력하세요"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            maxLength={50}
-                        />
-                    </div>
+
 
                     {/* Details 입력 */}
                     <div style={styles.inputGroup}>
@@ -97,7 +96,7 @@ export default function CustomChallengeModal({ isOpen, onClose, onGenerate, isLo
                         <div style={styles.textareaWrapper}>
                             <textarea
                                 style={styles.textarea}
-                                placeholder="구체적인 목표나 상황을 자유롭게 적어주세요 (예: 배달 음식 줄이기)"
+                                placeholder="예: 외식을 줄여서 절약하고 싶어요."
                                 value={details}
                                 onChange={(e) => setDetails(e.target.value.slice(0, 300))}
                                 maxLength={300}

@@ -28,6 +28,9 @@ const difficultyOrder = { '쉬움': 1, '보통': 2, '어려움': 3, 'EASY': 1, '
  */
 const transformTemplate = (template) => ({
     id: template.id,
+    // Template과 UserChallenge는 서로 다른 DB 테이블이므로 id가 겨칠 수 있음
+    // React key로 사용할 고유 식별자 추가
+    uniqueId: `template_${template.id}`,
     title: template.name,
     description: template.description,
     icon: template.icon || 'target',
@@ -76,6 +79,9 @@ const transformUserChallenge = (uc) => {
 
     return {
         id: uc.id,
+        // Template과 UserChallenge는 서로 다른 DB 테이블이므로 id가 겨칠 수 있음
+        // React key로 사용할 고유 식별자 추가
+        uniqueId: `uc_${uc.id}`,
         title: uc.name,
         description: uc.description,
         icon: uc.icon || 'target',

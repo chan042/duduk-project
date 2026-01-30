@@ -3,12 +3,14 @@
  * - 챌린지 상세 모달 컴포넌트
  * - 챌린지 카드 클릭 시 표시되는 팝업
  * - 새로운 UserChallenge 모델에 맞게 progress 객체 처리
+ * - 난이도별 두둑 캐릭터 얼굴 아이콘 표시
  */
 import { useState, useRef } from 'react';
 import { X, Sparkles, ShoppingCart, Utensils, Wallet, Coffee, MapPin, FileText, Target, Dumbbell, Zap, Clock, Camera, Image, ChevronDown } from 'lucide-react';
 import { CATEGORIES, getCategoryIcon } from '../common/CategoryIcons';
+import { useAuth } from '@/contexts/AuthContext';
 
-// 아이콘 컴포넌트 매핑
+// 아이콘 컴포넌트 매핑 (fallback용)
 const getIcon = (iconName, color) => {
     const iconProps = { size: 48, color };
     switch (iconName) {
@@ -25,6 +27,33 @@ const getIcon = (iconName, color) => {
     }
 };
 
+// 난이도별 캐릭터 얼굴 이미지 경로 반환
+const getCharacterFace = (difficulty, characterType) => {
+    // characterType은 'char_ham', 'char_cat' 등의 형태로 저장됨
+    const charType = characterType || 'char_ham';
+    const diffLower = difficulty?.toLowerCase();
+
+    let faceName = 'face_happy';
+    switch (diffLower) {
+        case '쉬움':
+        case 'easy':
+            faceName = 'face_basic';
+            break;
+        case '보통':
+        case 'medium':
+            faceName = 'face_happy';
+            break;
+        case '어려움':
+        case 'hard':
+            faceName = 'face_money';
+            break;
+        default:
+            faceName = 'face_happy';
+    }
+
+    return `/images/characters/${charType}/${faceName}.png`;
+};
+
 // 난이도 라벨 매핑
 const getDifficultyLabel = (difficulty) => {
     const diffLower = difficulty?.toLowerCase();
@@ -34,12 +63,12 @@ const getDifficultyLabel = (difficulty) => {
             return 'EASY';
         case '보통':
         case 'medium':
-            return 'MEDIUM';
+            return 'NORMAL';
         case '어려움':
         case 'hard':
             return 'HARD';
         default:
-            return 'MEDIUM';
+            return 'NORMAL';
     }
 };
 
@@ -80,6 +109,9 @@ const getProgressData = (progress) => {
 };
 
 export default function ChallengeDetailModal({ challenge, onClose, onStart, onRetry, onCancel, onDelete, onPhotoUpload }) {
+    const { user } = useAuth();
+    const characterType = user?.character_type || 'ham';
+
     const [inputValues, setInputValues] = useState({});
     const [openCategorySelect, setOpenCategorySelect] = useState(null);
     const fileInputRef = useRef(null);
@@ -143,13 +175,14 @@ export default function ChallengeDetailModal({ challenge, onClose, onStart, onRe
                     <X size={24} />
                 </button>
 
-                {/* 상단 아이콘 영역 */}
-                <div style={{
-                    ...styles.iconArea,
-                    backgroundColor: challenge.color,
-                }}>
+                {/* 상단 캐릭터 아이콘 영역 */}
+                <div style={styles.iconArea}>
                     <div style={styles.iconContainer}>
-                        {getIcon(challenge.icon, challenge.iconColor)}
+                        <img
+                            src={getCharacterFace(challenge.difficulty, characterType)}
+                            alt="character"
+                            style={styles.characterImage}
+                        />
                     </div>
                 </div>
 
@@ -170,7 +203,14 @@ export default function ChallengeDetailModal({ challenge, onClose, onStart, onRe
                     {/* 포인트 & 기간 & 예상 절약 (Custom/AI) */}
                     <div style={styles.infoRow}>
                         <div style={styles.points}>
-                            <span style={styles.pointsValue}>{challenge.points || challenge.basePoints || 0}</span>
+                            <span style={styles.pointsValue}>
+                                {(challenge.progressType === 'random_budget' ||
+                                    challenge.displayConfig?.progress_type === 'random_budget' ||
+                                    challenge.successConditions?.type === 'random_budget') &&
+                                    (challenge.points === 0 || challenge.points === undefined || challenge.points === null)
+                                    ? '?'
+                                    : (challenge.points || challenge.basePoints || 0)}
+                            </span>
                             <span style={styles.pointsLabel}>P</span>
                         </div>
                         {(challenge.duration || challenge.durationDays) && (
@@ -304,7 +344,7 @@ export default function ChallengeDetailModal({ challenge, onClose, onStart, onRe
                             {progressData.isOnTrack !== undefined && (
                                 <span style={{
                                     ...styles.trackStatus,
-                                    color: progressData.isOnTrack ? '#10B981' : '#EF4444'
+                                    color: progressData.isOnTrack ? 'var(--primary)' : '#EF4444'
                                 }}>
                                     {progressData.isOnTrack ? '순조롭게 진행 중' : '목표 달성이 어려울 수 있어요'}
                                 </span>
@@ -488,6 +528,12 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    characterImage: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
     },
     content: {
         padding: '1.5rem',
@@ -616,8 +662,8 @@ const styles = {
     },
     completedInfo: {
         fontSize: '0.9rem',
-        color: '#10B981',
-        backgroundColor: '#D1FAE5',
+        color: 'var(--primary)',
+        backgroundColor: 'rgba(47, 133, 90, 0.1)',
         padding: '8px 12px',
         borderRadius: '8px',
         marginBottom: '16px',
