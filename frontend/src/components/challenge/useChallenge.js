@@ -19,7 +19,6 @@ export const useChallenge = (challenge, isOngoing = false) => {
     const isFailed = challenge?.status === 'failed' || !!challenge?.failedDate;
     const isCompleted = challenge?.status === 'completed';
     const isReady = challenge?.status === 'ready';
-    const isCancelled = challenge?.status === 'cancelled';
 
     /**
      * 버튼 텍스트 결정
@@ -29,20 +28,18 @@ export const useChallenge = (challenge, isOngoing = false) => {
         if (isFailed) return '재도전';
         if (isCompleted) return '완료';
         if (isReady) return '시작하기';
-        if (isCancelled) return '취소됨';
         return '도전하기';
     };
 
     /**
      * 버튼 타입 결정
-     * @returns {'active' | 'failed' | 'completed' | 'ready' | 'cancelled' | 'default'}
+     * @returns {'active' | 'failed' | 'completed' | 'ready' | 'default'}
      */
     const getButtonType = () => {
         if (isActive) return 'active';
         if (isFailed) return 'failed';
         if (isCompleted) return 'completed';
         if (isReady) return 'ready';
-        if (isCancelled) return 'cancelled';
         return 'default';
     };
 
@@ -78,7 +75,6 @@ export const useChallenge = (challenge, isOngoing = false) => {
         isFailed,
         isCompleted,
         isReady,
-        isCancelled,
         progressPercent,
         progressData,
         getButtonText,
@@ -89,3 +85,4 @@ export const useChallenge = (challenge, isOngoing = false) => {
 };
 
 export default useChallenge;
+

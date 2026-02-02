@@ -101,6 +101,13 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClick, is
                     {/* 타이틀 */}
                     <div style={styles.title}>{challenge.title}</div>
 
+                    {/* 설명 표시 */}
+                    {challenge.description && (
+                        <div style={styles.description}>
+                            {challenge.description}
+                        </div>
+                    )}
+
                     {/* 진행 정보 (진행률 바 없이 텍스트만) */}
                     {isActive && (
                         <div style={styles.progressInfo}>
@@ -223,6 +230,14 @@ const styles = {
         overflow: 'hidden',
         textOverflow: 'ellipsis',
     },
+    description: {
+        fontSize: '0.75rem',
+        color: 'var(--text-sub)',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        marginTop: '2px',
+    },
     progressInfo: {
         display: 'flex',
         alignItems: 'center',
@@ -232,9 +247,10 @@ const styles = {
     progressBarSection: {
         width: '100%',
         paddingTop: '4px',
+        marginLeft: '60px',
     },
     progressBarContainer: {
-        width: '100%',
+        width: '60%',
         height: '6px',
         backgroundColor: '#E5E7EB',
         borderRadius: '3px',
@@ -283,16 +299,20 @@ const styles = {
         fontWeight: '600',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
+        minWidth: '65px',
+        textAlign: 'center',
     },
     statusButton: {
-        padding: '5px 12px',
+        padding: '6px 16px',
         borderRadius: '4px',
         border: '2px solid var(--primary)',
         backgroundColor: 'white',
         color: 'var(--primary)',
-        fontSize: '0.7rem',
+        fontSize: '0.75rem',
         fontWeight: '600',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
+        minWidth: '65px',
+        textAlign: 'center',
     },
 };

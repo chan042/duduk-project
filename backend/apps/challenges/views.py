@@ -318,7 +318,7 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
-        """챌린지 취소"""
+        """챌린지 취소 - 레코드 삭제"""
         user_challenge = self.get_object()
         
         if user_challenge.status != 'active':
@@ -327,9 +327,8 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        user_challenge.status = 'cancelled'
-        user_challenge.completed_at = timezone.now()
-        user_challenge.save()
+        # 취소 시 레코드 삭제
+        user_challenge.delete()
         
         return Response({'message': '챌린지가 취소되었습니다.'})
 
@@ -344,11 +343,6 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not user_challenge.template:
-            return Response(
-                {'error': '템플릿 기반 챌린지만 재도전할 수 있습니다.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
         user_challenge.daily_logs.all().delete()
 

@@ -86,18 +86,63 @@ export default function ChallengePage() {
 
             switch (activeTab) {
                 case 'all':
-                    // 전체 탭: 모든 템플릿 + 사용자 챌린지 + 진행중인 챌린지 분리
-                    const allTemplates = await getChallengeTemplates('duduk');
+                    // 전체 탭: 모든 템플릿 + 사용자 챌린지 + 실패/완료 챌린지 포함
+                    // 1. 두둑 템플릿 + 이벤트 템플릿
+                    const allDudukTemplates = await getChallengeTemplates('duduk');
+                    let allEventTemplates = [];
+                    try {
+                        allEventTemplates = await getChallengeTemplates('event');
+                    } catch (e) {
+                        // 이벤트 템플릿이 없을 수 있음
+                    }
+                    const allTemplates = [...allDudukTemplates, ...allEventTemplates];
+
+                    // 2. 사용자 챌린지 (AI, 커스텀)
                     const userChallengesAll = await getUserChallenges();
+
+                    // 3. 진행중, 실패, 완료 챌린지
                     ongoing = await getMyChallenges('active');
+                    const failedChallenges = await getMyChallenges('failed');
+                    const completedChallenges = await getMyChallenges('completed');
 
-                    // 진행중인 챌린지의 템플릿 ID 목록
+                    // 진행중인 챌린지의 템플릿 ID/챌린지 ID 목록 (중복 방지용)
                     const ongoingTemplateIds = ongoing.map(c => c.templateId);
+                    const ongoingIds = ongoing.map(c => c.id);
 
-                    // 진행중이 아닌 템플릿만 필터링 (두둑 + 사용자 챌린지)
+                    // 진행중이 아닌 템플릿만 필터링
                     const filteredTemplates = allTemplates.filter(t => !ongoingTemplateIds.includes(t.id));
-                    const filteredUserChallenges = userChallengesAll.filter(c => !ongoingTemplateIds.includes(c.templateId) && c.status !== 'active');
-                    data = [...filteredTemplates, ...filteredUserChallenges];
+
+                    // 사용자 챌린지: active 상태 제외
+                    const filteredUserChallenges = userChallengesAll.filter(c =>
+                        !ongoingIds.includes(c.id) && c.status !== 'active'
+                    );
+
+                    // 이미 포함된 템플릿 ID 수집 (중복 방지)
+                    const existingTemplateIds = new Set([
+                        ...filteredTemplates.map(t => t.id),
+                        ...filteredUserChallenges.map(c => c.templateId || c.id)
+                    ]);
+
+                    // 실패 챌린지: 중복 제외
+                    const uniqueFailedChallenges = failedChallenges.filter(c =>
+                        !existingTemplateIds.has(c.templateId) && !existingTemplateIds.has(c.id)
+                    );
+
+                    // 완료 챌린지: 중복 제외 (실패 챌린지와도 중복 체크)
+                    const failedIds = new Set(uniqueFailedChallenges.map(c => c.templateId || c.id));
+                    const uniqueCompletedChallenges = completedChallenges.filter(c =>
+                        !existingTemplateIds.has(c.templateId) &&
+                        !existingTemplateIds.has(c.id) &&
+                        !failedIds.has(c.templateId) &&
+                        !failedIds.has(c.id)
+                    );
+
+                    data = [
+                        ...filteredTemplates,
+                        ...filteredUserChallenges,
+                        ...uniqueFailedChallenges,
+                        ...uniqueCompletedChallenges
+                    ];
                     setOngoingChallenges(ongoing);
                     break;
 
@@ -387,17 +432,19 @@ export default function ChallengePage() {
 
                     {/* 다른 탭: 일반 리스트 */}
                     {activeTab !== 'all' && challenges.length > 0 && (
-                        <div style={styles.cardList}>
-                            {challenges.map((challenge) => (
-                                <ChallengeCard
-                                    key={challenge.uniqueId || challenge.id}
-                                    challenge={challenge}
-                                    onClick={handleCardClick}
-                                    onStart={handleStartChallenge}
-                                    onRetry={handleRetryChallenge}
-                                    isOngoing={activeTab === 'ongoing'}
-                                />
-                            ))}
+                        <div style={styles.section}>
+                            <div style={styles.cardList}>
+                                {challenges.map((challenge) => (
+                                    <ChallengeCard
+                                        key={challenge.uniqueId || challenge.id}
+                                        challenge={challenge}
+                                        onClick={handleCardClick}
+                                        onStart={handleStartChallenge}
+                                        onRetry={handleRetryChallenge}
+                                        isOngoing={activeTab === 'ongoing'}
+                                    />
+                                ))}
+                            </div>
                         </div>
                     )}
 

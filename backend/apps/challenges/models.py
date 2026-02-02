@@ -124,7 +124,6 @@ class UserChallenge(models.Model):
         ('active', '진행 중'),
         ('completed', '완료'),
         ('failed', '실패'),
-        ('cancelled', '취소'),
     ]
     
     user = models.ForeignKey(

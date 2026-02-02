@@ -16,24 +16,12 @@ def _should_track_transaction(user_challenge, transaction):
     2. target_categories만 있으면 카테고리 매칭
     3. 둘 다 없거나 "all"이면 모든 지출 추적
     """
-    source_type = user_challenge.source_type
     success_conditions = user_challenge.success_conditions or {}
     
-    # duduk/event 챌린지
-    if source_type not in ['custom', 'ai']:
-        condition_type = success_conditions.get('type', 'amount_limit')
-        if condition_type == 'zero_spend':
-            target_categories = success_conditions.get('categories', [])
-            if not target_categories or 'all' in target_categories:
-                return True
-            return transaction.category in target_categories
-        return True
-    
-    # custom/ai 챌린지: 키워드 + 카테고리 필터링
     target_keywords = success_conditions.get('keywords', [])
     target_categories = success_conditions.get('categories', [])
     
-    # 키워드가 있으면 키워드 매칭 우선
+    # 1. 키워드가 있으면 키워드 매칭 우선
     if target_keywords:
         search_text = f"{transaction.item} {transaction.store} {transaction.memo}".lower()
         for keyword in target_keywords:
@@ -41,7 +29,7 @@ def _should_track_transaction(user_challenge, transaction):
                 return True
         return False
     
-    # 키워드가 없으면 카테고리 매칭
+    # 2. 키워드가 없으면 카테고리 매칭
     if not target_categories or 'all' in target_categories:
         return True
     
@@ -284,8 +272,10 @@ def _update_daily_rule_progress(user_challenge, success_conditions):
 
 
 def _check_auto_judgement(user_challenge, transaction_date=None, category=None, amount=None):
-    """ 각 챌린지 유형별 즉시 실패 조건 체크 """
-
+    """
+    각 챌린지 유형별 즉시 실패 조건 체크
+    딕셔너리+함수 매핑으로 condition_type별 핸들러 호출
+    """
     progress = user_challenge.progress or {}
     success_conditions = user_challenge.success_conditions or {}
 
@@ -300,108 +290,138 @@ def _check_auto_judgement(user_challenge, transaction_date=None, category=None, 
 
     # 챌린지 유형별 즉시 실패 조건 확인
     condition_type = success_conditions.get('type', 'amount_limit')
+    
+    # 딕셔너리에서 핸들러 조회 후 실행
+    handler = IMMEDIATE_FAILURE_HANDLERS.get(condition_type)
+    if handler:
+        handler(user_challenge, progress, success_conditions, transaction_date, category)
 
-    # 3만원의 행복 (amount_limit)
-    if condition_type == 'amount_limit':
-        target = int(success_conditions.get('target_amount', 0))
+
+# ============================================================
+# 즉시 실패 조건 체크 핸들러 함수들
+# ============================================================
+
+def _check_amount_limit_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None):
+    """amount_limit 타입 즉시 실패 체크 (예: 3만원의 행복)"""
+    target = int(success_conditions.get('target_amount', 0))
+    current = progress.get('current', 0)
+    
+    if target > 0:
+        # 목표 금액이 있는 경우: 초과 시 즉시 실패
+        if current > target:
+            user_challenge.complete_challenge(False, current)
+    else:
+        # 목표 금액이 0인 경우 (무지출 챌린지): 지출 발생 시 즉시 실패
+        if current > 0:
+            user_challenge.complete_challenge(False, current)
+
+
+def _check_compare_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None):
+    """compare 타입 즉시 실패 체크 (예: 나와의 싸움, 고정비 다이어트)"""
+    compare_type = success_conditions.get('compare_type', '')
+    compare_base = int(success_conditions.get('compare_base', 0))
+    current = progress.get('current', 0)
+
+    if compare_type == 'last_month_week':
+        # 지난달 주차 지출보다 초과하면 즉시 실패
+        if compare_base > 0 and current > compare_base:
+            user_challenge.complete_challenge(False, current)
+    elif compare_type == 'fixed_expense':
+        # 고정비 다이어트 - 이번주 고정비 >= 이전 고정비면 즉시 실패
+        if compare_base > 0 and current >= compare_base:
+            user_challenge.complete_challenge(False, current)
+    elif compare_type == 'next_month_category':
+        # 미래의 나에게 - (a+1)달 카테고리 지출이 a달 초과 시 즉시 실패
+        if compare_base > 0 and current > compare_base:
+            user_challenge.complete_challenge(False, current)
+
+
+def _check_zero_spend_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None):
+    """zero_spend 타입 즉시 실패 체크 (예: 3일 연속 무지출, 외식/배달 X)"""
+    if progress.get('is_violated', False):
+        user_challenge.complete_challenge(False, progress.get('violation_amount', 0))
+
+
+def _check_amount_limit_with_photo_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None):
+    """amount_limit_with_photo 타입 즉시 실패 체크 (예: 현금 챌린지)"""
+    target = user_challenge.user_input_values.get('target_amount', 0)
+    if target:
+        target = int(target)
         current = progress.get('current', 0)
-        if target > 0 and current > target:
+        if current > target:
             user_challenge.complete_challenge(False, current)
             return
 
-    # 나와의 싸움 (compare - last_month_week)
-    elif condition_type == 'compare':
-        compare_type = success_conditions.get('compare_type', '')
+    # 하루라도 사진 미인증 시 즉시 실패 (전날까지 체크)
+    if transaction_date:
+        _check_photo_missing_failure(user_challenge, transaction_date)
 
-        if compare_type == 'last_month_week':
-            # 지난달 주차 지출보다 초과하면 즉시 실패
-            compare_base = int(success_conditions.get('compare_base', 0))
-            current = progress.get('current', 0)
-            if compare_base > 0 and current > compare_base:
-                user_challenge.complete_challenge(False, current)
-                return
 
-        elif compare_type == 'fixed_expense':
-            # 고정비 다이어트 - 이번주 고정비 >= 이전 고정비면 즉시 실패
-            compare_base = int(success_conditions.get('compare_base', 0))
-            current = progress.get('current', 0)
-            if compare_base > 0 and current >= compare_base:
-                user_challenge.complete_challenge(False, current)
-                return
+def _check_photo_verification_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None):
+    """photo_verification 타입 즉시 실패 체크 (예: 원플원 러버)"""
+    photo_condition = success_conditions.get('photo_condition', '')
+    if '1+1' in photo_condition:
+        # 편의점 지출이 있으면 당일 사진 인증 체크
+        if category and '편의점' in category:
+            _check_one_plus_one_failure(user_challenge, transaction_date)
 
-        elif compare_type == 'next_month_category':
-            # 미래의 나에게 - (a+1)달 카테고리 지출이 a달 초과 시 즉시 실패
-            compare_base = int(success_conditions.get('compare_base', 0))
-            current = progress.get('current', 0)
-            if compare_base > 0 and current > compare_base:
-                user_challenge.complete_challenge(False, current)
-                return
 
-    # 3일 연속 무지출 챌린지 & 외식/배달 X (zero_spend)
-    elif condition_type == 'zero_spend':
-        if progress.get('is_violated', False):
-            user_challenge.complete_challenge(False, progress.get('violation_amount', 0))
-            return
-
-    # 현금 챌린지 (amount_limit_with_photo)
-    elif condition_type == 'amount_limit_with_photo':
-        # 설정 금액 초과 시 즉시 실패
-        target = user_challenge.user_input_values.get('target_amount', 0)
-        if target:
-            target = int(target)
-            current = progress.get('current', 0)
-            if current > target:
-                user_challenge.complete_challenge(False, current)
-                return
-
-        # 하루라도 사진 미인증 시 즉시 실패 (전날까지 체크)
-        if transaction_date:
-            _check_photo_missing_failure(user_challenge, transaction_date)
-
-    # 원플원 러버 (photo_verification with convenience store)
-    elif condition_type == 'photo_verification':
-        photo_condition = success_conditions.get('photo_condition', '')
-        if '1+1' in photo_condition:
-            # 편의점 지출이 있으면 당일 사진 인증 체크
-            if category and '편의점' in category:
-                _check_one_plus_one_failure(user_challenge, transaction_date)
-
-    # 내 소비 맞추기 (amount_range)
-    elif condition_type == 'amount_range':
-        target = user_challenge.user_input_values.get('target_amount', 0)
-        if target:
-            target = int(target)
-            tolerance_percent = success_conditions.get('tolerance_percent', 10)
-            upper_limit = target * (1 + tolerance_percent / 100)
-            current = progress.get('current', 0)
-            if current > upper_limit:
-                user_challenge.complete_challenge(False, current)
-                return
-
-    # 무00의 날 (daily_rule)
-    elif condition_type == 'daily_rule':
-        # 지출 발생하면 즉시 실패
-        if progress.get('has_violation', False):
-            user_challenge.complete_challenge(False, progress.get('current', 0))
-            return
-
-    # 두근두근 데스게임 (random_budget)
-    elif condition_type == 'random_budget':
-        random_budget = user_challenge.system_generated_values.get('random_budget', 0)
-        if random_budget:
-            random_budget = int(random_budget)
-            current = progress.get('current', 0)
-            if current > random_budget:
-                user_challenge.complete_challenge(False, current)
-                return
-
-    # AI/커스텀 챌린지 (custom) - target_amount 초과 시 즉시 실패
-    elif condition_type == 'custom':
-        target = int(success_conditions.get('target_amount', 0))
+def _check_amount_range_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None):
+    """amount_range 타입 즉시 실패 체크 (예: 내 소비 맞추기)"""
+    target = user_challenge.user_input_values.get('target_amount', 0)
+    if target:
+        target = int(target)
+        tolerance_percent = success_conditions.get('tolerance_percent', 10)
+        upper_limit = target * (1 + tolerance_percent / 100)
         current = progress.get('current', 0)
-        if target > 0 and current > target:
+        if current > upper_limit:
             user_challenge.complete_challenge(False, current)
-            return
+
+
+def _check_daily_rule_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None):
+    """daily_rule 타입 즉시 실패 체크 (예: 무00의 날)"""
+    if progress.get('has_violation', False):
+        user_challenge.complete_challenge(False, progress.get('current', 0))
+
+
+def _check_random_budget_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None):
+    """random_budget 타입 즉시 실패 체크 (예: 두근두근 데스게임)"""
+    random_budget = user_challenge.system_generated_values.get('random_budget', 0)
+    if random_budget:
+        random_budget = int(random_budget)
+        current = progress.get('current', 0)
+        if current > random_budget:
+            user_challenge.complete_challenge(False, current)
+
+
+def _check_custom_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None):
+    """custom 타입 즉시 실패 체크 (AI/커스텀 챌린지)"""
+    target = int(success_conditions.get('target_amount', 0))
+    current = progress.get('current', 0)
+    
+    if target > 0:
+        # 목표 금액이 있는 경우: 초과 시 즉시 실패
+        if current > target:
+            user_challenge.complete_challenge(False, current)
+    else:
+        # 목표 금액이 0인 경우 (zero_spend 스타일): 지출 발생 시 즉시 실패
+        if progress.get('is_violated', False) or current > 0:
+            user_challenge.complete_challenge(False, current)
+
+
+# condition_type별 즉시 실패 체크 핸들러 매핑
+IMMEDIATE_FAILURE_HANDLERS = {
+    'amount_limit': _check_amount_limit_failure,
+    'compare': _check_compare_failure,
+    'zero_spend': _check_zero_spend_failure,
+    'amount_limit_with_photo': _check_amount_limit_with_photo_failure,
+    'photo_verification': _check_photo_verification_failure,
+    'amount_range': _check_amount_range_failure,
+    'daily_rule': _check_daily_rule_failure,
+    'random_budget': _check_random_budget_failure,
+    'custom': _check_custom_failure,
+    'daily_check': None,  # daily_check는 즉시 실패 조건 없음
+}
 
 
 

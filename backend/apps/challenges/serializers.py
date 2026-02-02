@@ -613,6 +613,16 @@ class BaseChallengeStartSerializer(serializers.Serializer):
         required=False,
         default=list
     )
+    # 모든 기존 condition_type 허용
+    condition_type = serializers.ChoiceField(
+        choices=[
+            'amount_limit', 'zero_spend', 'compare', 'amount_range',
+            'daily_rule', 'random_budget', 'photo_verification',
+            'amount_limit_with_photo', 'daily_check', 'custom'
+        ],
+        required=False,
+        default='amount_limit'
+    )
 
     def validate_target_categories(self, value):
         for category in value:
@@ -620,10 +630,13 @@ class BaseChallengeStartSerializer(serializers.Serializer):
                 raise serializers.ValidationError(f"유효하지 않은 카테고리입니다: {category}")
         return value
 
-    def _build_success_conditions(self, target_amount, target_categories, target_keywords, success_conditions_list):
+    def _build_success_conditions(self, target_amount, target_categories, target_keywords, success_conditions_list, condition_type=None):
         """success_conditions JSON 생성"""
+        if condition_type is None:
+            condition_type = "amount_limit" if target_amount else "custom"
+        
         return {
-            "type": "amount_limit" if target_amount else "custom",
+            "type": condition_type,
             "target_amount": target_amount or 0,
             "categories": target_categories or ["all"],
             "keywords": target_keywords or [],
@@ -675,9 +688,10 @@ class BaseChallengeStartSerializer(serializers.Serializer):
         target_categories = validated_data.pop('target_categories', [])
         target_keywords = validated_data.pop('target_keywords', [])
         success_conditions_list = validated_data.pop('success_conditions', [])
+        condition_type = validated_data.pop('condition_type', None)
 
         success_conditions = self._build_success_conditions(
-            target_amount, target_categories, target_keywords, success_conditions_list
+            target_amount, target_categories, target_keywords, success_conditions_list, condition_type
         )
         display_config = self._build_display_config(target_amount, success_conditions_list)
         progress = self._build_initial_progress(target_amount)
