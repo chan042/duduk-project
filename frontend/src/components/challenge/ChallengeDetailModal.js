@@ -7,7 +7,7 @@
  * - 참고 UI 기반 재설계: 그라데이션 배경, 비스듬한 난이도 배지, 카드형 레이아웃
  */
 import { useState, useRef } from 'react';
-import { X, Clock, Camera, Image, ChevronDown, Trophy, TrendingUp, FileText, Target } from 'lucide-react';
+import { X, Clock, Camera, Image, ChevronDown, Trophy, TrendingUp, FileText, Target, CheckCircle } from 'lucide-react';
 import { CATEGORIES, getCategoryIcon } from '../common/CategoryIcons';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -230,30 +230,49 @@ export default function ChallengeDetailModal({
                     </div>
 
                     {/* 달성 조건 카드 */}
-                    {(challenge.successDescription || (challenge.requiresPhoto && challenge.photoDescription)) && (
-                        <div style={styles.descriptionCard}>
-                            <div style={styles.cardAccent} />
-                            <div style={styles.cardContent}>
-                                <div style={styles.cardHeader}>
-                                    <Target size={16} color="var(--primary)" />
-                                    <span>달성 조건</span>
+                    {(() => {
+                        const conditions = challenge.displayConfig?.success_conditions_display || challenge.display_config?.success_conditions_display;
+                        const hasConditions = conditions && conditions.length > 0;
+                        const showCard = hasConditions || challenge.successDescription || (challenge.requiresPhoto && challenge.photoDescription);
+
+                        if (!showCard) return null;
+
+                        return (
+                            <div style={styles.descriptionCard}>
+                                <div style={styles.cardAccent} />
+                                <div style={styles.cardContent}>
+                                    <div style={styles.cardHeader}>
+                                        <Target size={16} color="var(--primary)" />
+                                        <span>달성 조건</span>
+                                    </div>
+                                    {hasConditions ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+                                            {conditions.map((cond, idx) => (
+                                                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                                    <CheckCircle size={16} color="var(--primary)" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                                    <span style={{ ...styles.cardText, margin: 0 }}>{cond}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        challenge.successDescription && (
+                                            <p style={styles.cardText}>{challenge.successDescription}</p>
+                                        )
+                                    )}
+                                    {challenge.requiresPhoto && challenge.photoDescription && (
+                                        <p style={{
+                                            ...styles.cardText,
+                                            marginTop: (hasConditions || challenge.successDescription) ? '8px' : '0',
+                                            color: 'var(--primary)',
+                                            fontWeight: '500'
+                                        }}>
+                                            📷 {challenge.photoDescription}
+                                        </p>
+                                    )}
                                 </div>
-                                {challenge.successDescription && (
-                                    <p style={styles.cardText}>{challenge.successDescription}</p>
-                                )}
-                                {challenge.requiresPhoto && challenge.photoDescription && (
-                                    <p style={{
-                                        ...styles.cardText,
-                                        marginTop: challenge.successDescription ? '8px' : '0',
-                                        color: 'var(--primary)',
-                                        fontWeight: '500'
-                                    }}>
-                                        📷 {challenge.photoDescription}
-                                    </p>
-                                )}
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {/* 무00의 날 챌린지: 요일별 금지 카테고리 선택 UI */}
                     {!isActive && !isFailed && !isCompleted && challenge.userInputs && challenge.userInputs.some(i => i.key === 'mon_forbidden') && (
@@ -459,13 +478,7 @@ export default function ChallengeDetailModal({
                             </div>
                         )}
 
-                    {/* 실패 정보 */}
-                    {isFailed && (
-                        <div style={styles.failedInfo}>
-                            {challenge.failedDate || '이전 시도'} 실패
-                            {challenge.attemptNumber > 1 && ` (${challenge.attemptNumber - 1}회차)`}
-                        </div>
-                    )}
+
 
                     {/* 완료 정보 */}
                     {isCompleted && (
