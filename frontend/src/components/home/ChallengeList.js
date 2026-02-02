@@ -36,7 +36,7 @@ export default function ChallengeList() {
 
     if (!isLoading && challenges.length === 0) {
         return (
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ marginBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}>
                     <h2 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-main)' }}>도전 중인 챌린지</h2>
                     <button
@@ -73,7 +73,7 @@ export default function ChallengeList() {
     }
 
     return (
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}>
                 <h2 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-main)' }}>도전 중인 챌린지</h2>
                 <button

@@ -60,9 +60,13 @@ export const deleteTransaction = async (id) => {
     }
 };
 
-export const getCategoryStats = async () => {
+export const getCategoryStats = async (year, month) => {
     try {
-        const response = await client.get('/api/transactions/category-stats/');
+        let url = '/api/transactions/category-stats/';
+        if (year && month) {
+            url += `?year=${year}&month=${month}`;
+        }
+        const response = await client.get(url);
         return response.data;
     } catch (error) {
         console.error('Get Category Stats Error:', error);

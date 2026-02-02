@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from apps.transactions.models import Transaction
 from external.gemini.client import GeminiClient
@@ -12,18 +13,29 @@ User = get_user_model()
 class CoachingAdviceView(APIView):
     """
     사용자의 코칭 카드 목록을 조회하는 뷰
-    (코칭 생성은 지출 내역 추가 시 자동으로 이루어짐)
+    - query param으로 year, month가 주어지면 해당 월에 생성된 코칭만 반환
+    - 주어지지 않으면 전체 코칭 반환 (기존 동작 유지)
     """
-    permission_classes = [IsAuthenticated]  # 인증된 사용자만 사용 가능
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # 로그인한 사용자의 코칭 카드만 조회
         user = request.user
+        year = request.query_params.get('year')
+        month = request.query_params.get('month')
 
         from .models import Coaching
 
-        # 최신순으로 코칭 카드 조회
-        coachings = Coaching.objects.filter(user=user).order_by('-created_at')
+        # 기본: 모든 코칭 조회 (최신순)
+        coachings = Coaching.objects.filter(user=user)
+        
+        # year/month 파라미터가 있으면 해당 월에 생성된 코칭만 필터링
+        if year and month:
+            coachings = coachings.filter(
+                created_at__year=int(year),
+                created_at__month=int(month)
+            )
+        
+        coachings = coachings.order_by('-created_at')
         
         data = []
         for c in coachings:

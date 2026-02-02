@@ -14,6 +14,7 @@ export default function CoachingPage() {
     const router = useRouter();
     const [cards, setCards] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [totalSavingsThisMonth, setTotalSavingsThisMonth] = useState(0);
 
     // AI 챌린지 모달 상태
     const [showAIPreviewModal, setShowAIPreviewModal] = useState(false);
@@ -34,18 +35,32 @@ export default function CoachingPage() {
     useEffect(() => {
         const fetchCoaching = async () => {
             try {
-                const data = await getCoachingAdvice();
+                // 전체 코칭 카드 조회 (카드 목록 표시용)
+                const allData = await getCoachingAdvice();
+
+                // 현재 월 코칭 카드 조회 (예상 절약액 계산용)
+                const today = new Date();
+                const currentMonthData = await getCoachingAdvice(today.getFullYear(), today.getMonth() + 1);
+
                 // Map backend data to frontend format
-                const mappedCards = data.map(item => ({
+                const mappedCards = allData.map(item => ({
                     id: item.id,
                     tag: item.subject,
                     title: item.title,
                     analysis: item.analysis,
                     description: item.coaching_content,
-                    estimated_savings: item.estimated_savings, // 추가된 필드 저장
-                    icon: getIconForSubject(item.subject)
+                    estimated_savings: item.estimated_savings,
+                    icon: getIconForSubject(item.subject),
+                    created_at: item.created_at
                 }));
+
+                // 현재 월 예상 절약액 합계 계산
+                const currentMonthSavings = currentMonthData.reduce(
+                    (sum, item) => sum + (item.estimated_savings || 0), 0
+                );
+
                 setCards(mappedCards);
+                setTotalSavingsThisMonth(currentMonthSavings);
             } catch (error) {
                 console.error("Failed to fetch coaching:", error);
             } finally {
@@ -87,9 +102,6 @@ export default function CoachingPage() {
         }
     };
 
-    // 예상 절약액 합계 계산
-    const totalSavings = cards.reduce((sum, card) => sum + (card.estimated_savings || 0), 0);
-
     // 최신 4개와 나머지 카드 분리 (최대 5개)
     const recentCards = cards.slice(0, 4);
     const olderCards = cards.slice(4, 9); // 5번째부터 9번째까지 (최대 5개)
@@ -102,8 +114,8 @@ export default function CoachingPage() {
         }}>
 
             <main>
-                {/* 계산된 합계를 전달 */}
-                <SavingsSummary totalSavings={totalSavings} />
+                {/* 이번 달 예상 절약액만 전달 */}
+                <SavingsSummary totalSavings={totalSavingsThisMonth} />
                 {/* 최신 4개 카드만 전달 */}
                 <CoachingCardList
                     cards={recentCards}

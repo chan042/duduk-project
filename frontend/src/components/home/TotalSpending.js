@@ -16,7 +16,8 @@ export default function TotalSpending() {
     const fetchTotalSpending = async () => {
         try {
             setLoading(true);
-            const response = await getCategoryStats();
+            const today = new Date();
+            const response = await getCategoryStats(today.getFullYear(), today.getMonth() + 1);
             setTotalSpending(response.total);
         } catch (err) {
             console.error('Failed to fetch total spending:', err);
@@ -36,7 +37,7 @@ export default function TotalSpending() {
             borderRadius: 'var(--radius-lg)',
             padding: '1.75rem',
             boxShadow: 'var(--shadow-md)',
-            marginBottom: '2rem',
+            marginBottom: '0.75rem',
             position: 'relative',
             overflow: 'hidden'
         }}>

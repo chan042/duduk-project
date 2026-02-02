@@ -26,24 +26,27 @@ export default function CategorySpending() {
         try {
             setLoading(true);
             setError(null);
-            const response = await getCategoryStats();
+            const today = new Date();
+            const response = await getCategoryStats(today.getFullYear(), today.getMonth() + 1);
             console.log('API Response Categories:', response.categories.map(c => c.category)); // Debugging log
 
-            // 카테고리별 색상 지정
-            const categoriesWithColors = response.categories.map((cat, index) => {
-                const normalizedName = normalizeCategory(cat.category);
-                return {
-                    name: normalizedName,
-                    originalName: cat.category, // Keep original for reference if needed
-                    amount: cat.amount,
-                    percent: cat.percent,
-                    color: CATEGORY_COLORS[normalizedName] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]
-                };
-            });
+            // 카테고리별 색상 지정 및 정렬
+            const categoriesWithColors = response.categories
+                .map((cat, index) => {
+                    const normalizedName = normalizeCategory(cat.category);
+                    return {
+                        name: normalizedName,
+                        originalName: cat.category,
+                        amount: cat.amount,
+                        percent: cat.percent,
+                        color: CATEGORY_COLORS[normalizedName] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]
+                    };
+                })
+                .sort((a, b) => b.amount - a.amount) // 금액 내림차순 정렬
+                .slice(0, 5); // 상위 5개만 선택
 
             setData(categoriesWithColors);
             setTotal(response.total);
-            // 기본값으로 가장 큰 비율의 카테고리 선택
 
         } catch (err) {
             console.error('Failed to fetch category stats:', err);
@@ -68,12 +71,12 @@ export default function CategorySpending() {
             <div style={{
                 backgroundColor: 'white',
                 borderRadius: 'var(--radius-lg)',
-                padding: '2rem 1.5rem',
+                padding: '1rem 1.5rem',
                 boxShadow: 'var(--shadow-md)',
-                marginBottom: '2.5rem',
+                marginBottom: '0.75rem',
                 textAlign: 'center'
             }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '2rem' }}>카테고리별 소비</h2>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.25rem' }}>카테고리별 소비</h2>
                 <p style={{ color: 'var(--text-sub)', padding: '3rem 0' }}>데이터를 불러오는 중...</p>
             </div>
         );
@@ -84,12 +87,12 @@ export default function CategorySpending() {
             <div style={{
                 backgroundColor: 'white',
                 borderRadius: 'var(--radius-lg)',
-                padding: '2rem 1.5rem',
+                padding: '1rem 1.5rem',
                 boxShadow: 'var(--shadow-md)',
-                marginBottom: '2.5rem',
+                marginBottom: '0.75rem',
                 textAlign: 'center'
             }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '2rem' }}>카테고리별 소비</h2>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.25rem' }}>카테고리별 소비</h2>
                 <p style={{ color: '#ef4444', padding: '3rem 0' }}>{error}</p>
             </div>
         );
@@ -100,41 +103,45 @@ export default function CategorySpending() {
             <div style={{
                 backgroundColor: 'white',
                 borderRadius: 'var(--radius-lg)',
-                padding: '2rem 1.5rem',
+                padding: '1rem 1.5rem',
                 boxShadow: 'var(--shadow-md)',
-                marginBottom: '2.5rem',
+                marginBottom: '0.75rem',
                 textAlign: 'center'
             }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '2rem' }}>카테고리별 소비</h2>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.25rem' }}>카테고리별 소비</h2>
                 <p style={{ color: 'var(--text-sub)', padding: '3rem 0' }}>아직 지출 내역이 없습니다.</p>
             </div>
         );
     }
 
+    // Top 5 항목들의 총합 계산 (차트 정규화용)
+    const totalTop5 = data.reduce((acc, curr) => acc + curr.amount, 0);
     let cumulativePercent = 0;
 
     return (
         <div style={{
             backgroundColor: 'white',
             borderRadius: 'var(--radius-lg)',
-            padding: '2rem 1.5rem',
+            padding: '1rem 1.5rem',
             boxShadow: 'var(--shadow-md)',
-            marginBottom: '2.5rem'
+            marginBottom: '0.75rem'
         }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '2rem' }}>카테고리별 소비</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.25rem' }}>카테고리별 소비</h2>
 
             {/* Donut Chart */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2.5rem', position: 'relative' }}>
-                <svg viewBox="-1.5 -1.5 3 3" style={{ transform: 'rotate(-90deg)', width: '200px', height: '200px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.25rem', position: 'relative' }}>
+                <svg viewBox="-1.25 -1.25 2.5 2.5" style={{ transform: 'rotate(-90deg)', width: '320px', height: '320px' }}>
                     {data.map((slice, index) => {
+                        // 차트에는 Top 5 내에서의 비중을 사용
+                        const relativePercent = slice.amount / totalTop5;
                         const start = cumulativePercent;
-                        cumulativePercent += slice.percent / 100;
+                        cumulativePercent += relativePercent;
                         const end = cumulativePercent;
 
                         const [startX, startY] = getCoordinatesForPercent(start);
                         const [endX, endY] = getCoordinatesForPercent(end);
 
-                        const largeArcFlag = slice.percent > 50 ? 1 : 0;
+                        const largeArcFlag = relativePercent > 0.5 ? 1 : 0;
 
                         const pathData = [
                             `M ${startX} ${startY}`,
@@ -142,7 +149,6 @@ export default function CategorySpending() {
                             `L 0 0`,
                         ].join(' ');
 
-                        // 선택된 카테고리인지 확인
                         return (
                             <path
                                 key={index}

@@ -125,12 +125,23 @@ class TransactionListView(APIView):
 class CategoryStatsView(APIView):
     """
     사용자의 카테고리별 지출 통계를 조회하는 뷰
+    - query param으로 year, month가 주어지면 해당 월의 내역만 필터링
+    - 주어지지 않으면 현재 월 기준으로 필터링
     """
     permission_classes = [IsAuthenticated]
     def get(self, request):
         user = request.user
+        year = request.query_params.get('year')
+        month = request.query_params.get('month')
+        today = timezone.localdate()
+        target_year = int(year) if year else today.year
+        target_month = int(month) if month else today.month
         
-        transactions = Transaction.objects.filter(user=user)
+        transactions = Transaction.objects.filter(
+            user=user,
+            date__year=target_year,
+            date__month=target_month
+        )
         
         from django.db.models import Sum
         category_stats = transactions.values('category').annotate(

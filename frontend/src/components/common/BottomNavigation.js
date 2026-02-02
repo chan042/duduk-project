@@ -91,9 +91,9 @@ export default function BottomNavigation({ onQuickAddClick }) {
                 </Link>
 
                 {/* 윤택지수 */}
-                <Link href="/wellness" style={{
+                <Link href="/yuntaek-index" style={{
                     ...styles.navButton,
-                    color: pathname === '/wellness' ? 'var(--primary)' : 'var(--text-sub)'
+                    color: pathname === '/yuntaek-index' ? 'var(--primary)' : 'var(--text-sub)'
                 }}>
                     <TrendingUp size={24} />
                     <span style={styles.navLabel}>윤택지수</span>

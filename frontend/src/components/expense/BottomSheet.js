@@ -16,11 +16,15 @@ export default function BottomSheet({ isOpen, onClose, children }) {
         if (isOpen) {
             document.addEventListener('mousedown', handleClickOutside);
             document.addEventListener('touchstart', handleClickOutside);
+            // 배경 스크롤 방지
+            document.body.style.overflow = 'hidden';
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
             document.removeEventListener('touchstart', handleClickOutside);
+            // 배경 스크롤 복구
+            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
 

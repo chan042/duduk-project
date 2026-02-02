@@ -60,6 +60,7 @@ class ProfileView(APIView):
         return Response(serializer.data)
 
     def patch(self, request):
+        old_monthly_budget = request.user.monthly_budget
         serializer = UserSerializer(
             request.user, 
             data=request.data, 
@@ -67,6 +68,17 @@ class ProfileView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        
+        # monthly_budget 변경 시 일일 권장 예산 스냅샷 재계산
+        new_monthly_budget = request.user.monthly_budget
+        if old_monthly_budget != new_monthly_budget:
+            from django.utils import timezone
+            from apps.transactions.services import recalculate_snapshots_from_date
+            today = timezone.localdate()
+            # 이번 달 1일부터 재계산
+            first_day_of_month = today.replace(day=1)
+            recalculate_snapshots_from_date(request.user, first_day_of_month)
+        
         return Response(serializer.data)
 
     def delete(self, request):

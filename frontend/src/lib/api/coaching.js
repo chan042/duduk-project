@@ -1,8 +1,12 @@
 import client from './client';
 
-export const getCoachingAdvice = async () => {
+export const getCoachingAdvice = async (year, month) => {
     try {
-        const response = await client.get('/api/coaching/advice/');
+        let url = '/api/coaching/advice/';
+        if (year && month) {
+            url += `?year=${year}&month=${month}`;
+        }
+        const response = await client.get(url);
         return response.data;
     } catch (error) {
         console.error('Error fetching coaching advice:', error);
