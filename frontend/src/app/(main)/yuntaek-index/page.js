@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Smile, Award, CheckCircle2, TrendingUp, Shield, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function YuntaekIndexPage() {
+    const router = useRouter();
     const score = 98;
     const [displayedScore, setDisplayedScore] = useState(0);
     const [isDetailExpanded, setIsDetailExpanded] = useState(false);
@@ -180,16 +182,18 @@ export default function YuntaekIndexPage() {
                     </p>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                    <button style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--text-sub)',
-                        fontSize: '0.85rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                    }}>
+                    <button
+                        onClick={() => router.push('/yuntaek-index/report')}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-sub)',
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                        }}>
                         더보기 <span style={{ fontSize: '1rem' }}>›</span>
                     </button>
                 </div>

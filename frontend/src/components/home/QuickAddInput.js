@@ -56,12 +56,12 @@ export default function QuickAddInput({ value, onChange }) {
                 .rainbow-border::before {
                     content: "";
                     position: absolute;
-                    inset: -4px;
+                    inset: -2px;
                     border-radius: 20px;
                     background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
                     background-size: 400%;
                     z-index: -2;
-                    filter: blur(8px);
+                    filter: blur(4px);
                     opacity: 0.7;
                     animation: aurora 10s linear infinite;
                 }
