@@ -51,7 +51,7 @@ export default function ClosetPage() {
     }, [activeTab]);
 
     const handleBack = () => {
-        router.back();
+        router.push('/challenge');
     };
 
     const handleItemClick = (item) => {

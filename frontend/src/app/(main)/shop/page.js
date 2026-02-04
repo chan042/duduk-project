@@ -65,7 +65,7 @@ export default function ShopPage() {
     }, [activeTab]);
 
     const handleBack = () => {
-        router.back();
+        router.push('/challenge');
     };
 
     const handleGachaClick = () => {
