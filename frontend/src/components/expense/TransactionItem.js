@@ -20,13 +20,18 @@ export default function TransactionItem({ transaction, onClick, isLast }) {
             className={`${styles.transactionItem} ${isLast ? '' : styles.transactionItemBorder}`}
             onClick={() => onClick(transaction)}
         >
-            <div className={styles.transactionLeft}>
-                <div className={styles.transactionCategory}>
-                    {transaction.category}
+            <div className={styles.transactionLeftWrapper}>
+                <div className={styles.transactionIconCircle}>
+                    <IconComponent size={22} color={iconColor} />
                 </div>
-                <div className={styles.transactionMerchant}>
-                    {transaction.merchant}
-                    {displayMemo && <span className={styles.transactionMemo}> | {truncateMemo(displayMemo)}</span>}
+                <div className={styles.transactionLeft}>
+                    <div className={styles.transactionCategory}>
+                        {transaction.category}
+                    </div>
+                    <div className={styles.transactionMerchant}>
+                        {transaction.merchant}
+                        {displayMemo && <span className={styles.transactionMemo}> | {truncateMemo(displayMemo)}</span>}
+                    </div>
                 </div>
             </div>
             <div className={styles.transactionRight}>

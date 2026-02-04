@@ -7,8 +7,8 @@
   /* Allow growth */
   max-width: 100%;
   padding: 0.25rem;
-  padding-bottom: 6rem;
-  /* Space for bottom nav */
+  /* 하단 패딩 제거 (바텀 네비와 거의 맞닿게) */
+  padding-bottom: 0;
   position: relative;
   /* Removed height: 100dvh, overflow hidden constraints */
 }
@@ -357,8 +357,8 @@
   display: flex;
   gap: 0.75rem;
   padding: 0 0.5rem;
-  margin-bottom: 2rem;
-  /* Add more bottom space */
+  /* Keep very small bottom spacing */
+  margin-bottom: 0.5rem;
   flex-shrink: 0;
 }
 
@@ -734,8 +734,7 @@
 .transactionItem {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  /* Changed to flex-start for multi-line text alignment */
+  align-items: center;
   padding: 0.75rem 0;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -750,12 +749,30 @@
   border-radius: 8px;
 }
 
+.transactionLeftWrapper {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.transactionIconCircle {
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: -0.25rem;
+  margin-right: 1.1rem;
+}
+
 .transactionLeft {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   flex: 1;
-  padding-right: 1rem;
 }
 
 .transactionCategory {
