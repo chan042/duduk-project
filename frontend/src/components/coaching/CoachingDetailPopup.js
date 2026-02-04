@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Coffee, ShoppingBag, MapPin, Droplets, Zap, Lightbulb } from 'lucide-react';
+import { X, Coffee, ShoppingBag, MapPin, Droplets, Zap, Lightbulb, Sparkles } from 'lucide-react';
 
 export default function CoachingDetailPopup({ isOpen, onClose, data, onStartChallenge }) {
     if (!isOpen || !data) return null;
@@ -45,120 +45,198 @@ export default function CoachingDetailPopup({ isOpen, onClose, data, onStartChal
                 animation: 'slideUp 0.3s ease-out'
             }} onClick={e => e.stopPropagation()}>
 
-                {/* Header */}
-                <div style={{
-                    padding: '1.5rem',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderBottom: '1px solid #f0f0f0'
-                }}>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>AI 코칭</h3>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                        <X size={24} color="#666" />
-                    </button>
-                </div>
-
-                {/* Content */}
-                <div style={{
-                    padding: '2rem 1.5rem',
-                    overflowY: 'auto', // 세로 스크롤 허용
-                    overscrollBehavior: 'contain' // 내부 스크롤이 부모로 전파되는 것 방지
-                }}>
-                    {/* Icon */}
-                    <div style={{
+                {/* Floating Close Button */}
+                <button
+                    onClick={onClose}
+                    style={{
+                        position: 'absolute',
+                        top: '1.5rem',
+                        right: '1.5rem',
+                        zIndex: 20,
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(0,0,0,0.05)',
+                        borderRadius: '50%',
+                        width: '40px',
+                        height: '40px',
                         display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'center',
-                        marginBottom: '1.5rem'
-                    }}>
-                        {getIcon(data.tag)}
-                    </div>
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                        transition: 'transform 0.2s ease'
+                    }}
+                    onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
+                    onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                    <X size={20} color="#334155" />
+                </button>
 
-                    {/* Title */}
-                    <h2 style={{
-                        fontSize: '1.5rem',
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        marginBottom: '0.5rem',
-                        lineHeight: '1.3'
-                    }}>
-                        {data.title}
-                    </h2>
+                {/* Scrollable Content */}
+                <div style={{
+                    padding: '0',
+                    overflowY: 'auto',
+                    overscrollBehavior: 'contain',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: '#ffffff'
+                }}>
 
-                    {/* Tag */}
+                    {/* Header Section */}
                     <div style={{
-                        textAlign: 'center',
-                        marginBottom: '2rem'
+                        padding: '4.5rem 2rem 1.5rem 2rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        textAlign: 'center'
                     }}>
+                        {/* Tag */}
                         <span style={{
-                            color: '#14b8a6',
-                            fontWeight: '600',
-                            fontSize: '0.95rem'
+                            backgroundColor: 'rgba(20, 184, 166, 0.1)',
+                            color: '#0d9488',
+                            padding: '6px 14px',
+                            borderRadius: '100px',
+                            fontSize: '0.85rem',
+                            fontWeight: '700',
+                            letterSpacing: '-0.01em',
+                            marginBottom: '1rem'
                         }}>
                             {data.tag}
                         </span>
+
+                        {/* Title */}
+                        <h2 style={{
+                            fontSize: '1.75rem',
+                            fontWeight: '800',
+                            color: '#111827',
+                            marginBottom: '1rem',
+                            lineHeight: '1.3',
+                            letterSpacing: '-0.03em',
+                            wordBreak: 'keep-all'
+                        }}>
+                            {data.title}
+                        </h2>
                     </div>
 
-                    {/* Main Content */}
-                    <p style={{
-                        fontSize: '1rem',
-                        color: '#2d3748',
-                        lineHeight: '1.6',
-                        marginBottom: '1.5rem',
-                        whiteSpace: 'pre-wrap'
-                    }}>
-                        {data.description}
-                    </p>
-
-                    {/* Analysis Box */}
+                    {/* Body Content */}
                     <div style={{
-                        backgroundColor: '#fffbeb', // Light yellow bg
-                        padding: '1.25rem',
-                        borderRadius: '12px',
-                        marginBottom: '2rem'
+                        padding: '0 2rem 8rem 2rem', // Bottom padding for footer
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2.5rem'
                     }}>
-                        <h4 style={{
-                            fontSize: '0.9rem',
-                            fontWeight: 'bold',
-                            color: '#4a5568',
-                            marginBottom: '0.5rem'
+                        {/* Description */}
+                        <div style={{
+                            fontSize: '1.1rem',
+                            color: '#334155',
+                            lineHeight: '1.75',
+                            letterSpacing: '-0.015em',
+                            fontWeight: '400',
+                            whiteSpace: 'pre-wrap'
                         }}>
-                            왜 이 코칭이 나왔을까요?
-                        </h4>
-                        <p style={{
-                            fontSize: '0.95rem',
-                            color: '#2d3748',
-                            lineHeight: '1.5'
-                        }}>
-                            {data.analysis}
-                        </p>
-                    </div>
+                            {data.description}
+                        </div>
 
-                    {/* Button */}
-                    <button style={{
-                        width: '100%',
-                        padding: '1rem',
-                        backgroundColor: '#14b8a6',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '12px',
-                        fontSize: '1rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer'
-                    }} onClick={() => {
-                        if (onStartChallenge) {
-                            onStartChallenge(data);
-                        }
-                        onClose();
-                    }}>
-                        챌린지 시작하기
-                    </button>
+                        {/* Analysis Card - Soft Surface Design */}
+                        <div style={{
+                            backgroundColor: '#f8fafc', // Very light slate/gray
+                            borderRadius: '24px',
+                            padding: '1.75rem',
+                            border: '1px solid #f1f5f9'
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                marginBottom: '1rem'
+                            }}>
+                                <Sparkles size={18} color="#0f766e" fill="#0f766e" />
+                                <h4 style={{
+                                    fontSize: '1rem',
+                                    fontWeight: '700',
+                                    color: '#0f766e', // Dark Teal
+                                    margin: 0,
+                                    letterSpacing: '-0.02em'
+                                }}>
+                                    이 코칭이 생성된 이유
+                                </h4>
+                            </div>
+                            <p style={{
+                                fontSize: '1rem',
+                                color: '#1e293b', // Slate 800
+                                lineHeight: '1.65',
+                                margin: 0,
+                                fontWeight: '500'
+                            }}>
+                                {data.analysis || "분석 내용이 없습니다."}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer (Floating Button) */}
+                <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    padding: '1.5rem',
+                    background: 'linear-gradient(to top, #ffffff 60%, rgba(255,255,255,0))',
+                    zIndex: 10,
+                    pointerEvents: 'none' // Let clicks pass through transparent part
+                }}>
+                    <div className="glow-button-wrapper" style={{ width: '100%', pointerEvents: 'auto' }}>
+                        <button style={{
+                            width: '100%',
+                            padding: '1.1rem',
+                            backgroundColor: '#14b8a6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '16px', // Slightly more rounded
+                            fontSize: '1.05rem',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            zIndex: 2,
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                        }} onClick={() => {
+                            if (onStartChallenge) {
+                                onStartChallenge(data);
+                            }
+                            onClose();
+                        }}>
+                            이 코칭으로 챌린지 생성
+                        </button>
+                    </div>
                 </div>
             </div>
             <style jsx>{`
                 @keyframes slideUp {
                     from { transform: translateY(20px); opacity: 0; }
                     to { transform: translateY(0); opacity: 1; }
+                }
+                @keyframes aurora {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                }
+                .glow-button-wrapper {
+                    position: relative;
+                    z-index: 1;
+                }
+                .glow-button-wrapper::before {
+                    content: "";
+                    position: absolute;
+                    inset: -2px;
+                    border-radius: 16px;
+                    background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
+                    background-size: 400%;
+                    z-index: -1;
+                    filter: blur(4px);
+                    opacity: 0.7;
+                    animation: aurora 10s linear infinite;
                 }
             `}</style>
         </div>
