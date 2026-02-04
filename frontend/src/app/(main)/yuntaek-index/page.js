@@ -121,6 +121,15 @@ export default function YuntaekIndexPage() {
                     opacity: 0.7;
                     animation: aurora 10s linear infinite;
                 }
+                @keyframes pulse {
+                    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(147, 197, 253, 0.4); }
+                    70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(147, 197, 253, 0); }
+                    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(147, 197, 253, 0); }
+                }
+                @keyframes bounce {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(5px); }
+                }
             `}</style>
 
             {/* Score Section (Hero) */}
@@ -132,17 +141,52 @@ export default function YuntaekIndexPage() {
             </section>
 
             {/* Detail Section (Clean List) - Moved Up & Collapsible */}
-            <section className="glass-card fade-in" style={{ ...styles.detailSection, animationDelay: '0.3s' }}>
-                <div
-                    style={styles.detailHeader}
-                    onClick={() => setIsDetailExpanded(!isDetailExpanded)}
-                >
-                    <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>세부 지표</h2>
-                    {isDetailExpanded ? <ChevronUp size={20} color="var(--text-sub)" /> : <ChevronDown size={20} color="var(--text-sub)" />}
-                </div>
-
-                {isDetailExpanded && (
-                    <div style={styles.detailList}>
+            {/* Detail Section (Clean List) - Collapsible with Center Text */}
+            <section
+                className="glass-card fade-in"
+                style={{
+                    ...styles.detailSection,
+                    animationDelay: '0.3s',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: isDetailExpanded ? 'flex-start' : 'center',
+                    alignItems: isDetailExpanded ? 'stretch' : 'center',
+                    minHeight: 'auto',
+                    padding: isDetailExpanded ? '1.5rem' : '1rem',
+                    transition: 'all 0.3s ease',
+                    animation: !isDetailExpanded ? 'pulse 2s infinite' : 'none',
+                    animationDelay: '0.3s' // Maintain delay for fade-in
+                }}
+                onClick={() => setIsDetailExpanded(!isDetailExpanded)}
+            >
+                {!isDetailExpanded ? (
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.2rem',
+                        width: '100%',
+                    }}>
+                        <span style={{
+                            color: '#1a1a1a',
+                            fontSize: '1.1rem',
+                            fontWeight: '800',
+                            letterSpacing: '-0.5px'
+                        }}>
+                            눌러서 세부 지표 확인하기
+                        </span>
+                        <ChevronDown
+                            size={24}
+                            color="#3b82f6"
+                            style={{
+                                animation: 'bounce 1.5s infinite',
+                                marginTop: '0px'
+                            }}
+                        />
+                    </div>
+                ) : (
+                    <div style={{ ...styles.detailList, marginTop: 0 }}>
+                        <h2 style={{ ...styles.sectionTitle, marginBottom: '1.5rem' }}>세부 지표</h2>
                         {details.map((item, index) => (
                             <div key={index} style={styles.detailItem}>
                                 <div style={styles.detailTextRow}>
