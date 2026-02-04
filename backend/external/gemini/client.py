@@ -1,13 +1,14 @@
 import os
 import json
-import re
 import datetime
 import google.generativeai as genai
+from typing import Optional
 
 # ============================================================
 # 상수 정의
 # ============================================================
 
+# TODO: 이 카테고리 목록은 추후 DB나 전역 설정과 동기화 필요
 CATEGORIES = [
     "식비", "생활", "카페/간식", "온라인 쇼핑", "패션/쇼핑", "뷰티/미용",
     "교통", "자동차", "주거/통신", "의료/건강", "문화/여가", "여행/숙박",
@@ -30,6 +31,10 @@ CHALLENGE_SCHEMA = """
     "difficulty": "easy/normal/hard 중 하나",
     "description": "동기부여가 되는 챌린지 설명 (50자 이내, 친근한 말투)",
     "success_conditions": ["성공 조건 1 (구체적이고 측정 가능하게)", "성공 조건 2 (선택)"],
+    "numeric_constraints": {{
+        "duration_days": "챌린지 기간(일 단위, 정수. 예: 7)",
+        "target_amount": "목표 절감 금액(정수, 없으면 null. 예: 30000)"
+    }},
     "target_keywords": ["지출 매칭 키워드1", "키워드2"],
     "target_categories": ["관련 카테고리1", "카테고리2"]
 }}
@@ -49,7 +54,7 @@ HARD: 엄격한 제한, 0회 또는 완전 금지 (예: 7일 연속 0회)
 # 헬퍼 함수 - AI 응답 파싱
 # ============================================================
 
-def parse_json_response(text: str) -> dict | None:
+def parse_json_response(text: str) -> Optional[dict]:
     """AI 응답에서 JSON을 추출하고 파싱"""
     try:
         cleaned = text.replace("```json", "").replace("```", "").strip()
@@ -69,58 +74,6 @@ def calculate_points(difficulty: str) -> int:
     return (min_pts + max_pts) // 2
 
 
-def parse_duration_from_conditions(conditions: list) -> int:
-    """성공 조건에서 기간 추출"""
-    if not conditions:
-        return 7  # 기본 7일
-    
-    text = " ".join(conditions)
-    
-    # "N일 연속" 패턴
-    match = re.search(r'(\d+)일\s*연속', text)
-    if match:
-        days = int(match.group(1))
-        return days + 2  # N+2일
-    
-    # "주" 단위 조건
-    if '주' in text or '일주일' in text:
-        return 7
-    
-    # "월" 단위 조건
-    if '월' in text or '한달' in text or '30일' in text:
-        return 30
-    
-    # "N일" 패턴
-    match = re.search(r'(\d+)일', text)
-    if match:
-        return int(match.group(1))
-    
-    return 7  # 기본 7일
-
-
-def parse_target_amount(conditions: list) -> int | None:
-    """성공 조건에서 목표 금액 추출"""
-    if not conditions:
-        return None
-    
-    text = " ".join(conditions)
-    
-    # "N원" 또는 "N,NNN원" 패턴
-    # 쉼표 제거 후 숫자 추출
-    patterns = [
-        r'(\d{1,3}(?:,\d{3})*)\s*원',  # 1,000원, 10,000원
-        r'(\d+)\s*원',  # 1000원
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            amount_str = match.group(1).replace(',', '')
-            return int(amount_str)
-    
-    return None
-
-
 # ============================================================
 # GeminiClient 클래스
 # ============================================================
@@ -130,11 +83,12 @@ class GeminiClient:
         self.api_key = os.environ.get("GEMINI_API_KEY")
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-2.5-flash')
+            # 기본 모델 사용 (Google Search는 프롬프트에서 지시)
+            self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
         else:
             self.model = None
 
-    def _generate(self, prompt: str) -> dict | None:
+    def _generate(self, prompt: str) -> Optional[dict]:
         """공통 생성 로직"""
         if not self.model:
             return None
@@ -147,7 +101,7 @@ class GeminiClient:
             traceback.print_exc()
             return None
 
-    def analyze_text(self, text: str) -> dict | None:
+    def analyze_text(self, text: str) -> Optional[dict]:
         """
         Parses natural language transaction text into structured JSON.
         """
@@ -169,7 +123,7 @@ class GeminiClient:
             "category": "카테고리 ({categories_str})",
             "item": "품목 (예: 아메리카노, 택시비)",
             "store": "소비처 (예: 스타벅스, 카카오택시)",
-            "amount": 금액(숫자만),
+            "amount": 금액(쉼표와 원 단위를 제거한 순수 정수. 예: 15000),
             "date": "YYYY-MM-DD 형식의 날짜",
             "memo": "기타 메모",
             "address": "추정되는 위치 (없으면 빈 문자열)",
@@ -190,7 +144,7 @@ class GeminiClient:
                 result['is_fixed'] = False
         return result
 
-    def get_advice(self, transaction_list_str: str) -> dict | None:
+    def get_advice(self, transaction_list_str: str) -> Optional[dict]:
         """
         Generates financial advice based on transaction history.
         """
@@ -212,6 +166,8 @@ class GeminiClient:
         - 사용자의 소비 항목에서 키워드를 추출해 이와 비슷한 키워드를 가진 대안을 추천
         - 대안 추천을 따랐을 때의 예상 절감액 제시(절감액 = 현재소비금액 - 대안소비금액)
         - 가격비교, 취향 적합 키워드 일치, 평점·후기 등을 검색 후 객관적 근거 제공
+        - Google Search 도구를 사용하여 실제 상품 정보와 현재 가격 정보를 검색한 후 제안하세요.
+        - 검색 결과가 없는 경우, 거짓 정보를 생성하지 말고 일반적인 소비 습관 개선 조언(행동 변화 제안)으로 대체하세요.
         
         2. 행동 변화 제안 
         - 불필요한 지출이나 과다 금액을 줄일 수 있는 구체적이고 실천 가능한 행동 제안
@@ -224,6 +180,8 @@ class GeminiClient:
         - 대안 소비 위치는 현재 소비 위치로부터 1km 이내여야 함.
         - 대안 추천을 따랐을 때의 예상 절감액 제시(절감액 = 현재금액 - 대안금액)
         - 가격비교, 거리/시간 제약 충족, 평점·후기 등 객관적 근거 제공
+        - Google Search 도구를 사용하여 사용자 주변의 실제 상점 정보와 현재 가격 정보를 검색한 후 제안하세요.
+        - 검색 결과가 없거나 위치를 특정할 수 없는 경우, 거짓 정보를 생성하지 말고 일반적인 소비 습관 개선 조언(행동 변화 제안)으로 대체하세요.
         
         4. 누수 소비 방지
         - 누수 소비는 습관적, 반복적으로 빠져나가는 소액 지출을 의미 (예: 택시비, 수수료, 미사용 구독)
@@ -265,7 +223,7 @@ class GeminiClient:
         return self._generate(prompt)
 
     def generate_challenge(self, details: str, difficulty: str = None,
-                          user_spending_summary: str = None) -> dict | None:
+                          user_spending_summary: str = None) -> Optional[dict]:
         """
         사용자 입력을 바탕으로 맞춤 챌린지를 생성합니다.
 
@@ -316,7 +274,7 @@ class GeminiClient:
         return result
 
     def generate_challenge_from_coaching(self, coaching_data: dict,
-                                         difficulty: str = None) -> dict | None:
+                                         difficulty: str = None) -> Optional[dict]:
         """
         코칭 카드 데이터를 바탕으로 맞춤 챌린지를 생성합니다.
 
@@ -382,18 +340,17 @@ class GeminiClient:
         difficulty = user_difficulty or result.get('difficulty', 'normal')
         result['difficulty'] = difficulty
 
-        # 성공 조건 가져오기
-        conditions = result.get('success_conditions', [])
-
-        # 백엔드 규칙 기반 처리
+        # 백엔드 규칙 기반 포인트 계산
         result['base_points'] = calculate_points(difficulty)
-        result['duration_days'] = parse_duration_from_conditions(conditions)
-        result['target_amount'] = parse_target_amount(conditions)
+
+        # numeric_constraints에서 직접 데이터 추출 (AI 응답 사용)
+        constraints = result.get('numeric_constraints', {})
+        result['duration_days'] = constraints.get('duration_days', 7)
+        result['target_amount'] = constraints.get('target_amount')
 
         # target_categories: AI가 생성한 값 사용, 없으면 기본값
         if not result.get('target_categories'):
             result['target_categories'] = ["기타"]
-
 
         # 기본값 설정
         result.setdefault('name', fallback_name[:20] if fallback_name else '맞춤 챌린지')
