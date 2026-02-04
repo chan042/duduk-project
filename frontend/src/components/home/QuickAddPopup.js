@@ -7,6 +7,7 @@ import ReceiptScan from './ReceiptScan';
 import ImageMatching from './ImageMatching';
 import TransactionConfirm from './TransactionConfirm';
 import { parseTransaction, createTransaction } from '../../lib/api/transaction';
+import { scanReceipt } from '../../lib/api/ocr';
 
 export default function QuickAddPopup({ onClose, onTransactionAdded, selectedDate }) {
     const [step, setStep] = useState('input'); // 'input' | 'confirm'
@@ -49,6 +50,22 @@ export default function QuickAddPopup({ onClose, onTransactionAdded, selectedDat
         } catch (error) {
             console.error('Failed to parse transaction:', error);
             alert('분석에 실패했습니다. 다시 시도해주세요.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // 영수증 OCR 스캔 핸들러
+    const handleReceiptScan = async (imageFile) => {
+        setIsLoading(true);
+        try {
+            const data = await scanReceipt(imageFile);
+            setParsedData(data);
+            setInputText(''); // OCR 사용 시 텍스트 입력 초기화
+            setStep('confirm');
+        } catch (error) {
+            console.error('Failed to scan receipt:', error);
+            alert(error.message || '영수증 분석에 실패했습니다. 다시 시도해주세요.');
         } finally {
             setIsLoading(false);
         }
@@ -120,7 +137,7 @@ export default function QuickAddPopup({ onClose, onTransactionAdded, selectedDat
                             <QuickAddInput value={inputText} onChange={setInputText} />
 
                             <div style={{ display: 'flex', gap: '1rem' }}>
-                                <ReceiptScan />
+                                <ReceiptScan onImageSelect={handleReceiptScan} disabled={isLoading} />
                                 <ImageMatching />
                             </div>
                         </div>
