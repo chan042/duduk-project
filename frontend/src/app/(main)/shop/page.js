@@ -4,23 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Home, Shirt, X, ChevronLeft } from 'lucide-react';
-import { getUserPoints } from '@/lib/api/challenge';
-
-// Mock data to match the UI visual
-const mockProducts = [
-    { id: 1, name: '탐정 모자', price: 2500, category: 'clothing', image: '/images/items/hat.png' },
-    { id: 2, name: '빈티지 정장', price: 2500, category: 'clothing', image: '/images/items/suit.png' },
-    { id: 3, name: '단안경', price: 2500, category: 'item', image: '/images/items/monocle.png' },
-    { id: 4, name: '나비 넥타이', price: 2500, category: 'clothing', image: '/images/items/bowtie.png' },
-    { id: 5, name: '구식 여행 가방', price: 1500, category: 'item', image: '/images/items/bag.png' },
-    { id: 6, name: '도서관 배경', price: 1500, category: 'background', image: '/images/items/library.png' },
-    { id: 11, name: '빨간 목도리', price: 1500, category: 'clothing', image: '/images/items/hat.png' },
-    { id: 12, name: '파란 조끼', price: 2000, category: 'clothing', image: '/images/items/suit.png' },
-    { id: 13, name: '검은 안경', price: 1200, category: 'clothing', image: '/images/items/monocle.png' },
-    { id: 14, name: '선장 모자', price: 3000, category: 'clothing', image: '/images/items/hat.png' },
-    { id: 15, name: '해적 코트', price: 3500, category: 'clothing', image: '/images/items/suit.png' },
-    { id: 16, name: '황금 왕관', price: 9900, category: 'clothing', image: '/images/items/hat.png' },
-];
+import { getShopItems, getShopUserPoints, purchaseItem, playGacha } from '@/lib/api/shop';
 
 export default function ShopPage() {
     // Shopkeeper messages
@@ -33,36 +17,37 @@ export default function ShopPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState('clothing');
     const [userPoints, setUserPoints] = useState(0);
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [showGachaModal, setShowGachaModal] = useState(false);
+    const [gachaStatus, setGachaStatus] = useState('idle'); // 'idle' | 'rolling' | 'burst' | 'result'
+    const [gachaResult, setGachaResult] = useState(null); // 스텝별 가챠 결과 (null -> loading -> result)
     const [speechBubble, setSpeechBubble] = useState(shopkeeperMessages[0]);
     const [isVisible, setIsVisible] = useState(true); // Control opacity for fade effect
     const [speechIndex, setSpeechIndex] = useState(0);
-    // Using simple category filtering logic
-    const [filteredProducts, setFilteredProducts] = useState([]);
 
+    // 데이터 불러오기
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            // 포인트와 현재 탭의 상품 목록 동시 조회
+            const [pointsData, itemsData] = await Promise.all([
+                getShopUserPoints(),
+                getShopItems(activeTab)
+            ]);
+            setUserPoints(pointsData.points);
+            setProducts(itemsData);
+        } catch (err) {
+            console.error('데이터 로딩 실패:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    // Fetch user points on mount
+    // 탭 변경 시 상품 다시 조회
     useEffect(() => {
-        const fetchPoints = async () => {
-            try {
-                const data = await getUserPoints();
-                setUserPoints(data.points);
-            } catch (err) {
-                console.error('포인트 조회 실패:', err);
-            }
-        };
-        fetchPoints();
-    }, []);
-
-    useEffect(() => {
-        // Filter products based on activeTab
-        // Logic: 
-        // clothing -> items with category 'clothing'
-        // item -> items with category 'item'
-        // background -> items with category 'background'
-        const filtered = mockProducts.filter(p => p.category === activeTab);
-        setFilteredProducts(filtered);
+        fetchData();
     }, [activeTab]);
 
     // Handle speech bubble fade out
@@ -81,20 +66,51 @@ export default function ShopPage() {
     };
 
     const handleGachaClick = () => {
+        setGachaResult(null); // 초기화
+        setGachaStatus('idle'); // 가챠 모달 열 때 상태 초기화
         setShowGachaModal(true);
     };
 
-    const handleGachaDraw = () => {
-        // Here we would deduct points and give a random item
+    const handleGachaDraw = async () => {
+        if (gachaStatus !== 'idle') return; // Prevent double click
+
         if (userPoints < 500) {
-            alert('포인트가 부족합니다!');
+            alert('포인트가 부족합니다! (500P 필요)');
             return;
         }
-        alert('가챠를 뽑았습니다! (기능 준비중)');
-        setShowGachaModal(false);
+
+        try {
+            setGachaStatus('rolling'); // Start animation
+
+            // 1. Call API
+            const data = await playGacha();
+
+            // 2. Wait for animation (at least 2s)
+            setTimeout(() => {
+                if (data.success) {
+                    setGachaResult(data);
+                    setUserPoints(data.remaining_points);
+                    fetchData(); // Update inventory
+
+                    // Skip 'burst' state, go directly to result
+                    setGachaStatus('result');
+                }
+            }, 2000);
+
+        } catch (err) {
+            console.error('가챠 실패:', err);
+            alert(err.response?.data?.message || '가챠 도중 오류가 발생했습니다.');
+            setGachaStatus('idle'); // Reset on error
+        }
     };
 
     const handleProductClick = (product) => {
+        if (product.is_rare) {
+            // 레어템인 경우 클릭 시 상점 주인 말풍선 띄우기
+            setSpeechBubble("레어템은 가챠를 통해 만나볼 수 있어요.");
+            setSpeechIndex(0); // 인덱스 초기화하지 않아도 되지만 확실하게
+            return;
+        }
         setSelectedProduct(product);
     };
 
@@ -102,18 +118,27 @@ export default function ShopPage() {
         setSelectedProduct(null);
     };
 
-    const handlePurchase = () => {
-        alert(`${selectedProduct.name}을(를) 구매했습니다!`);
-        setSelectedProduct(null);
+    const handlePurchase = async () => {
+        if (!selectedProduct) return;
+
+        try {
+            const data = await purchaseItem(selectedProduct.id);
+            if (data.success) {
+                alert(`${selectedProduct.name}을(를) 구매했습니다!`);
+                setUserPoints(data.remaining_points);
+                setSelectedProduct(null);
+                // 상품 목록 새로고침 (보유 상태 업데이트 확인용)
+                fetchData();
+            }
+        } catch (err) {
+            console.error('구매 실패:', err);
+            alert(err.response?.data?.message || '구매 도중 오류가 발생했습니다.');
+        }
     };
 
     const handleCharacterClick = () => {
         setSpeechBubble(shopkeeperMessages[speechIndex]);
         setSpeechIndex((prev) => (prev + 1) % shopkeeperMessages.length);
-        // Auto hide after 3 seconds
-        // setTimeout(() => {
-        //     setSpeechBubble(null);
-        // }, 3000);
     };
 
     return (
@@ -141,7 +166,6 @@ export default function ShopPage() {
 
                 {/* Shopkeeper Image */}
                 <div style={styles.characterContainer} onClick={handleCharacterClick}>
-                    {/* Using dog_in_shop.png as the main character/scene */}
                     <Image
                         src="/images/characters/char_dog/dog_in_shop.png"
                         alt="Shopkeeper"
@@ -194,31 +218,66 @@ export default function ShopPage() {
                 </div>
 
                 {/* Products Grid */}
-                {/* Products Grid Wrapper for Scrolling */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
                     <div style={styles.productsGrid}>
-                        {filteredProducts.map((product) => (
-                            <div
-                                key={product.id}
-                                style={styles.productCard}
-                                onClick={() => handleProductClick(product)}
-                            >
-                                <div style={styles.productImagePlaceholder}>
-                                    {/* Placeholder since we don't have item images yet */}
-                                    <span style={{ fontSize: '2rem' }}>🎁</span>
-                                </div>
-                                <div style={styles.productInfo}>
-                                    <div style={styles.productName}>{product.name}</div>
-                                    <div style={styles.productPrice}>
-                                        {product.price.toLocaleString()}p
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        {filteredProducts.length === 0 && (
+                        {loading ? (
                             <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '20px', color: '#888' }}>
-                                상품이 없습니다.
+                                로딩 중...
                             </div>
+                        ) : (
+                            <>
+                                {products.map((product) => (
+                                    <div
+                                        key={product.id}
+                                        style={{
+                                            ...styles.productCard,
+                                            border: product.is_rare ? '2px solid #ffd700' : '1px solid #eee',
+                                            backgroundColor: product.is_owned ? '#f0f0f0' : 'white',
+                                            opacity: product.is_owned ? 0.8 : 1
+                                        }}
+                                        onClick={() => handleProductClick(product)}
+                                    >
+                                        <div style={styles.productImagePlaceholder}>
+                                            {/* 실제 이미지가 없으면 텍스트나 이모지로 대체 */}
+                                            {product.image_url ? (
+                                                <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img
+                                                        src={product.image_url}
+                                                        alt={product.name}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.style.display = 'none';
+                                                            e.target.nextSibling.style.display = 'block';
+                                                        }}
+                                                    />
+                                                    <span style={{ fontSize: '2rem', display: 'none', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+                                                        {product.category === 'CLOTHING' ? '👕' :
+                                                            product.category === 'ITEM' ? '🎒' : '🖼️'}
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span style={{ fontSize: '2rem' }}>🎁</span>
+                                            )}
+                                        </div>
+                                        <div style={styles.productInfo}>
+                                            <div style={styles.productName}>
+                                                {product.is_rare && <span style={{ color: '#ffd700', marginRight: '4px' }}>★</span>}
+                                                {product.name}
+                                            </div>
+                                            <div style={styles.productPrice}>
+                                                {product.is_owned ? '보유중' : `${product.price.toLocaleString()}p`}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {products.length === 0 && (
+                                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '20px', color: '#888' }}>
+                                        상품이 없습니다.
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
@@ -228,67 +287,191 @@ export default function ShopPage() {
             {selectedProduct && (
                 <div style={styles.popupOverlay} onClick={handleClosePopup}>
                     <div style={styles.popupContent} onClick={(e) => e.stopPropagation()}>
-                        {/* Close Button */}
                         <button style={styles.popupCloseButton} onClick={handleClosePopup}>
                             <X size={20} color="#666" />
                         </button>
 
-                        {/* Product Image */}
                         <div style={styles.popupImageContainer}>
-                            <span style={{ fontSize: '4rem' }}>🎁</span>
+                            {selectedProduct.image_url ? (
+                                <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={selectedProduct.image_url}
+                                        alt={selectedProduct.name}
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.style.display = 'none';
+                                            e.target.nextSibling.style.display = 'block';
+                                        }}
+                                    />
+                                    <span style={{ fontSize: '3.5rem', display: 'none', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+                                        {selectedProduct.category === 'CLOTHING' ? '👕' :
+                                            selectedProduct.category === 'ITEM' ? '🎒' : '🖼️'}
+                                    </span>
+                                </div>
+                            ) : (
+                                <span style={{ fontSize: '3.5rem' }}>🎁</span>
+                            )}
                         </div>
 
-                        {/* Product Name */}
                         <div style={styles.popupProductName}>{selectedProduct.name}</div>
 
-                        {/* Product Price */}
                         <div style={styles.popupProductPrice}>
-                            {selectedProduct.price.toLocaleString()}P
+                            {selectedProduct.is_owned ? '이미 보유 중입니다' : `${selectedProduct.price.toLocaleString()}P`}
                         </div>
 
-                        {/* Purchase Button */}
-                        <button style={styles.purchaseButton} onClick={handlePurchase}>
-                            구매하기
-                        </button>
+                        {!selectedProduct.is_owned && (
+                            <button style={styles.purchaseButton} onClick={handlePurchase}>
+                                구매하기
+                            </button>
+                        )}
 
-                        {/* Refund Warning */}
-                        <div style={styles.refundWarning}>*구매 후 환불 불가</div>
+                        {!selectedProduct.is_owned && (
+                            <div style={styles.refundWarning}>*구매 후 환불 불가</div>
+                        )}
                     </div>
                 </div>
             )}
 
             {/* Gacha Popup */}
             {showGachaModal && (
-                <div style={styles.popupOverlay} onClick={() => setShowGachaModal(false)}>
+                <div style={styles.popupOverlay} onClick={() => {
+                    if (gachaStatus === 'result' || gachaStatus === 'idle') {
+                        setGachaResult(null);
+                        setGachaStatus('idle');
+                        setShowGachaModal(false);
+                    }
+                }}>
+                    <style jsx global>{`
+                        @keyframes shake {
+                            0% { transform: translate(0, 0) rotate(0deg); }
+                            25% { transform: translate(-5px, 2px) rotate(-5deg); }
+                            50% { transform: translate(5px, -2px) rotate(5deg); }
+                            75% { transform: translate(-5px, 2px) rotate(-5deg); }
+                            100% { transform: translate(0, 0) rotate(0deg); }
+                        }
+                        @keyframes lightSpread {
+                            0% { transform: translate(-50%, -50%) scale(0); opacity: 0.8; }
+                            100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; }
+                        }
+                        @keyframes popIn {
+                            0% { transform: scale(0) translateY(50px); opacity: 0; }
+                            60% { transform: scale(1.1) translateY(-10px); opacity: 1; }
+                            100% { transform: scale(1) translateY(0); }
+                    `}</style>
                     <div style={styles.popupContent} onClick={(e) => e.stopPropagation()}>
-                        {/* Close Button */}
-                        <button style={styles.popupCloseButton} onClick={() => setShowGachaModal(false)}>
+                        <button style={styles.popupCloseButton} onClick={() => {
+                            if (gachaStatus === 'rolling') return;
+                            setGachaResult(null);
+                            setGachaStatus('idle');
+                            setShowGachaModal(false);
+                        }}>
                             <X size={20} color="#666" />
                         </button>
 
-                        {/* Big Gacha Image */}
-                        <div style={styles.gachaPopupImageContainer}>
-                            <Image
-                                src="/images/shop.png"
-                                alt="Gacha Machine"
-                                width={306}
-                                height={306} // Square or fit based on image aspect
-                                style={{ objectFit: 'contain' }}
-                            />
-                        </div>
+                        {/* Gacha Machine & Animation Area */}
+                        {(gachaStatus === 'idle' || gachaStatus === 'rolling') ? (
+                            <>
+                                <div style={{
+                                    ...styles.gachaPopupImageContainer,
+                                    animation: gachaStatus === 'rolling' ? 'shake 0.5s infinite' : 'none',
+                                }}>
+                                    <Image
+                                        src="/images/shop.png"
+                                        alt="Gacha Machine"
+                                        width={306}
+                                        height={306}
+                                        style={{ objectFit: 'contain' }}
+                                    />
+                                </div>
 
-                        {/* Description */}
-                        <div style={styles.gachaDescriptionContainer}>
-                            <div style={styles.gachaDescription}>
-                                500p를 내면 가챠를 뽑을 수 있어요.<br />
-                                가챠를 통해 희귀 아이템을 얻어보아요!
+                                <div style={styles.gachaDescriptionContainer}>
+                                    <div style={styles.gachaDescription}>
+                                        {gachaStatus === 'rolling' ? '두근두근...' :
+                                            <>500p를 내면 가챠를 뽑을 수 있어요.<br />가챠를 통해 희귀 아이템을 얻어보아요!</>}
+                                    </div>
+                                </div>
+                                <button
+                                    style={{
+                                        ...styles.gachaDrawButton,
+                                        opacity: (gachaStatus === 'rolling') ? 0.5 : 1,
+                                        cursor: (gachaStatus === 'rolling') ? 'not-allowed' : 'pointer'
+                                    }}
+                                    onClick={handleGachaDraw}
+                                    disabled={gachaStatus === 'rolling'}
+                                >
+                                    {gachaStatus === 'rolling' ? '뽑는 중...' : '가챠 뽑기 (500P)'}
+                                </button>
+                            </>
+                        ) : (
+                            // Result Screen (gachaStatus === 'result')
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'popIn 0.5s forwards', width: '100%' }}>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '20px', color: 'var(--primary)' }}>
+                                    축하합니다!
+                                </div>
+
+                                <div style={{
+                                    position: 'relative',
+                                    width: '150px',
+                                    height: '150px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginBottom: '20px',
+                                    fontSize: '4rem',
+                                    // Removed yellow box styles (background, border, shadow)
+                                }}>
+                                    {/* Rare Effect: Light Spread */}
+                                    {gachaResult.is_rare && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '50%',
+                                            left: '50%',
+                                            width: '300px', // Increased from 200px
+                                            height: '300px', // Increased from 200px
+                                            borderRadius: '50%',
+                                            background: 'radial-gradient(circle, rgba(255, 215, 0, 0.8) 0%, rgba(255, 215, 0, 0) 70%)',
+                                            animation: 'lightSpread 1s ease-out forwards',
+                                            zIndex: 0,
+                                            pointerEvents: 'none'
+                                        }} />
+                                    )}
+
+                                    {gachaResult.acquired_item.image_url ? (
+                                        <div style={{ position: 'relative', width: '100%', height: '100%', zIndex: 1 }}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                                src={gachaResult.acquired_item.image_url}
+                                                alt={gachaResult.acquired_item.name}
+                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.style.display = 'none';
+                                                    e.target.nextSibling.style.display = 'block';
+                                                }}
+                                            />
+                                            <span style={{ fontSize: '4rem', display: 'none', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>🎁</span>
+                                        </div>
+                                    ) : (
+                                        <span style={{ fontSize: '4rem', zIndex: 1 }}>🎁</span>
+                                    )}
+                                </div>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '8px', zIndex: 1, textAlign: 'center' }}>
+                                    {gachaResult.is_rare && <span style={{ color: '#ffd700', textShadow: '0 0 5px rgba(255,215,0,0.5)' }}>★ LEGENDARY ★<br /></span>}
+                                    {gachaResult.acquired_item.name}
+                                </div>
+                                <div style={{ color: '#888', marginBottom: '20px', zIndex: 1 }}>
+                                    을(를) 획득했습니다!
+                                </div>
+                                <button style={{ ...styles.gachaDrawButton, zIndex: 1 }} onClick={() => {
+                                    setGachaResult(null);
+                                    setGachaStatus('idle');
+                                }}>
+                                    한 번 더 뽑기
+                                </button>
                             </div>
-                        </div>
-
-                        {/* Draw Button */}
-                        <button style={styles.gachaDrawButton} onClick={handleGachaDraw}>
-                            가챠 뽑기 (500P)
-                        </button>
+                        )}
                     </div>
                 </div>
             )}
@@ -547,8 +730,6 @@ const styles = {
     },
     popupContent: {
         backgroundColor: 'white',
-        borderRadius: '20px',
-        padding: '24px',
         borderRadius: '20px',
         padding: '24px',
         width: '85%', // Slightly wider
