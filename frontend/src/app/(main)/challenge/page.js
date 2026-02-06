@@ -8,7 +8,7 @@
  * - AI Insight 섹션 추가
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Sparkles, Store } from 'lucide-react';
+import { Plus, Sparkles, Store, Home, Shirt } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 // 컴포넌트
@@ -351,10 +351,18 @@ export default function ChallengePage() {
             <div style={styles.headerWrapper}>
                 {/* 상단 섹션 - 스크롤 시 사라짐 */}
                 <div style={styles.headerTop} ref={headerTopRef}>
-                    {/* 우상단: 상점 버튼 */}
-                    <button style={styles.storeButton} onClick={() => router.push('/shop')}>
-                        <Store size={22} color="var(--primary)" />
-                    </button>
+                    {/* 우상단: 홈, 옷장, 상점 버튼 */}
+                    <div style={styles.headerIcons}>
+                        <button style={styles.iconButton} onClick={() => router.push('/')}>
+                            <Home size={22} color="var(--primary)" />
+                        </button>
+                        <button style={styles.iconButton} onClick={() => router.push('/closet')}>
+                            <Shirt size={22} color="var(--primary)" />
+                        </button>
+                        <button style={styles.iconButton} onClick={() => router.push('/shop')}>
+                            <Store size={22} color="var(--primary)" />
+                        </button>
+                    </div>
 
                     {/* 중앙: 포인트 표시 */}
                     <div style={styles.pointsDisplay}>
@@ -558,10 +566,26 @@ const styles = {
         fontWeight: '700',
         color: 'var(--primary)',
     },
-    storeButton: {
+    headerIcons: {
         position: 'absolute',
         top: '12px',
         right: '12px',
+        display: 'flex',
+        gap: '8px',
+    },
+    iconButton: {
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        padding: '8px',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'background-color 0.2s ease',
+    },
+    storeButton: {
+        // Kept for backwards compatibility but not used anymore
         background: 'none',
         border: 'none',
         cursor: 'pointer',

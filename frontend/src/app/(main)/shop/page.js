@@ -10,8 +10,10 @@ export default function ShopPage() {
     // Shopkeeper messages
     const shopkeeperMessages = [
         '한번 천천히 둘러보시게.',
-        '가차를 통해 희귀한 상품을 얻을 수 있다네',
-        '좋은 소비가 되길 바라네'
+        '가차를 통해 희귀한 상품을 얻을 수 있다네.',
+        '좋은 소비가 되길 바라네.',
+        '나를 어디서 본 것 같다고? 후후..',
+        '또 왔구려. 곧 단골이 되겠어.'
     ];
 
     const router = useRouter();
@@ -105,12 +107,7 @@ export default function ShopPage() {
     };
 
     const handleProductClick = (product) => {
-        if (product.is_rare) {
-            // 레어템인 경우 클릭 시 상점 주인 말풍선 띄우기
-            setSpeechBubble("레어템은 가챠를 통해 만나볼 수 있어요.");
-            setSpeechIndex(0); // 인덱스 초기화하지 않아도 되지만 확실하게
-            return;
-        }
+        // 레어템도 구매 가능 (이전에는 가챠만 가능했음)
         setSelectedProduct(product);
     };
 
@@ -185,13 +182,56 @@ export default function ShopPage() {
                     )}
                 </div>
 
-                {/* Gacha Button */}
+                {/* Gacha Button with Sparkle Animation */}
+                <style jsx>{`
+                    @keyframes sparkle {
+                        0%, 100% { opacity: 0; transform: scale(0.5); }
+                        50% { opacity: 1; transform: scale(1); }
+                    }
+                    @keyframes sparkleRotate {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `}</style>
                 <button onClick={handleGachaClick} style={styles.gachaButton}>
+                    {/* Sparkle effects */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '-5px',
+                        left: '-5px',
+                        fontSize: '14px',
+                        animation: 'sparkle 1.5s ease-in-out infinite',
+                        animationDelay: '0s'
+                    }}>✨</div>
+                    <div style={{
+                        position: 'absolute',
+                        top: '10px',
+                        right: '-8px',
+                        fontSize: '12px',
+                        animation: 'sparkle 1.5s ease-in-out infinite',
+                        animationDelay: '0.5s'
+                    }}>✨</div>
+                    <div style={{
+                        position: 'absolute',
+                        bottom: '5px',
+                        left: '0px',
+                        fontSize: '10px',
+                        animation: 'sparkle 1.5s ease-in-out infinite',
+                        animationDelay: '1s'
+                    }}>✨</div>
+                    <div style={{
+                        position: 'absolute',
+                        bottom: '-3px',
+                        right: '15px',
+                        fontSize: '11px',
+                        animation: 'sparkle 1.5s ease-in-out infinite',
+                        animationDelay: '0.75s'
+                    }}>✨</div>
                     <Image
                         src="/images/shop.png"
                         alt="Gacha"
-                        width={100}
-                        height={100}
+                        width={130}
+                        height={130}
                         style={styles.gachaImage}
                     />
                 </button>
@@ -316,6 +356,12 @@ export default function ShopPage() {
                         </div>
 
                         <div style={styles.popupProductName}>{selectedProduct.name}</div>
+
+                        {selectedProduct.description && (
+                            <div style={styles.popupProductDescription}>
+                                {selectedProduct.description}
+                            </div>
+                        )}
 
                         <div style={styles.popupProductPrice}>
                             {selectedProduct.is_owned ? '이미 보유 중입니다' : `${selectedProduct.price.toLocaleString()}P`}
@@ -588,13 +634,21 @@ const styles = {
     },
     gachaButton: {
         position: 'absolute',
-        bottom: '25px', // Sit partially on the line or just above? Image suggests above
-        right: '25px',
+        bottom: '35px',
+        right: '15px', // Changed back to right
         zIndex: 60, // Above everything in top section
         background: 'none',
         border: 'none',
         padding: 0,
         cursor: 'pointer',
+    },
+    popupProductDescription: {
+        fontSize: '0.9rem',
+        color: '#666',
+        textAlign: 'center',
+        marginBottom: '12px',
+        lineHeight: '1.4',
+        padding: '0 16px',
     },
     gachaWrapper: {
         position: 'relative',
