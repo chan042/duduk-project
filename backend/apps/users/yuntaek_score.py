@@ -1,11 +1,14 @@
 """
-윤택지수(Yuntaek Score) 산출 알고리즘
+윤택지수 산출 알고리즘
 
-총 65점 만점:
+총 100점 만점:
 - 예산 달성률: 35점
 - 대안 행동 실현도: 20점
 - 소비 일관성: 7점  
 - 챌린지 성공: 3점
+- 건강 점수: 15점 (AI 분석)
+- 누수 지출 개선: 10점 (AI 분석)
+- 성장 소비: 10점 (AI 분석)
 """
 
 from datetime import date, datetime
@@ -15,15 +18,24 @@ import statistics
 from django.db.models import Sum, Count
 from django.utils import timezone
 
+from apps.transactions.models import Transaction, MonthlyLog
+from apps.challenges.models import UserChallenge
+from external.gemini.client import GeminiClient
+
 
 class YuntaekScoreCalculator:
     """윤택지수 계산기"""
     
-    # 점수 가중치
+    # 알고리즘 기반 점수 가중치
     MAX_BUDGET_SCORE = 35
     MAX_ALTERNATIVE_ACTION_SCORE = 20
     MAX_CONSISTENCY_SCORE = 7
     MAX_CHALLENGE_SCORE = 3
+    
+    # AI 분석 기반 점수 가중치
+    MAX_HEALTH_SCORE = 15
+    MAX_LEAKAGE_IMPROVEMENT_SCORE = 10
+    MAX_GROWTH_SCORE = 10
     
     # 챌린지 생성 최소 횟수
     MIN_CHALLENGE_COUNT_FOR_SCORE = 3
@@ -44,32 +56,44 @@ class YuntaekScoreCalculator:
         
     def calculate(self) -> dict:
         """윤택지수 전체 계산"""
-        budget_result = self._calculate_budget_achievement()
-        alternative_result = self._calculate_alternative_action()
-        consistency_result = self._calculate_spending_consistency()
-        challenge_result = self._calculate_challenge_success()
+        # 알고리즘 기반 점수
+        budget_score = self._calculate_budget_achievement()
+        alternative_score = self._calculate_alternative_action()
+        consistency_score = self._calculate_spending_consistency()
+        challenge_score = self._calculate_challenge_success()
+        
+        # AI 분석 기반 점수
+        health_score = self._calculate_health_score()
+        leakage_score = self._calculate_leakage_improvement()
+        growth_score = self._calculate_growth_consumption()
         
         total_score = (
-            budget_result['score'] + 
-            alternative_result['score'] + 
-            consistency_result['score'] + 
-            challenge_result['score']
+            budget_score + 
+            alternative_score + 
+            consistency_score + 
+            challenge_score +
+            health_score +
+            leakage_score +
+            growth_score
         )
         
         return {
             'total_score': int(total_score),
-            'max_score': 65,
+            'max_score': 100,
             'year': self.year,
             'month': self.month,
             'breakdown': {
-                'budget_achievement': budget_result,
-                'alternative_action': alternative_result,
-                'spending_consistency': consistency_result,
-                'challenge_success': challenge_result,
+                'budget_achievement': budget_score,
+                'alternative_action': alternative_score,
+                'spending_consistency': consistency_score,
+                'challenge_success': challenge_score,
+                'health_score': health_score,
+                'leakage_improvement': leakage_score,
+                'growth_consumption': growth_score,
             }
         }
     
-    def _calculate_budget_achievement(self) -> dict:
+    def _calculate_budget_achievement(self) -> int:
         """
         1. 예산 달성률 (35점)
         
@@ -79,21 +103,10 @@ class YuntaekScoreCalculator:
         - 10% ~ 20% 초과: 14점
         - 20% 이상 초과: 0점
         """
-        from apps.transactions.models import Transaction
-        
         monthly_budget = self._get_monthly_budget()
         
         if not monthly_budget or monthly_budget <= 0:
-            return {
-                'score': 0,
-                'max': self.MAX_BUDGET_SCORE,
-                'details': {
-                    'monthly_budget': 0,
-                    'total_spent': 0,
-                    'exceeded_percent': 0,
-                    'message': '예산이 설정되지 않았습니다.'
-                }
-            }
+            return 0
         
         start_date, end_date = self._get_month_date_range()
         total_spent = Transaction.objects.filter(
@@ -105,22 +118,12 @@ class YuntaekScoreCalculator:
         monthly_budget_float = float(monthly_budget)
         
         if total_spent <= monthly_budget_float:
-            exceeded_percent = 0
             score = self.MAX_BUDGET_SCORE
         else:
             exceeded_percent = ((total_spent - monthly_budget_float) / monthly_budget_float) * 100
             score = self._get_budget_score_by_exceeded_percent(exceeded_percent)
         
-        return {
-            'score': score,
-            'max': self.MAX_BUDGET_SCORE,
-            'details': {
-                'monthly_budget': int(monthly_budget_float),
-                'total_spent': int(total_spent),
-                'exceeded_percent': round(exceeded_percent, 1),
-                'within_budget': total_spent <= monthly_budget_float
-            }
-        }
+        return int(score)
     
     def _get_budget_score_by_exceeded_percent(self, exceeded_percent: float) -> int:
         """초과율에 따른 예산 달성률 점수 반환"""
@@ -134,15 +137,13 @@ class YuntaekScoreCalculator:
             return 14
         return 0
     
-    def _calculate_alternative_action(self) -> dict:
+    def _calculate_alternative_action(self) -> int:
         """
         2. 대안 행동 실현도 (20점)
         
         공식: (성공한 AI 코칭 챌린지 건수 / 챌린지 생성 AI 코칭 건수) * 20
         - 코칭 카드에서 3회 이상 챌린지 생성시 점수 반영 (3회 미만 시 0점 처리)
         """
-        from apps.challenges.models import UserChallenge
-        
         start_date, end_date = self._get_month_date_range()
         
         # 생성 건수와 성공 건수 조회
@@ -156,33 +157,15 @@ class YuntaekScoreCalculator:
         challenges_created = ai_challenges.count()
         
         if challenges_created < self.MIN_CHALLENGE_COUNT_FOR_SCORE:
-            return {
-                'score': 0,
-                'max': self.MAX_ALTERNATIVE_ACTION_SCORE,
-                'details': {
-                    'challenges_created': challenges_created,
-                    'successful_challenges': 0,
-                    'completion_rate': 0,
-                    'message': f'챌린지 생성이 {self.MIN_CHALLENGE_COUNT_FOR_SCORE}회 미만입니다.'
-                }
-            }
+            return 0
         
         successful_challenges = ai_challenges.filter(status='completed').count()
         
-        completion_rate = (successful_challenges / challenges_created) * 100
         score = int((successful_challenges / challenges_created) * self.MAX_ALTERNATIVE_ACTION_SCORE)
         
-        return {
-            'score': score,
-            'max': self.MAX_ALTERNATIVE_ACTION_SCORE,
-            'details': {
-                'challenges_created': challenges_created,
-                'successful_challenges': successful_challenges,
-                'completion_rate': round(completion_rate, 1)
-            }
-        }
+        return int(score)
     
-    def _calculate_spending_consistency(self) -> dict:
+    def _calculate_spending_consistency(self) -> int:
         """
         3. 소비 일관성 (7점)
 
@@ -191,22 +174,10 @@ class YuntaekScoreCalculator:
 
         무지출인 날은 계산에서 제외
         """
-        from apps.transactions.models import Transaction
-
         monthly_budget = self._get_monthly_budget()
 
         if not monthly_budget or monthly_budget <= 0:
-            return {
-                'score': 0,
-                'max': self.MAX_CONSISTENCY_SCORE,
-                'details': {
-                    'monthly_budget': 0,
-                    'threshold': 0,
-                    'std_deviation': 0,
-                    'days_with_spending': 0,
-                    'message': '예산이 설정되지 않았습니다.'
-                }
-            }
+            return 0
 
         monthly_budget_float = float(monthly_budget)
         threshold = (monthly_budget_float / 30) * 2
@@ -225,17 +196,7 @@ class YuntaekScoreCalculator:
         daily_amounts = [d['daily_total'] for d in daily_spending]
 
         if not daily_amounts:
-            return {
-                'score': self.MAX_CONSISTENCY_SCORE,
-                'max': self.MAX_CONSISTENCY_SCORE,
-                'details': {
-                    'monthly_budget': int(monthly_budget_float),
-                    'threshold': int(threshold),
-                    'std_deviation': 0,
-                    'days_with_spending': 0,
-                    'message': '지출 데이터가 없어 만점 처리됩니다.'
-                }
-            }
+            return self.MAX_CONSISTENCY_SCORE
         
         # 표준편차 계산
         if len(daily_amounts) == 1:
@@ -250,19 +211,9 @@ class YuntaekScoreCalculator:
             raw_score = (1 - (std_deviation / threshold)) * self.MAX_CONSISTENCY_SCORE
             score = int(max(0, raw_score))
         
-        return {
-            'score': score,
-            'max': self.MAX_CONSISTENCY_SCORE,
-            'details': {
-                'monthly_budget': int(monthly_budget_float),
-                'threshold': int(threshold),
-                'std_deviation': int(std_deviation),
-                'days_with_spending': len(daily_amounts),
-                'avg_daily_spending': int(sum(daily_amounts) / len(daily_amounts))
-            }
-        }
+        return int(score)
     
-    def _calculate_challenge_success(self) -> dict:
+    def _calculate_challenge_success(self) -> int:
         """
         4. 챌린지 성공 (3점)
         
@@ -270,8 +221,6 @@ class YuntaekScoreCalculator:
         - 1회 성공: 2점
         - 0회: 0점
         """
-        from apps.challenges.models import UserChallenge
-        
         start_date, end_date = self._get_month_date_range()
         
         success_count = UserChallenge.objects.filter(
@@ -288,22 +237,106 @@ class YuntaekScoreCalculator:
         else:
             score = 0
         
-        return {
-            'score': score,
-            'max': self.MAX_CHALLENGE_SCORE,
-            'details': {
-                'success_count': success_count,
-                'required_for_full_score': 2
-            }
-        }
+        return int(score)
+    
+    # ============================================================
+    # AI 분석 기반 점수 계산
+    # ============================================================
+    
+    def _calculate_health_score(self) -> int:
+        """
+        5. 건강 점수 (15점) - AI 분석
+        
+        client.py에서 사용자의 거래 내역을 분석하여 건강 점수 반환
+        """
+        client = GeminiClient(purpose="analysis")
+        health_score = client.analyze_health_score(self.user.id, self.year, self.month)
+        
+        # AI가 반환한 점수를 최대값으로 제한
+        score = min(int(health_score or 0), self.MAX_HEALTH_SCORE)
+        
+        return int(score)
+    
+    def _calculate_leakage_improvement(self) -> int:
+        """
+        6. 누수 지출 개선 (10점) - AI 분석
+        
+        client.py에서 이번달/지난달 누수 지출액을 반환
+        공식: 1 - (이번달 누수 지출액 / 지난달 누수 지출액)
+        - 감소율 90% 이상: 10점
+        - 감소율 50%: 5점
+        - 오히려 증가 시: 0점
+        """
+        client = GeminiClient(purpose="analysis")
+        
+        # 이번 달 누수 지출액
+        current_leakage = client.analyze_leakage_spending(self.user.id, self.year, self.month) or 0
+        
+        # 지난 달 누수 지출액
+        if self.month == 1:
+            prev_year, prev_month = self.year - 1, 12
+        else:
+            prev_year, prev_month = self.year, self.month - 1
+        
+        prev_leakage = client.analyze_leakage_spending(self.user.id, prev_year, prev_month) or 0
+        
+        # 점수 계산
+        if prev_leakage == 0:
+            score = self.MAX_LEAKAGE_IMPROVEMENT_SCORE
+        else:
+            improvement_rate = 1 - (current_leakage / prev_leakage)
+            
+            if improvement_rate >= 0.9:
+                score = 10
+            elif improvement_rate >= 0.5:
+                score = int(5 + (improvement_rate - 0.5) * 12.5)
+            elif improvement_rate > 0:
+                score = int(improvement_rate * 10)
+            else:
+                score = 0
+        
+        return int(score)
+    
+    def _calculate_growth_consumption(self) -> int:
+        """
+        7. 성장 소비 (10점) - AI 분석
+        
+        client.py에서 성장 지출액을 반환
+        권장 비율(월 지출의 7%) 대비 실제 성장 카테고리 지출 비율
+        공식: (성장 카테고리 총 지출액 / 권장 금액) * 10 (최대 10점)
+        """
+        start_date, end_date = self._get_month_date_range()
+        
+        # 월 총 지출액
+        total_spent = Transaction.objects.filter(
+            user=self.user,
+            date__gte=start_date,
+            date__lt=end_date
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        if total_spent == 0:
+            return 0
+        
+        client = GeminiClient(purpose="analysis")
+        growth_amount = client.analyze_growth_spending(self.user.id, self.year, self.month) or 0
+        
+        # 권장 금액: 월 총 지출의 7%
+        recommended_amount = total_spent * 0.07
+        
+        # 점수 계산: (성장 지출액 / 권장 금액) * 10, 최대 10점
+        if recommended_amount > 0:
+            raw_score = (growth_amount / recommended_amount) * self.MAX_GROWTH_SCORE
+            score = min(int(raw_score), self.MAX_GROWTH_SCORE)
+        else:
+            score = 0
+        
+        return int(score)
     
     def _get_monthly_budget(self):
         """해당 월의 예산 가져오기"""
         if self._monthly_budget is not None:
             return self._monthly_budget
             
-        from apps.transactions.models import MonthlyLog
-        
         monthly_log = MonthlyLog.objects.filter(
             user=self.user,
             year=self.year,
