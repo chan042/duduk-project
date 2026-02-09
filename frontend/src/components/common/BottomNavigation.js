@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 
 export default function BottomNavigation({ onQuickAddClick }) {
     const pathname = usePathname();
-    const isHome = pathname === '/room';
+    const isHome = pathname === '/';
 
     return (
         <div style={{
@@ -71,7 +71,7 @@ export default function BottomNavigation({ onQuickAddClick }) {
                         </button>
                     </div>
                 ) : (
-                    <Link href="/room" style={{
+                    <Link href="/" style={{
                         ...styles.navButton,
                         color: 'var(--text-sub)'
                     }}>
