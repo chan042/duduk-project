@@ -5,5 +5,8 @@ google-generativeai
 django-cors-headers
 djangorestframework
 django-filter
+requests
 djangorestframework-simplejwt
 Pillow
+django-allauth==0.61.1
+google-auth==2.28.0

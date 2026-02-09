@@ -66,5 +66,19 @@ class User(AbstractUser):
     total_points_earned = models.IntegerField(default=0, verbose_name='총 적립 포인트')
     total_points_used = models.IntegerField(default=0, verbose_name='총 사용 포인트')
 
+    # OAuth 관련 필드
+    auth_provider = models.CharField(
+        max_length=50, 
+        default='email',
+        choices=[('email', 'Email'), ('google', 'Google')],
+        verbose_name='인증 제공자'
+    )
+    social_id = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True,
+        verbose_name='소셜 로그인 ID'
+    )
+
     def __str__(self):
         return self.username

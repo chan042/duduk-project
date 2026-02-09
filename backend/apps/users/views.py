@@ -1,49 +1,17 @@
 """
 [파일 역할]
-- 사용자 인증 관련 API 뷰를 정의합니다.
-- 회원가입, 프로필 조회 기능을 제공합니다.
-- 로그인은 SimpleJWT의 TokenObtainPairView를 사용합니다.
+- 사용자 프로필 관련 API 뷰를 정의합니다.
+- 프로필 조회, 수정, 삭제 기능을 제공합니다.
+- 로그인은 Google OAuth를 사용합니다.
 """
-from rest_framework import generics, permissions, status
+from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
 
-from .serializers import UserSerializer, RegisterSerializer
+from .serializers import UserSerializer
 
 User = get_user_model()
-
-
-class RegisterView(generics.CreateAPIView):
-    """
-    회원가입 API
-    POST /api/users/register/
-    
-    요청 본문:
-    {
-        "email": "user@example.com",
-        "username": "사용자명",
-        "password": "비밀번호",
-        "password_confirm": "비밀번호 확인"
-    }
-    """
-    queryset = User.objects.all()
-    permission_classes = [permissions.AllowAny]
-    serializer_class = RegisterSerializer
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        
-        return Response({
-            "message": "회원가입이 완료되었습니다.",
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "username": user.username
-            }
-        }, status=status.HTTP_201_CREATED)
 
 
 class ProfileView(APIView):

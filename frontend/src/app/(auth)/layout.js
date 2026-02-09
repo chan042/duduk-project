@@ -7,23 +7,11 @@
 export default function AuthLayout({ children }) {
     return (
         <div style={{
-            backgroundColor: '#e0e0e0',
+            backgroundColor: '#FFFFFF',
             minHeight: '100vh',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '1rem'
+            width: '100%'
         }}>
-            <div style={{
-                width: '100%',
-                maxWidth: '430px',
-                backgroundColor: 'var(--background-light)',
-                borderRadius: 'var(--radius-lg)',
-                boxShadow: 'var(--shadow-lg)',
-                overflow: 'hidden'
-            }}>
-                {children}
-            </div>
+            {children}
         </div>
     );
 }

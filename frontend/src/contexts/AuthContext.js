@@ -88,6 +88,45 @@ export function AuthProvider({ children }) {
     }, [router]);
 
     /**
+     * Google 로그인 처리
+     * @param {string} accessToken - Google Access Token
+     */
+    const loginWithGoogle = useCallback(async (accessToken) => {
+        try {
+            const response = await fetch('http://localhost:8000/api/users/auth/google/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ access_token: accessToken }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Google 로그인 실패');
+            }
+
+            const data = await response.json();
+            const { access, refresh } = data;
+
+            localStorage.setItem('accessToken', access);
+            localStorage.setItem('refreshToken', refresh);
+            await fetchUser();
+
+            // 프로필 완성 여부에 따라 리다이렉트
+            const profile = await getProfile();
+            if (!profile.is_profile_complete) {
+                router.push('/userinfo');
+            } else {
+                router.push('/');
+            }
+        } catch (error) {
+            console.error('Google 로그인 실패:', error);
+            throw error;
+        }
+    }, [fetchUser, router]);
+
+    /**
      * 로그인 여부 확인
      */
     const isAuthenticated = !!user;
@@ -97,6 +136,7 @@ export function AuthProvider({ children }) {
         loading,
         isAuthenticated,
         login: handleLogin,
+        loginWithGoogle,
         logout: handleLogout,
         refreshUser: fetchUser
     };
