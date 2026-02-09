@@ -367,3 +367,289 @@ class GeminiClient:
         result.setdefault('description', '')
         result.setdefault('success_conditions', [])
         result.setdefault('target_keywords', [])
+
+    # ============================================================
+    # AI 분석 메서드 - 윤택지수 계산용
+    # ============================================================
+
+    def _get_transactions_summary(self, user_id: int, year: int, month: int) -> str:
+        """
+        해당 월의 거래 내역을 텍스트로 요약 (AI 분석용)
+        
+        Args:
+            user_id: 사용자 ID
+            year: 연도
+            month: 월
+        
+        Returns:
+            거래 내역 요약 문자열
+        """
+        from apps.transactions.models import Transaction
+        from datetime import datetime
+        from django.utils import timezone
+        from django.contrib.auth import get_user_model
+        
+        User = get_user_model()
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return ""
+        
+        # 해당 월의 시작일과 종료일
+        start_date = timezone.make_aware(datetime(year, month, 1))
+        if month == 12:
+            end_date = timezone.make_aware(datetime(year + 1, 1, 1))
+        else:
+            end_date = timezone.make_aware(datetime(year, month + 1, 1))
+        
+        # 거래 내역 조회
+        transactions = Transaction.objects.filter(
+            user=user,
+            date__gte=start_date,
+            date__lt=end_date
+        ).order_by('-date')[:50]  # 최대 50건
+        
+        if not transactions:
+            return "이번 달 지출 내역이 없습니다."
+        
+        # 요약 생성
+        summary_lines = [f"{year}년 {month}월 지출 내역:"]
+        for t in transactions:
+            summary_lines.append(
+                f"- {t.date.strftime('%Y-%m-%d')} | {t.category} | {t.item} | {t.store} | {t.amount:,}원"
+            )
+        
+        return "\n".join(summary_lines)
+
+    def analyze_health_score(self, user_id: int, year: int, month: int) -> int:
+        """
+        건강 점수 분석 (15점 만점)
+        
+        사용자의 지출 내역을 분석하여 건강 관련 지출을 평가하고 점수를 반환합니다.
+        - 건강한 식품, 운동, 의료비 등 건강 관련 지출의 적절성 평가
+        - 패스트푸드, 배달음식, 술/유흥 등 건강하지 않은 지출 패턴 분석
+        
+        Args:
+            user_id: 사용자 ID
+            year: 연도
+            month: 월
+        
+        Returns:
+            건강 점수 (0~15)
+        """
+        transactions_summary = self._get_transactions_summary(user_id, year, month)
+        
+        if not transactions_summary or transactions_summary == "이번 달 지출 내역이 없습니다.":
+            return 0
+        
+        prompt = f"""
+        [역할]
+        당신은 소비 패턴을 분석하여 건강 점수를 산출하는 AI입니다.
+        
+        [지출 내역]
+        {transactions_summary}
+        
+        [분석 기준]
+        1. 건강한 지출 (+점수)
+           - 신선 식품, 건강식품 구매
+           - 운동 관련 지출 (헬스장, 운동용품, 스포츠)
+           - 의료/건강 관련 지출 (병원, 약국, 건강검진)
+           - 홈쿡, 직접 조리 관련 지출
+        
+        2. 건강하지 않은 지출 (-점수)
+           - 패스트푸드, 인스턴트 식품 과다
+           - 배달음식 과다 (주 3회 이상)
+           - 술/유흥 과다
+           - 카페/간식 과다
+           - 야식 관련 지출
+        
+        3. 건강 패턴 평가
+           - 규칙적인 식사 패턴
+           - 운동의 지속성
+           - 건강 관리 노력의 일관성
+        
+        [점수 산출 기준]
+        - 13~15점: 매우 건강한 소비 패턴, 운동/건강식 지출이 우수, 불건강 지출 거의 없음
+        - 10~12점: 양호한 건강 관리, 일부 개선 여지 있음
+        - 7~9점: 보통 수준, 건강한 지출과 불건강한 지출이 혼재
+        - 4~6점: 개선 필요, 불건강한 지출이 많음
+        - 0~3점: 건강 관리가 거의 없거나 매우 불건강한 소비 패턴
+        
+        [반환 형식]
+        반드시 아래 JSON 형식으로만 반환하세요:
+        {{
+            "score": 점수(0~15 사이의 정수),
+            "reason": "점수 산출 근거 (1줄, 50자 이내)"
+        }}
+        
+        JSON 외에 다른 말은 하지 마세요.
+        """
+        
+        result = self._generate(prompt)
+        if result and 'score' in result:
+            score = int(result['score'])
+            # 0~15 범위로 제한
+            return max(0, min(15, score))
+        
+        return 0
+
+    def analyze_leakage_spending(self, user_id: int, year: int, month: int) -> int:
+        """
+        누수 지출 분석
+        
+        습관적, 반복적으로 빠져나가는 소액 지출을 분석하여 총액을 반환합니다.
+        - 택시비, 수수료, 미사용 구독, 편의점 충동구매 등
+        
+        Args:
+            user_id: 사용자 ID
+            year: 연도
+            month: 월
+        
+        Returns:
+            누수 지출 총액 (원)
+        """
+        transactions_summary = self._get_transactions_summary(user_id, year, month)
+        
+        if not transactions_summary or transactions_summary == "이번 달 지출 내역이 없습니다.":
+            return 0
+        
+        prompt = f"""
+        [역할]
+        당신은 소비 패턴을 분석하여 '누수 지출'을 찾아내는 AI입니다.
+        
+        [지출 내역]
+        {transactions_summary}
+        
+        [누수 지출(Leakage Spending) 정의]
+        습관적이고 반복적으로 빠져나가는 소액 지출로, 사용자가 인지하지 못한 채 누적되는 지출
+        
+        [누수 지출 예시]
+        1. 교통 누수
+           - 잦은 택시 이용 (대중교통 대체 가능한 경우)
+           - 주차비, 톨게이트 등 비효율적 교통비
+        
+        2. 편의점 충동구매
+           - 습관적인 편의점 방문
+           - 소액이지만 반복되는 간식, 음료 구매
+        
+        3. 구독/멤버십 누수
+           - 거의 사용하지 않는 구독 서비스
+           - 자동결제되는 멤버십
+        
+        4. 수수료 누수
+           - ATM 수수료, 송금 수수료
+           - 각종 플랫폼 수수료
+        
+        5. 배달 앱 과다 이용
+           - 소액 배달 주문의 배달비
+           - 충동적인 야식 주문
+        
+        6. 기타 습관적 소비
+           - 매일 반복되는 커피/음료
+           - 습관적인 온라인 쇼핑
+        
+        [분석 방법]
+        - 지출 내역에서 누수 지출에 해당하는 항목들을 식별
+        - 각 항목의 금액을 합산하여 총 누수 지출액 계산
+        - 누수 지출이 아닌 필요한 지출(예: 계획적인 구독, 정기 교통비)은 제외
+        
+        [반환 형식]
+        반드시 아래 JSON 형식으로만 반환하세요:
+        {{
+            "total_leakage": 누수 지출 총액(정수, 원 단위),
+            "reason": "누수 지출 항목들 (1줄, 50자 이내)"
+        }}
+        
+        JSON 외에 다른 말은 하지 마세요.
+        """
+        
+        result = self._generate(prompt)
+        if result and 'total_leakage' in result:
+            return int(result['total_leakage'])
+        
+        return 0
+
+    def analyze_growth_spending(self, user_id: int, year: int, month: int) -> int:
+        """
+        성장 소비 분석
+        
+        자기계발, 교육, 투자 등 개인의 성장에 기여하는 지출을 분석하여 총액을 반환합니다.
+        
+        Args:
+            user_id: 사용자 ID
+            year: 연도
+            month: 월
+        
+        Returns:
+            성장 지출 총액 (원)
+        """
+        transactions_summary = self._get_transactions_summary(user_id, year, month)
+        
+        if not transactions_summary or transactions_summary == "이번 달 지출 내역이 없습니다.":
+            return 0
+        
+        prompt = f"""
+        [역할]
+        당신은 소비 패턴을 분석하여 '성장 소비'를 찾아내는 AI입니다.
+        
+        [지출 내역]
+        {transactions_summary}
+        
+        [성장 소비(Growth Spending) 정의]
+        개인의 성장, 발전, 미래 가치 증진에 기여하는 지출
+        
+        [성장 소비 예시]
+        1. 교육/학습
+           - 온라인/오프라인 강의, 강좌
+           - 학원, 과외
+           - 자격증, 시험 준비
+           - 세미나, 워크샵 참가비
+        
+        2. 도서/콘텐츠
+           - 전문 서적, 실용 도서
+           - 교육 관련 콘텐츠 구독
+           - 업무/학습 관련 소프트웨어
+        
+        3. 자기계발
+           - 코칭, 멘토링
+           - 심리상담, 커리어 코칭
+           - 생산성 도구, 앱 구독
+        
+        4. 건강/운동
+           - 헬스, 요가 등 규칙적인 운동
+           - 건강 관리 (건강검진 등)
+        
+        5. 네트워킹/관계
+           - 직무 관련 모임, 네트워킹
+           - 전문가 커뮤니티 회비
+        
+        6. 투자 관련
+           - 재테크 교육
+           - 투자 정보 구독
+        
+        [제외 항목]
+        - 순수 오락/여가 (게임, 영화 등)
+        - 단순 소비재 구매
+        - 술/유흥
+        - 일반적인 식비, 생활비
+        
+        [분석 방법]
+        - 지출 내역에서 성장 소비에 해당하는 항목들을 식별
+        - 각 항목이 정말 성장에 기여하는지 평가 (명목상 학습이지만 실제 불필요한 경우 제외)
+        - 성장 지출 항목들의 금액을 합산
+        
+        [반환 형식]
+        반드시 아래 JSON 형식으로만 반환하세요:
+        {{
+            "total_growth": 성장 지출 총액(정수, 원 단위),
+            "reason": "성장 지출 항목들 (1줄, 50자 이내)"
+        }}
+        
+        JSON 외에 다른 말은 하지 마세요.
+        """
+        
+        result = self._generate(prompt)
+        if result and 'total_growth' in result:
+            return int(result['total_growth'])
+        
+        return 0
