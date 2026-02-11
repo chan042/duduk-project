@@ -121,12 +121,7 @@ export default function RoomPage() {
                 />
             </div>
 
-            {/* 캐릭터 이름 */}
-            {user?.character_name && (
-                <div style={styles.characterName}>
-                    {user.character_name}의 방
-                </div>
-            )}
+
         </div>
     );
 }
@@ -177,20 +172,7 @@ const styles = {
         transform: 'translateX(-50%)',
         zIndex: 5,
     },
-    characterName: {
-        position: 'absolute',
-        bottom: '60px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: 'rgba(255, 255, 255, 0.9)',
-        padding: '8px 20px',
-        borderRadius: '20px',
-        fontWeight: 'bold',
-        fontSize: '1rem',
-        color: '#333',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        zIndex: 10,
-    },
+
     loading: {
         display: 'flex',
         alignItems: 'center',
