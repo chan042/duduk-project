@@ -116,7 +116,7 @@ class GeminiClient:
         if self.api_key:
             genai.configure(api_key=self.api_key)
             # 기본 모델 사용 (Google Search는 프롬프트에서 지시)
-            self.model = genai.GenerativeModel('gemini-2.5-flash')
+            self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
         else:
             self.model = None
 

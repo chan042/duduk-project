@@ -1,11 +1,17 @@
 import axios from 'axios';
 
+// Use environment variable for backend URL, fallback to localhost for local development
+const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+console.log('[API Client] baseURL:', baseURL);
+console.log('[API Client] NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+
 const client = axios.create({
-    baseURL: 'http://localhost:8000', // Backend URL
-    baseURL: 'http://127.0.0.1:8000',
+    baseURL: baseURL,
     headers: {
         'Content-Type': 'application/json',
     },
+    timeout: 10000, // 10 second timeout
 });
 
 /**
