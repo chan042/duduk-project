@@ -8,7 +8,10 @@ import LoadingOverlay from '@/components/common/LoadingOverlay';
 
 export default function YuntaekReportPage() {
     const router = useRouter();
-    const { reportData, loading, error } = useYuntaekReport();
+    const { reportData, loading, error, fromCache } = useYuntaekReport();
+
+    // 캐시에서 데이터를 가져온 경우 로딩 표시 안 함
+    const showLoading = loading && !fromCache;
 
     function downloadReport() {
         if (!reportData?.report || typeof reportData.report !== 'object') return;
@@ -35,7 +38,7 @@ export default function YuntaekReportPage() {
 
     return (
         <div className="report-page-container">
-            {loading && <LoadingOverlay message="리포트를 불러오는 중입니다..." />}
+            {showLoading && <LoadingOverlay message="리포트를 불러오는 중입니다..." />}
 
             <ReportHeader
                 onBack={() => router.back()}

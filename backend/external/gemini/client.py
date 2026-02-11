@@ -1,5 +1,7 @@
 import os
 import json
+import re
+import time
 import datetime
 import logging
 import google.generativeai as genai
@@ -59,6 +61,23 @@ HARD: 엄격한 제한, 0회 또는 완전 금지 (예: 7일 연속 0회)
 
 def parse_json_response(text: str) -> Optional[dict]:
     """AI 응답에서 JSON을 추출하고 파싱"""
+    # 1차: 코드블록 내부 JSON 추출
+    code_block = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
+    if code_block:
+        try:
+            return json.loads(code_block.group(1).strip())
+        except json.JSONDecodeError:
+            pass
+
+    # 2차: 전체 텍스트에서 가장 바깥쪽 {...} 추출
+    brace_match = re.search(r'\{[\s\S]*\}', text)
+    if brace_match:
+        try:
+            return json.loads(brace_match.group(0))
+        except json.JSONDecodeError:
+            pass
+
+    # 3차: 기존 방식 (단순 클리닝)
     try:
         cleaned = text.replace("```json", "").replace("```", "").strip()
         return json.loads(cleaned)
@@ -97,20 +116,42 @@ class GeminiClient:
         if self.api_key:
             genai.configure(api_key=self.api_key)
             # 기본 모델 사용 (Google Search는 프롬프트에서 지시)
-            self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
+            self.model = genai.GenerativeModel('gemini-2.5-flash')
         else:
             self.model = None
 
-    def _generate(self, prompt: str) -> Optional[dict]:
-        """공통 생성 로직"""
+    def _generate(self, prompt: str, max_retries: int = 3) -> Optional[dict]:
+        """공통 생성 로직 (할당량 초과 시 자동 재시도)"""
         if not self.model:
+            logger.warning("Gemini 모델이 초기화되지 않았습니다 (API 키 확인 필요)")
             return None
-        try:
-            response = self.model.generate_content(prompt)
-            return parse_json_response(response.text)
-        except Exception as e:
-            logger.error(f"Gemini API Error: {e}", exc_info=True)
-            return None
+        for attempt in range(max_retries + 1):
+            try:
+                response = self.model.generate_content(prompt)
+                result = parse_json_response(response.text)
+                if result is None:
+                    logger.error(
+                        "Gemini JSON 파싱 실패. 원본 응답(앞 500자): %s",
+                        response.text[:500]
+                    )
+                return result
+            except Exception as e:
+                error_str = str(e).lower()
+                is_rate_limit = (
+                    '429' in error_str
+                    or 'resource' in error_str
+                    or 'quota' in error_str
+                )
+                if is_rate_limit and attempt < max_retries:
+                    wait_time = 40 * (attempt + 1)
+                    logger.warning(
+                        "Gemini API 할당량 초과 (시도 %d/%d). %d초 후 재시도...",
+                        attempt + 1, max_retries, wait_time,
+                    )
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Gemini API Error: {e}", exc_info=True)
+                    return None
 
     def analyze_text(self, text: str) -> Optional[dict]:
         """

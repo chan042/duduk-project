@@ -60,6 +60,27 @@ def is_new_user_for_month(user, year, month):
     return (year < joined.year) or (year == joined.year and month <= joined.month)
 
 
+def _get_prev_score_without_ai(user, year, month):
+    """
+    전월 윤택지수를 캐시된 리포트에서 가져옴 (AI 호출 없음).
+
+    캐시가 없으면 0을 반환하여 Gemini API 호출 횟수를 절감합니다.
+    """
+    from apps.users.models import MonthlyReport
+
+    cached = MonthlyReport.objects.filter(
+        user=user, year=year, month=month
+    ).first()
+
+    if cached and isinstance(cached.report_content, dict):
+        yuntaek = cached.report_content.get('yuntaek_analysis', {})
+        score = yuntaek.get('current_score', 0)
+        if score:
+            return {'total_score': score, 'breakdown': {}}
+
+    return {'total_score': 0, 'breakdown': {}}
+
+
 def collect_report_data(user, year, month):
     """
     리포트 생성에 필요한 데이터 수집.
@@ -92,9 +113,11 @@ def collect_report_data(user, year, month):
         user=user, date__gte=prev_start, date__lte=prev_end
     ).aggregate(total=Sum('amount'))['total'] or 0
 
-    # 윤택지수
+    # 당월 윤택지수 (AI 호출 O)
     current_score = get_yuntaek_score(user, year, month)
-    prev_score = get_yuntaek_score(user, prev_year, prev_month)
+
+    # 전월 윤택지수 (AI 호출 X)
+    prev_score = _get_prev_score_without_ai(user, prev_year, prev_month)
 
     # 챌린지
     challenges = UserChallenge.objects.filter(

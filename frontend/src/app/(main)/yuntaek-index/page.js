@@ -8,10 +8,11 @@ import LoadingOverlay from '@/components/common/LoadingOverlay';
 
 export default function YuntaekIndexPage() {
     const router = useRouter();
-    const { score, details, scoreData, isNewUser: scoreNewUser, loading: scoreLoading, error: scoreError } = useYuntaekScore();
-    const { reportSummary, isNewUser: reportNewUser, loading: reportLoading, error: reportError } = useYuntaekReport();
+    const { score, details, scoreData, isNewUser: scoreNewUser, loading: scoreLoading, error: scoreError, fromCache: scoreFromCache } = useYuntaekScore();
+    const { reportSummary, isNewUser: reportNewUser, loading: reportLoading, error: reportError, fromCache: reportFromCache } = useYuntaekReport();
 
-    const loading = scoreLoading || reportLoading;
+    // 캐시에서 데이터를 가져온 경우 로딩 표시 안 함
+    const loading = (scoreLoading || reportLoading) && !(scoreFromCache || reportFromCache);
     const error = scoreError || reportError;
     const isNewUser = scoreNewUser || reportNewUser;
 
