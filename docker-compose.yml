@@ -71,6 +71,8 @@ services:
     depends_on:
       - redis
       - db
+    env_file:
+      - .env
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
 
@@ -83,6 +85,8 @@ services:
     depends_on:
       - redis
       - db
+    env_file:
+      - .env
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
 
