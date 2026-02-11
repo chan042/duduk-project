@@ -2,8 +2,15 @@
 
 import { X, Coffee, ShoppingBag, MapPin, Droplets, Zap, Lightbulb, Sparkles } from 'lucide-react';
 
-export default function CoachingDetailPopup({ isOpen, onClose, data, onStartChallenge }) {
+export default function CoachingDetailPopup({ isOpen, onClose, data, onStartChallenge, characterType }) {
     if (!isOpen || !data) return null;
+
+    // Build character face image path
+    let charType = (characterType || 'cat').toLowerCase();
+    if (!charType.startsWith('char_')) {
+        charType = `char_${charType}`;
+    }
+    const faceImagePath = `/images/characters/${charType}/face_surprise.png`;
 
     const getIcon = (subject) => {
         const props = { size: 48, color: "#14b8a6", strokeWidth: 1.5 };
@@ -162,6 +169,16 @@ export default function CoachingDetailPopup({ isOpen, onClose, data, onStartChal
                                 }}>
                                     이 코칭이 생성된 이유
                                 </h4>
+                                <img
+                                    src={faceImagePath}
+                                    alt="Character Face"
+                                    style={{
+                                        width: '40px',
+                                        height: '40px',
+                                        objectFit: 'contain',
+                                        marginLeft: 'auto'
+                                    }}
+                                />
                             </div>
                             <p style={{
                                 fontSize: '1rem',

@@ -5,8 +5,10 @@ import { ShoppingBag, Coffee, ChevronRight, MapPin, Droplets, Zap, ThumbsUp, Thu
 import DislikeReasonPopup from './DislikeReasonPopup';
 import CoachingDetailPopup from './CoachingDetailPopup';
 import { getCoachingAdvice, submitFeedback } from '@/lib/api/coaching';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function CoachingCardList({ cards, loading, onStartChallenge }) {
+    const { user } = useAuth();
     const [likedCards, setLikedCards] = useState(new Set());
     const [dislikedCards, setDislikedCards] = useState(new Set());
     const [showDislikePopup, setShowDislikePopup] = useState(null);
@@ -279,6 +281,7 @@ export default function CoachingCardList({ cards, loading, onStartChallenge }) {
                     onClose={() => setSelectedCard(null)}
                     data={selectedCard}
                     onStartChallenge={onStartChallenge}
+                    characterType={user?.character_type}
                 />
             )}
         </div>
