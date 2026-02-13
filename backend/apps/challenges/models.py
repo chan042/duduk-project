@@ -63,8 +63,11 @@ class ChallengeTemplate(models.Model):
     photo_frequency = models.CharField(max_length=20, blank=True, null=True, verbose_name='사진 인증 빈도')
     photo_description = models.CharField(max_length=200, blank=True, null=True, verbose_name='사진 인증 설명')
     
-    success_description = models.TextField(verbose_name='성공 조건 설명')
-    
+    success_description = models.JSONField(
+        default=list, blank=True,
+        help_text="성공 조건 리스트 (예: ['3일 연속 진행', '매일 0원 지출'])"
+    )
+
     # 프론트 표시 설정 - JSONB
     display_config = models.JSONField(verbose_name='프론트 표시 설정', default=dict, blank=True)
 
@@ -196,8 +199,12 @@ class UserChallenge(models.Model):
     bonus_condition = models.JSONField(blank=True, null=True, verbose_name='보너스 조건')
     bonus_points = models.IntegerField(blank=True, null=True, verbose_name='보너스 포인트')
     
-    success_description = models.TextField(blank=True, null=True, verbose_name='성공 조건 설명')
-    
+    success_description = models.JSONField(
+        default=list, blank=True,
+        verbose_name='성공 조건 설명',
+        help_text='성공 조건 리스트'
+    )
+
     # 프론트 표시 설정
     display_config = models.JSONField(verbose_name='프론트 표시 설정', default=dict, blank=True)
     

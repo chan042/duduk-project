@@ -95,9 +95,17 @@ button {
 /* ===== 공통 애니메이션 ===== */
 
 @keyframes aurora {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 @keyframes fadeIn {
@@ -108,19 +116,42 @@ button {
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(147, 197, 253, 0.4); }
-  70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(147, 197, 253, 0); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(147, 197, 253, 0); }
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(147, 197, 253, 0.4);
+  }
+
+  70% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 10px rgba(147, 197, 253, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(147, 197, 253, 0);
+  }
 }
 
 @keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(5px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(5px);
+  }
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* ===== 공통 유틸리티 클래스 ===== */
@@ -220,4 +251,16 @@ button {
   display: flex;
   flex-direction: column;
   padding-bottom: 2rem;
+}
+
+/* Remove spin buttons from number inputs */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spinner[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

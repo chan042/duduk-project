@@ -33,7 +33,7 @@ export default function AIGeneratedChallengeModal({
         title: editedData.name || editedData.title,
         description: editedData.description,
         difficulty: editedData.difficulty,
-        successDescription: editedData.success_conditions ? editedData.success_conditions.join('\n') : '',
+        successDescription: editedData.success_conditions || [],
         points: editedData.base_points,
         durationDays: editedData.duration_days,
         sourceType: 'ai',

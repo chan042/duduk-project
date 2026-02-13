@@ -128,6 +128,27 @@ export const getCharacterFace = (difficulty, characterType) => {
 
 
 /**
+ * 난이도별 원형 배경색 반환 (챌린지 상세 모달용)
+ */
+export const getDifficultyBackgroundColor = (difficulty) => {
+    const diffLower = difficulty?.toLowerCase();
+    switch (diffLower) {
+        case '쉬움':
+        case 'easy':
+            return '#D1FAE5'; // 연한 초록색
+        case '보통':
+        case 'normal':
+        case 'medium':
+            return '#FEF3C7'; // 연한 노란색
+        case '어려움':
+        case 'hard':
+            return '#FED7AA'; // 연한 주황색
+        default:
+            return '#F3F4F6'; // 회색
+    }
+};
+
+/**
  * progress 객체에서 percentage 추출
  */
 export const getProgressPercent = (progress) => {

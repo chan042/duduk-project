@@ -519,9 +519,9 @@ class CustomChallengeCreateSerializer(serializers.Serializer):
             display_config=display_config,
             progress=progress,
             base_points=100,
-            success_description=f"{validated_data['duration_days']}일간 목표 달성 시 성공!",
+            success_description=[f"{validated_data['duration_days']}일간 목표 금액 이하 지출"],
         )
-        
+
         return user_challenge
 
 
@@ -644,7 +644,7 @@ class BaseChallengeStartSerializer(serializers.Serializer):
             "conditions_list": success_conditions_list
         }
 
-    def _build_display_config(self, target_amount, success_conditions_list):
+    def _build_display_config(self, target_amount):
         """display_config 생성"""
         progress_type = "amount" if target_amount else "custom"
         return {
@@ -657,7 +657,6 @@ class BaseChallengeStartSerializer(serializers.Serializer):
                 "target_label": "목표"
             },
             "show_progress_bar": True,
-            "success_conditions_display": success_conditions_list
         }
 
     def _build_initial_progress(self, target_amount):
@@ -693,9 +692,9 @@ class BaseChallengeStartSerializer(serializers.Serializer):
         success_conditions = self._build_success_conditions(
             target_amount, target_categories, target_keywords, success_conditions_list, condition_type
         )
-        display_config = self._build_display_config(target_amount, success_conditions_list)
+        display_config = self._build_display_config(target_amount)
         progress = self._build_initial_progress(target_amount)
-        success_description = f"{validated_data['duration_days']}일간 목표 달성 시 성공!"
+        success_description = success_conditions_list
 
         user_challenge = UserChallenge.objects.create(
             user=user,

@@ -25,8 +25,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "3만원의 행복",
         "description": "일주일 동안 3만원으로 절약의 행복을 찾아봐요!",
-        "icon": "coins",
-        "icon_color": "#EF4444",
         "source_type": "duduk",
         "difficulty": "medium",
         "base_points": 350,
@@ -41,7 +39,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "user_inputs": None,
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": "7일 내 지출 3만원 이하 시 성공!",
+        "success_description": ["일주일 간 총 지출 3만원 이하 유지"],
         "display_config": {
             "progress_type": "amount",
             "primary_metric": {
@@ -52,7 +50,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
                 "target_label": "목표"
             },
             "show_progress_bar": True,
-            "show_daily_breakdown": True
+            "show_daily_breakdown": True,
         },
         "is_active": True,
         "display_order": 1,
@@ -64,8 +62,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "나와의 싸움",
         "description": "지난달의 나와 싸워서 이기자! 지난달 하나의 주차를 선택하고, 해당 주차보다 지출을 절약해봐요.",
-        "icon": "swords",
-        "icon_color": "#8B5CF6",
         "source_type": "duduk",
         "difficulty": "easy",
         "base_points": 100,
@@ -88,7 +84,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         ],
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": "지난달 N주차 소비보다 덜 지출하면 성공!",
+        "success_description": ["지난달 선택한 주차보다 적게 지출"],
         "display_config": {
             "progress_type": "compare",
             "primary_metric": {
@@ -99,7 +95,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
                 "target_label": "지난달"
             },
             "show_progress_bar": True,
-            "show_daily_breakdown": True
+            "show_daily_breakdown": True,
         },
         "is_active": True,
         "display_order": 2,
@@ -111,8 +107,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "3일 연속 무지출 챌린지",
         "description": "3일간 무소유 마인드를 장착 해보는 건 어때요?",
-        "icon": "wallet",
-        "icon_color": "#10B981",
         "source_type": "duduk",
         "difficulty": "hard",
         "base_points": 450,
@@ -127,7 +121,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "user_inputs": None,
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": "3일간 무지출 시 성공!",
+        "success_description": ["3일 연속 진행", "매일 0원 지출 유지"],
         "display_config": {
             "progress_type": "zero_spend",
             "primary_metric": {
@@ -139,7 +133,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
             },
             "show_progress_bar": False,
             "show_daily_breakdown": True,
-            "special_display": "daily_zero_check"
+            "special_display": "daily_zero_check",
         },
         "is_active": True,
         "display_order": 3,
@@ -151,8 +145,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "현금 챌린지",
         "description": "보이지 않는 숫자는 그만! 눈앞에서 줄어드는 지폐를 보며 소비 습관을 돌아보아요.",
-        "icon": "banknote",
-        "icon_color": "#22C55E",
         "source_type": "duduk",
         "difficulty": "easy",
         "base_points": 200,
@@ -178,7 +170,11 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "requires_photo": True,
         "photo_frequency": "daily",
         "photo_description": "저녁에 남은 현금을 사진으로 인증해주세요",
-        "success_description": "7일동안 매일 저녁 남은 현금 사진 인증 + 설정한 금액 이하로 지출 시 성공!",
+        "success_description": [
+            "일주일 동안 설정한 예산으로 생활",
+            "매일 저녁 남은 현금 사진 인증",
+            "목표 금액 이하 지출"
+        ],
         "display_config": {
             "progress_type": "amount",
             "primary_metric": {
@@ -192,7 +188,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
                 {"label": "사진 인증", "key": "photo_count", "format": "count"}
             ],
             "show_progress_bar": True,
-            "show_daily_breakdown": True
+            "show_daily_breakdown": True,
         },
         "is_active": True,
         "display_order": 4,
@@ -204,8 +200,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "외식/배달 X",
         "description": "외식, 배달은 그만! 든든한 집밥과 함께 내 지갑도 든든하게!",
-        "icon": "utensils-crossed",
-        "icon_color": "#F97316",
         "source_type": "duduk",
         "difficulty": "hard",
         "base_points": 500,
@@ -220,7 +214,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "user_inputs": None,
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": "기간 내 외식/배달 지출이 없다면 성공!",
+        "success_description": ["외식, 배달 카테고리 지출 0원"],
         "display_config": {
             "progress_type": "zero_spend",
             "primary_metric": {
@@ -231,7 +225,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
                 "target_label": "목표"
             },
             "show_progress_bar": False,
-            "show_daily_breakdown": True
+            "show_daily_breakdown": True,
         },
         "is_active": True,
         "display_order": 5,
@@ -243,8 +237,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "원플원러버",
         "description": "알뜰살뜰~ 편의점 이용 시 1+1 소비만 해보기!",
-        "icon": "tag",
-        "icon_color": "#EC4899",
         "source_type": "duduk",
         "difficulty": "easy",
         "base_points": 100,
@@ -260,7 +252,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "requires_photo": True,
         "photo_frequency": "on_purchase",
         "photo_description": "편의점에서 1+1 제품을 구매할 때마다 사진으로 인증해주세요",
-        "success_description": "편의점 이용 시 반드시 1+1 제품만 사용 (사진 인증)!",
+        "success_description": ["편의점 지출 입력 시 1+1 제품 사진으로 인증"],
         "display_config": {
             "progress_type": "photo",
             "primary_metric": {
@@ -270,7 +262,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
                 "show_target": False
             },
             "show_progress_bar": False,
-            "show_daily_breakdown": False
+            "show_daily_breakdown": False,
         },
         "is_active": True,
         "display_order": 6,
@@ -282,8 +274,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "집구석 보물찾기",
         "description": "중고 거래를 통해 소소한 용돈을 만들어 보는 건 어때요? 공간은 비우고 통장은 두둑하게!",
-        "icon": "gem",
-        "icon_color": "#FBBF24",
         "source_type": "duduk",
         "difficulty": "easy",
         "base_points": 100,
@@ -299,7 +289,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "requires_photo": True,
         "photo_frequency": "once",
         "photo_description": "중고 거래 사이트에 물건을 올린 화면을 캡처해주세요",
-        "success_description": "3일 안에 1건의 중고 거래 게시 사진 인증 시 성공!",
+        "success_description": ["중고 거래 사이트에 물건 등록", "등록 화면 사진 인증 1건 이상"],
         "display_config": {
             "progress_type": "photo",
             "primary_metric": {
@@ -310,7 +300,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
                 "target_label": "목표"
             },
             "show_progress_bar": True,
-            "show_daily_breakdown": False
+            "show_daily_breakdown": False,
         },
         "is_active": True,
         "display_order": 7,
@@ -322,8 +312,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "고정비 다이어트",
         "description": "나도 모르게 매달 빠져나가는 구독 서비스와 불필요한 고정 지출을 정리해봐요. 한 번의 정리로 앞으로의 지갑이 두둑!",
-        "icon": "scissors",
-        "icon_color": "#14B8A6",
         "source_type": "duduk",
         "difficulty": "easy",
         "base_points": 200,
@@ -337,7 +325,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "user_inputs": None,
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": "이번달 고정비가 지난달 고정비보다 적으면 성공!",
+        "success_description": ["이번달 고정비를 지난달보다 적게 사용"],
         "display_config": {
             "progress_type": "compare",
             "primary_metric": {
@@ -349,7 +337,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
             },
             "show_progress_bar": True,
             "show_daily_breakdown": False,
-            "show_category_breakdown": True
+            "show_category_breakdown": True,
         },
         "is_active": True,
         "display_order": 8,
@@ -361,8 +349,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "내 소비 맞추기",
         "description": "과하지도, 부족하지도 않게! 일주일 간 소비 계획을 세우고 그대로 실행해봐요.",
-        "icon": "target",
-        "icon_color": "#6366F1",
         "source_type": "duduk",
         "difficulty": "medium",
         "base_points": 300,
@@ -385,7 +371,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         ],
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": "계획한 소비에서 ±10% 이내일 경우 성공!",
+        "success_description": ["일주일 목표 소비 금액 설정", "목표 금액 ±10% 이내 지출"],
         "display_config": {
             "progress_type": "amount",
             "primary_metric": {
@@ -400,7 +386,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
             ],
             "show_progress_bar": True,
             "show_daily_breakdown": True,
-            "special_display": "target_range"
+            "special_display": "target_range",
         },
         "is_active": True,
         "display_order": 9,
@@ -412,8 +398,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "미라클 두둑!",
         "description": "매일 지출 입력하는 습관 기르기! 부지런한 내가 되어봐요.",
-        "icon": "sun",
-        "icon_color": "#F59E0B",
         "source_type": "duduk",
         "difficulty": "medium",
         "base_points": 350,
@@ -427,7 +411,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "user_inputs": None,
         "requires_daily_check": True,
         "requires_photo": False,
-        "success_description": "기간 내 매일매일 달력에 지출 입력(또는 무지출 체크) 시 성공!",
+        "success_description": ["달력에 매일 지출 입력 또는 무지출 체크"],
         "display_config": {
             "progress_type": "daily_check",
             "primary_metric": {
@@ -439,7 +423,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
             },
             "show_progress_bar": True,
             "show_daily_breakdown": True,
-            "special_display": "monthly_calendar"
+            "special_display": "monthly_calendar",
         },
         "is_active": True,
         "display_order": 10,
@@ -451,8 +435,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "무00의 날",
         "description": "어제는 카페, 오늘은 술! 내일은 어떤 소비를 참아볼까요?",
-        "icon": "calendar-x",
-        "icon_color": "#A855F7",
         "source_type": "duduk",
         "difficulty": "medium",
         "base_points": 300,
@@ -491,7 +473,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         ],
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": "요일마다 정한 금지 카테고리에서 지출하지 않으면 성공! (7일 중 3일은 AI가 랜덤 지정)",
+        "success_description": ["요일별 금지 카테고리에서 지출 금지"],
         "display_config": {
             "progress_type": "daily_rule",
             "primary_metric": {
@@ -503,7 +485,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
             },
             "show_progress_bar": True,
             "show_daily_breakdown": True,
-            "special_display": "weekly_forbidden_calendar"
+            "special_display": "weekly_forbidden_calendar",
         },
         "is_active": True,
         "display_order": 11,
@@ -515,8 +497,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "미래의 나에게",
         "description": "미래의 나에게 이번 달 가장 후회되는 소비 카테고리와 함께 따끔한 한마디를 적어서 보내요!",
-        "icon": "mail",
-        "icon_color": "#0EA5E9",
         "source_type": "duduk",
         "difficulty": "medium",
         "base_points": 350,
@@ -545,7 +525,11 @@ DUDUK_CHALLENGE_TEMPLATES = [
         ],
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": "선택한 카테고리의 다음 달 총 지출이 이번 달보다 적으면 성공!",
+        "success_description": [
+            "60일 동안 진행 (이번 달 + 다음 달)",
+            "개선할 카테고리 선택 및 메시지 작성",
+            "다음 달 해당 카테고리 지출이 이번 달보다 적게"
+        ],
         "display_config": {
             "progress_type": "compare",
             "primary_metric": {
@@ -557,7 +541,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
             },
             "show_progress_bar": True,
             "show_daily_breakdown": False,
-            "special_display": "letter_to_future"
+            "special_display": "letter_to_future",
         },
         "is_active": True,
         "display_order": 12,
@@ -569,8 +553,6 @@ DUDUK_CHALLENGE_TEMPLATES = [
     {
         "name": "두근두근 데스게임",
         "description": "두근두근! 랜덤으로 정해진 예산을 지켜 생존해봐요. 사용하지 않은 예산만큼 포인트를 받아요.",
-        "icon": "dice",
-        "icon_color": "#EF4444",
         "source_type": "duduk",
         "difficulty": "hard",
         "base_points": 0,
@@ -592,7 +574,10 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "user_inputs": None,
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": "랜덤 예산 이하로 지출 시 성공! 잭팟: 예산과 실제 지출 차이가 5% 이내면 1500p!",
+        "success_description": [
+            "랜덤으로 정해진 숨겨진 예산 이하로 지출",
+            "예산과 5% 이내 차이면 잭팟 1500P!"
+        ],
         "display_config": {
             "progress_type": "random_budget",
             "primary_metric": {
@@ -608,7 +593,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
             ],
             "show_progress_bar": True,
             "show_daily_breakdown": True,
-            "special_display": "death_game_gauge"
+            "special_display": "death_game_gauge",
         },
         "is_active": True,
         "display_order": 13,
