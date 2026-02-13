@@ -6,6 +6,7 @@
 - 로그인은 Google OAuth를 사용합니다.
 """
 import logging
+from django.db import transaction
 
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -193,3 +194,49 @@ class MonthlyReportView(APIView):
             'is_new_user': False,
         })
 
+class GameRewardView(APIView):
+    """
+    게임 보상 API
+    POST /api/users/game-reward/ - 게임에서 획득한 포인트를 적립
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        points = request.data.get('points', 0)
+
+        # 포인트 유효성 검증
+        if not isinstance(points, int) or points < 0:
+            return Response(
+                {'error': '유효하지 않은 포인트 값입니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 최대 적립 제한 (악용 방지: 한 번에 최대 300포인트)
+        if points > 300:
+            points = 300
+
+        if points == 0:
+            return Response({
+                'success': True,
+                'earned_points': 0,
+                'total_points': request.user.points,
+            })
+
+        try:
+            with transaction.atomic():
+                user = request.user
+                user.points += points
+                user.total_points_earned += points
+                user.save(update_fields=['points', 'total_points_earned'])
+
+                return Response({
+                    'success': True,
+                    'earned_points': points,
+                    'total_points': user.points,
+                })
+        except Exception as e:
+            logger.error(f"게임 보상 적립 중 오류: {e}", exc_info=True)
+            return Response(
+                {'error': '포인트 적립 중 오류가 발생했습니다.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

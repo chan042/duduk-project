@@ -205,7 +205,7 @@ export default function ClosetPage() {
                         fontSize: '0.9rem',
                     }}
                 >
-                    상태 저장
+                    Save
                 </button>
 
                 {/* Character Image */}

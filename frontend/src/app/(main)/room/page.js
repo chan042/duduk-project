@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Shirt, Store, DoorClosed } from 'lucide-react';
+import { ChevronLeft, Shirt, Store, DoorClosed, Gamepad2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEquippedItems } from '@/lib/api/shop';
 
@@ -96,6 +96,9 @@ export default function RoomPage() {
                 <button onClick={() => router.push('/challenge')} style={styles.iconButton}>
                     <ChevronLeft color="#333" size={20} />
                 </button>
+                <button onClick={() => router.push('/game')} style={styles.iconButton}>
+                    <Gamepad2 color="#333" size={20} />
+                </button>
                 <div style={styles.headerIcons}>
                     <button onClick={() => router.push('/closet')} style={styles.iconButton}>
                         <Shirt color="#333" size={20} />
@@ -117,7 +120,6 @@ export default function RoomPage() {
                     priority
                 />
             </div>
-
 
         </div>
     );
@@ -142,6 +144,7 @@ const styles = {
         right: 0,
         bottom: 0,
         zIndex: 0,
+        backgroundColor: '#e6e0d4', // 배경 미선택 시 베이지색
     },
     header: {
         position: 'absolute',
