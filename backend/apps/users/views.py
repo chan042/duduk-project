@@ -19,6 +19,7 @@ from .services import (
     collect_report_data,
     get_new_user_default_report,
     save_report_cache,
+    save_report_and_persona,
 )
 
 User = get_user_model()
@@ -164,21 +165,24 @@ class MonthlyReportView(APIView):
         try:
             report_data = collect_report_data(request.user, year, month)
             client = GeminiClient(purpose="analysis")
-            report_content = client.generate_monthly_report(report_data)
+            ai_result = client.generate_monthly_report(report_data)
 
-            if not report_content or not isinstance(report_content, dict):
+            if not ai_result or not isinstance(ai_result, dict):
                 return Response(
                     {'error': '리포트 형식이 올바르지 않습니다.'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
+
+            # 리포트 저장 + 페르소나 업데이트
+            saved, report_content = save_report_and_persona(
+                request.user, year, month, ai_result
+            )
         except Exception as e:
             logger.error(f"월간 리포트 생성 중 오류: {e}", exc_info=True)
             return Response(
                 {'error': f'리포트 생성 중 오류가 발생했습니다: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-        saved = save_report_cache(request.user, year, month, report_content)
 
         return Response({
             'year': year,
@@ -188,3 +192,4 @@ class MonthlyReportView(APIView):
             'cached': False,
             'is_new_user': False,
         })
+

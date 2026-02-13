@@ -26,6 +26,7 @@ def generate_monthly_reports_for_all_users():
         is_new_user_for_month,
         collect_report_data,
         save_report_cache,
+        save_report_and_persona,
     )
     from apps.notifications.services import create_monthly_report_notification
 
@@ -60,14 +61,15 @@ def generate_monthly_reports_for_all_users():
             # 데이터 수집 + AI 리포트 생성
             report_data = collect_report_data(user, year, month)
             client = GeminiClient(purpose="analysis")
-            report_content = client.generate_monthly_report(report_data)
+            ai_result = client.generate_monthly_report(report_data)
 
-            if not report_content or not isinstance(report_content, dict):
+            if not ai_result or not isinstance(ai_result, dict):
                 logger.error(f"사용자 {user.id}의 리포트 생성 실패: 잘못된 응답 형식")
                 fail_count += 1
                 continue
 
-            save_report_cache(user, year, month, report_content)
+            # 리포트 저장 + 페르소나 업데이트
+            save_report_and_persona(user, year, month, ai_result)
             
             # 월간 리포트 생성 알림 (윤택지수 + AI 리포트 통합)
             create_monthly_report_notification(user, year, month)

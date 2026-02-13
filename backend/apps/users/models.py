@@ -61,6 +61,13 @@ class User(AbstractUser):
     )
     is_profile_complete = models.BooleanField(default=False, verbose_name='프로필 완성 여부')
     
+    # AI 페르소나 (월간 리포트 분석을 통해 누적된 사용자의 소비 성향 요약 데이터)
+    ai_persona_summary = models.TextField(
+        blank=True, default="",
+        verbose_name='AI 소비 성향 요약',
+        help_text='월간 리포트 분석을 통해 누적된 사용자의 소비 성향 요약 데이터'
+    )
+
     # 포인트 시스템
     points = models.IntegerField(default=0, verbose_name='현재 포인트')
     total_points_earned = models.IntegerField(default=0, verbose_name='총 적립 포인트')

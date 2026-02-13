@@ -136,6 +136,13 @@ def collect_report_data(user, year, month):
         'score_breakdown': current_score.get('breakdown', {}),
         'challenge_count': challenges.count(),
         'challenge_success_count': challenges.filter(status='completed').count(),
+        # 사용자 페르소나 정보
+        'job': user.job or '',
+        'hobbies': user.hobbies or '',
+        'marital_status': user.get_marital_status_display(),
+        'has_children': user.has_children,
+        'self_development_field': user.self_development_field or '',
+        'ai_persona_summary': getattr(user, 'ai_persona_summary', ''),
     }
 
 
@@ -174,3 +181,36 @@ def save_report_cache(user, year, month, report_content):
         defaults={'report_content': report_content}
     )
     return report
+
+
+def save_report_and_persona(user, year, month, ai_result: dict):
+    """
+    AI 응답에서 리포트 내용과 페르소나 요약을 분리하여 각각 저장합니다.
+
+    Args:
+        user: User 인스턴스
+        year: 연도
+        month: 월
+        ai_result: GeminiClient.generate_monthly_report()의 반환값
+            - 'report': 리포트 JSON
+            - 'updated_persona_summary': 업데이트된 페르소나 요약 문자열
+
+    Returns:
+        (MonthlyReport 인스턴스, report_content dict)
+    """
+    report_content = ai_result.get('report', ai_result)
+    updated_persona = ai_result.get('updated_persona_summary', '')
+
+    # 1) 리포트 캐시 저장
+    saved = save_report_cache(user, year, month, report_content)
+
+    # 2) 페르소나 요약 업데이트
+    if updated_persona:
+        user.ai_persona_summary = updated_persona
+        user.save(update_fields=['ai_persona_summary'])
+        logger.info(
+            "사용자 %s의 ai_persona_summary 업데이트 완료 (%d자)",
+            user.id, len(updated_persona),
+        )
+
+    return saved, report_content

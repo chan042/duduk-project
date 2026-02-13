@@ -704,11 +704,22 @@ class GeminiClient:
         """
         월간 소비 분석 리포트 생성 (JSON 형식)
 
+        사용자의 페르소나(직업, 취미, 결혼 여부 등)와 AI가 축적한
+        소비 성향 요약(ai_persona_summary)을 프롬프트에 주입하여
+        초개인화된 리포트를 생성합니다.
+
         Args:
             report_data: 리포트 생성에 필요한 데이터
+                - 기존 지출/점수 데이터
+                - job, hobbies, marital_status, has_children,
+                  self_development_field, ai_persona_summary (페르소나)
 
         Returns:
-            구조화된 리포트 딕셔너리
+            {
+                "report": { ... 구조화된 리포트 JSON ... },
+                "updated_persona_summary": "업데이트된 성향 요약 문자열"
+            }
+            또는 실패 시 None
         """
         year = report_data.get('year')
         month = report_data.get('month')
@@ -721,6 +732,36 @@ class GeminiClient:
         score_breakdown = report_data.get('score_breakdown', {})
         challenge_count = report_data.get('challenge_count', 0)
         challenge_success_count = report_data.get('challenge_success_count', 0)
+
+        # ── 페르소나 정보 추출 ──
+        job = report_data.get('job', '')
+        hobbies = report_data.get('hobbies', '')
+        marital_status = report_data.get('marital_status', '')
+        has_children = report_data.get('has_children', False)
+        self_dev = report_data.get('self_development_field', '')
+        ai_persona_summary = report_data.get('ai_persona_summary', '')
+
+        # 페르소나 컨텍스트 문자열 생성
+        persona_lines = []
+        if job:
+            persona_lines.append(f"- 직업: {job}")
+        if hobbies:
+            persona_lines.append(f"- 취미: {hobbies}")
+        if marital_status:
+            persona_lines.append(f"- 결혼 여부: {marital_status}")
+        persona_lines.append(f"- 자녀 유무: {'있음' if has_children else '없음'}")
+        if self_dev:
+            persona_lines.append(f"- 자기개발 분야: {self_dev}")
+
+        if ai_persona_summary:
+            persona_lines.append(f"- 지난달까지 축적된 소비 성향 요약:\n  \"{ai_persona_summary}\"")
+        else:
+            persona_lines.append(
+                "- 지난달까지 축적된 소비 성향 요약: (정보 없음 — 첫 분석이므로 "
+                "이번 달 데이터를 토대로 새롭게 작성하세요)"
+            )
+
+        persona_context = "\n".join(persona_lines)
 
         # 카테고리별 지출 문자열 생성
         category_lines = []
@@ -740,6 +781,19 @@ class GeminiClient:
         [역할]
         당신은 '두둑' 서비스의 AI 재무 분석가입니다.
         사용자의 월간 소비 데이터를 분석하여 구조화된 JSON 리포트를 작성합니다.
+
+        [사용자 페르소나]
+        {persona_context}
+
+        [지시사항]
+        1. 위 사용자 페르소나(직업, 취미, 과거 소비 성향 요약 등)를 반드시 참고하여
+           사용자가 공감할 수 있는 어조와 맥락으로 리포트를 작성하세요.
+        2. 예를 들어, 직업이 '개발자'이고 취미가 '독서'라면
+           자기계발 도서 구매는 긍정적으로 평가하되, 야식/배달 과다는
+           직업 특성(야근)과 연관지어 분석하세요.
+        3. 과거 성향 요약(ai_persona_summary)이 있다면, 지난달과 비교하여
+           개선된 점과 새로 나타난 패턴을 분석에 포함하세요.
+        4. 성향 요약이 없는 경우(첫 분석), 이번 달 데이터만으로 새롭게 작성하세요.
 
         [분석 데이터]
         - 기간: {year}년 {month}월
@@ -766,12 +820,15 @@ class GeminiClient:
         3. 숫자와 데이터 기반의 논리적 분석
         4. 개선이 필요한 부분은 명확히 지적하되, 실현 가능한 솔루션을 제시
         5. 전월 데이터가 없을 경우({has_prev_data=}), 전월 관련 필드는 null로 설정
+        6. 사용자의 직업과 취미, 과거 성향을 고려하여 공감가는 맞춤 조언 제공
 
         [출력 형식]
         반드시 아래 JSON 스키마를 정확히 따라 응답하세요.
         JSON 외의 텍스트(설명, 마크다운 코드블록 등)는 절대 포함하지 마세요.
 
     {{
+      "updated_persona_summary": "이번 달 소비 내역을 분석하여 기존 성향 요약을 업데이트한 3~5문장의 요약글. 기존 성향이 없으면 이번 달 데이터를 토대로 새로 작성. 예: '충동구매는 줄었으나 식비 지출이 늘어남. 자기개발 욕구가 강하며 도서 구매가 눈에 띔.'",
+
       "summary": {{
         "period": "{year}년 {month}월",
         "overview": "300자 이내 전체 소비 현황 요약",
@@ -977,7 +1034,8 @@ class GeminiClient:
     }}
 
         [작성 가이드라인]
-        1. 톤앤매너: 전문 재무 상담가의 객관적이고 정중한 어조
+        1. 톤앤매너: 전문 재무 상담가의 객관적이고 정중한 어조.
+           사용자 페르소나를 참고하여 공감가는 맞춤형 조언을 제공하세요.
         2. 구체성: 모든 금액은 숫자로, 모호한 표현 대신 정확한 수치
         3. 패턴 분석:
         - 충동 소비: 같은 카테고리 내 평균 대비 고액 지출
@@ -991,6 +1049,21 @@ class GeminiClient:
         - 과도한 부정적 표현 지양
         - 일반적인 재테크 조언 나열 금지 (사용자 데이터 기반 분석만)
         - 불가능한 목표 제시 금지
+        6. updated_persona_summary 작성 규칙:
+        - 3~5문장으로 이번 달 소비 성향을 요약
+        - 기존 성향(ai_persona_summary)이 있으면 변화를 반영하여 업데이트
+        - 기존 성향이 없으면 이번 달 데이터를 기반으로 새로 작성
+        - 예: "충동구매는 줄었으나 식비 지출이 늘어남. 자기개발 욕구가 강하며 도서 구매가 눈에 띔."
       """
 
-        return self._generate(prompt)
+        raw_result = self._generate(prompt)
+        if not raw_result:
+            return None
+
+        # AI 응답에서 리포트와 페르소나 요약 분리
+        updated_persona = raw_result.pop('updated_persona_summary', '')
+
+        return {
+            'report': raw_result,
+            'updated_persona_summary': updated_persona,
+        }
