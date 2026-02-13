@@ -2,7 +2,7 @@
 
 import NewUserGuide from './NewUserGuide';
 
-export default function ReportSummary({ summary, guideData, year, month, isNewUser, onViewMore }) {
+export default function ReportSummary({ summary, year, month, isNewUser, onViewMore }) {
     return (
         <section className="rainbow-border fade-in" style={{ ...styles.reportSection, animationDelay: '0.5s' }}>
             <div style={styles.reportHeader}>
@@ -12,8 +12,8 @@ export default function ReportSummary({ summary, guideData, year, month, isNewUs
             </div>
 
             <div style={styles.reportContent}>
-                {isNewUser && guideData ? (
-                    <NewUserGuide guide={guideData} />
+                {isNewUser ? (
+                    <NewUserGuide />
                 ) : (
                     <p style={styles.reportText}>
                         {summary || '리포트를 불러오는 중...'}

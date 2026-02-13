@@ -146,30 +146,7 @@ def collect_report_data(user, year, month):
     }
 
 
-def get_new_user_default_report(year, month):
-    """신규 사용자용 기본 가이드 리포트 생성"""
-    now = timezone.localdate()
-    if now.month == 12:
-        next_month = 1
-    else:
-        next_month = now.month + 1
 
-    return {
-        "guide": {
-            "title": "\U0001f3af 시작 가이드",
-            "steps": [
-                f"지출 기록하기: 이번 달 소비를 꾸준히 기록해보세요. 다음달에 분석 결과를 확인할 수 있습니다.",
-                "예산 설정하기: 프로필에서 월 예산을 설정하면 더 정확한 분석이 가능합니다",
-                "챌린지 참여: 작은 목표부터 시작해 건강한 소비 습관을 만들어보세요"
-            ],
-            "tips": [
-                "작은 지출도 빠짐없이 기록하는 것이 중요합니다",
-                "일주일에 한 번씩 지출을 돌아보는 습관을 들여보세요",
-                "두둑의 AI 코칭을 적극 활용해보세요!",
-                "매월 1일에 전월 윤택지수가 생성됩니다"
-            ]
-        }
-    }
 
 
 def save_report_cache(user, year, month, report_content):

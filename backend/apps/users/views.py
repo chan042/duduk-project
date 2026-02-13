@@ -18,7 +18,6 @@ from .services import (
     get_target_month,
     is_new_user_for_month,
     collect_report_data,
-    get_new_user_default_report,
     save_report_cache,
     save_report_and_persona,
 )
@@ -146,18 +145,16 @@ class MonthlyReportView(APIView):
                 'report': cached_report.report_content,
                 'generated_at': cached_report.created_at,
                 'cached': True,
-                'is_new_user': 'guide' in cached_report.report_content,
+                'is_new_user': False,
             })
 
-        # 신규 사용자 처리
+        # 신규 사용자 처리 - 빈 리포트 반환 (프론트엔드에서 가이드 표시)
         if is_new_user_for_month(request.user, year, month):
-            default_report = get_new_user_default_report(year, month)
-            saved = save_report_cache(request.user, year, month, default_report)
             return Response({
                 'year': year,
                 'month': month,
-                'report': default_report,
-                'generated_at': saved.updated_at,
+                'report': {},
+                'generated_at': None,
                 'cached': False,
                 'is_new_user': True,
             })

@@ -70,18 +70,12 @@ function extractSummary(reportData) {
     return '요약 정보를 불러올 수 없습니다.';
 }
 
-/** 리포트 응답에서 isNewUser, guideData, reportSummary를 추출 */
+/** 리포트 응답에서 isNewUser, reportSummary를 추출 */
 function processReportResponse(data) {
     if (data.is_new_user) {
-        if (data.report?.guide) {
-            return { isNewUser: true, guideData: data.report.guide, reportSummary: '' };
-        }
-        if (data.report?.summary) {
-            return { isNewUser: true, guideData: null, reportSummary: data.report.summary.overview };
-        }
-        return { isNewUser: true, guideData: null, reportSummary: '리포트를 불러올 수 없습니다.' };
+        return { isNewUser: true, reportSummary: '' };
     }
-    return { isNewUser: false, guideData: null, reportSummary: extractSummary(data.report) };
+    return { isNewUser: false, reportSummary: extractSummary(data.report) };
 }
 
 // ─── Hooks ───
@@ -147,7 +141,6 @@ export function useYuntaekScore() {
 export function useYuntaekReport() {
     const [reportData, setReportData] = useState(null);
     const [reportSummary, setReportSummary] = useState('');
-    const [guideData, setGuideData] = useState(null);
     const [isNewUser, setIsNewUser] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -157,7 +150,6 @@ export function useYuntaekReport() {
         setReportData(data);
         const processed = processReportResponse(data);
         setIsNewUser(processed.isNewUser);
-        setGuideData(processed.guideData);
         setReportSummary(processed.reportSummary);
     }, []);
 
@@ -188,5 +180,5 @@ export function useYuntaekReport() {
         fetchReport();
     }, [applyReportData]);
 
-    return { reportData, reportSummary, guideData, isNewUser, loading, error, fromCache };
+    return { reportData, reportSummary, isNewUser, loading, error, fromCache };
 }

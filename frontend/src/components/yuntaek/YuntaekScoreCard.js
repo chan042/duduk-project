@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import ScoreDetail from './ScoreDetail';
 
 export default function YuntaekScoreCard({ score, year, month, isNewUser, details }) {
@@ -43,11 +43,10 @@ export default function YuntaekScoreCard({ score, year, month, isNewUser, detail
 
     return (
         <section
-            className="glass-card fade-in"
+            className="glass-card"
             style={{
                 ...styles.scoreSection,
                 padding: '2rem 1.5rem 1.5rem 1.5rem',
-                animationDelay: '0.1s',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: isDetailExpanded ? '1.5rem' : '0.5rem',
@@ -99,7 +98,23 @@ export default function YuntaekScoreCard({ score, year, month, isNewUser, detail
                 </span>
 
                 {isNewUser ? (
-                    <div />
+                    <div style={{
+                        width: '100px',
+                        height: '100px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        animation: 'bounce 2s infinite'
+                    }}>
+                        <HelpCircle
+                            size={80}
+                            color="#94a3b8"
+                            strokeWidth={1.5}
+                            style={{
+                                filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))'
+                            }}
+                        />
+                    </div>
                 ) : (
                     <span style={styles.scoreValue}>
                         {displayedScore}
