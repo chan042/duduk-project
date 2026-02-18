@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import { DoorClosed } from 'lucide-react';
 import { getProfile } from '@/lib/api/auth';
 import { submitGameReward } from '@/lib/api/game';
 
@@ -432,6 +433,10 @@ export default function FlappyGame({ onClose }) {
                             style={{ objectFit: 'cover' }}
                             priority
                         />
+                        {/* 좌상단 방으로 돌아가기 아이콘 */}
+                        <button onClick={onClose} style={styles.roomIconButton}>
+                            <DoorClosed color="#333" size={20} />
+                        </button>
                         <div style={styles.startContent}>
                             <div
                                 style={styles.startButtonWrapper}
@@ -540,6 +545,20 @@ const styles = {
         width: '100%',
         height: '100%',
         cursor: 'pointer',
+    },
+    roomIconButton: {
+        position: 'absolute',
+        top: '16px',
+        left: '16px',
+        zIndex: 50,
+        background: 'transparent',
+        border: 'none',
+        padding: '8px',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        filter: 'drop-shadow(0 0 2px white) drop-shadow(0 0 2px white)',
     },
     startContent: {
         position: 'absolute',

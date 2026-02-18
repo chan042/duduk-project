@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { DoorClosed, Store } from 'lucide-react';
+import { DoorClosed } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserInventory, getEquippedItems, saveEquippedItems } from '@/lib/api/shop';
 
@@ -180,9 +180,6 @@ export default function ClosetPage() {
                 <div style={styles.navIcons}>
                     <button onClick={() => router.push('/room')} style={styles.iconButton}>
                         <DoorClosed color="#333" size={20} />
-                    </button>
-                    <button onClick={() => router.push('/shop')} style={styles.iconButton}>
-                        <Store color="#333" size={20} />
                     </button>
                 </div>
 
