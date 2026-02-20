@@ -39,7 +39,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "user_inputs": None,
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": ["일주일 간 총 지출 3만원 이하 유지"],
+        "success_description": ["일주일 간, 총 지출 < 3만원"],
         "display_config": {
             "progress_type": "amount",
             "primary_metric": {
@@ -61,7 +61,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
     # ========================================================================
     {
         "name": "나와의 싸움",
-        "description": "지난달의 나와 싸워서 이기자! 지난달 하나의 주차를 선택하고, 해당 주차보다 지출을 절약해봐요.",
+        "description": "지난달의 나와 싸워서 이기자! 지난달 주차 중 하나를 골라, 더 적게 소비하면 이겨요. 챌린지 도전 시 월요일에 시작됩니다!",
         "source_type": "duduk",
         "difficulty": "easy",
         "base_points": 100,
@@ -84,7 +84,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         ],
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": ["지난달 선택한 주차보다 적게 지출"],
+        "success_description": ["지난 주차 지출 > 이번 주차 지출"],
         "display_config": {
             "progress_type": "compare",
             "primary_metric": {
@@ -144,7 +144,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
     # ========================================================================
     {
         "name": "현금 챌린지",
-        "description": "보이지 않는 숫자는 그만! 눈앞에서 줄어드는 지폐를 보며 소비 습관을 돌아보아요.",
+        "description": "일주일 간 사용할 금액을 정해 현금으로 지출해요. 매일 밤 남은 현금을 보며 내 소비 습관을 돌아 볼 수 있어요.",
         "source_type": "duduk",
         "difficulty": "easy",
         "base_points": 200,
@@ -169,10 +169,9 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "requires_daily_check": False,
         "requires_photo": True,
         "photo_frequency": "daily",
-        "photo_description": "저녁에 남은 현금을 사진으로 인증해주세요",
+        "photo_description": "매일 저녁에 남은 현금을 사진으로 인증해주세요",
         "success_description": [
-            "일주일 동안 설정한 예산으로 생활",
-            "매일 저녁 남은 현금 사진 인증",
+            "일주일 동안 설정한 예산으로 생활(권장 예산 이하 금액)",
             "목표 금액 이하 지출"
         ],
         "display_config": {
@@ -199,7 +198,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
     # ========================================================================
     {
         "name": "외식/배달 X",
-        "description": "외식, 배달은 그만! 든든한 집밥과 함께 내 지갑도 든든하게!",
+        "description": "외식, 배달은 그만! 밖에서 사 먹는 지출을 줄여 내 지갑을 두둑하게 만들어봐요.",
         "source_type": "duduk",
         "difficulty": "hard",
         "base_points": 500,
@@ -214,7 +213,10 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "user_inputs": None,
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": ["식비 카테고리 지출 0원"],
+        "success_description": [
+            "식사, 카페, 술 카테고리 지출 0원",
+            "장보기를 위한 생활 카테고리 지출 허용"
+        ],
         "display_config": {
             "progress_type": "zero_spend",
             "primary_metric": {
@@ -236,7 +238,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
     # ========================================================================
     {
         "name": "원플원러버",
-        "description": "알뜰살뜰~ 편의점 이용 시 1+1 소비만 해보기!",
+        "description": "알뜰살뜰~ 편의점 이용 시 1+1 소비만 해보기! 기간 동안 편의점 소비가 있을 때 마다 사진을 통해 인증해봐요.",
         "source_type": "duduk",
         "difficulty": "easy",
         "base_points": 100,
@@ -252,7 +254,10 @@ DUDUK_CHALLENGE_TEMPLATES = [
         "requires_photo": True,
         "photo_frequency": "on_purchase",
         "photo_description": "편의점에서 1+1 제품을 구매할 때마다 사진으로 인증해주세요",
-        "success_description": ["편의점 지출 입력 시 1+1 제품 사진으로 인증"],
+        "success_description": [
+            "편의점 지출 입력 시 당일까지 사진 인증",
+            "1+1제품만 지출 가능"
+        ],
         "display_config": {
             "progress_type": "photo",
             "primary_metric": {
@@ -348,7 +353,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
     # ========================================================================
     {
         "name": "내 소비 맞추기",
-        "description": "과하지도, 부족하지도 않게! 일주일 간 소비 계획을 세우고 그대로 실행해봐요.",
+        "description": "계획 소비의 힘을 키워볼까요? 일주일 간 나의 소비 계획을 세우고 더 쓰지도, 덜 쓰지도 않고 그대로 실행해봐요.",
         "source_type": "duduk",
         "difficulty": "medium",
         "base_points": 300,
@@ -371,7 +376,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
         ],
         "requires_daily_check": False,
         "requires_photo": False,
-        "success_description": ["일주일 목표 소비 금액 설정", "목표 금액 ±10% 이내 지출"],
+        "success_description": ["일주일 목표 소비 금액 설정(권장 예산 이하)", "목표 금액 ±10% 이내 지출"],
         "display_config": {
             "progress_type": "amount",
             "primary_metric": {
@@ -434,7 +439,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
     # ========================================================================
     {
         "name": "무00의 날",
-        "description": "어제는 카페, 오늘은 술! 내일은 어떤 소비를 참아볼까요?",
+        "description": "어제는 카페, 오늘은 술! 내일은 어떤 소비를 참아볼까요? 4일은 내가 정한 카테고리를, 3일은 AI가 정해준 카테고리를 피해 지출해봐요.",
         "source_type": "duduk",
         "difficulty": "medium",
         "base_points": 300,
@@ -552,7 +557,7 @@ DUDUK_CHALLENGE_TEMPLATES = [
     # ========================================================================
     {
         "name": "두근두근 데스게임",
-        "description": "두근두근! 랜덤으로 정해진 예산을 지켜 생존해봐요. 사용하지 않은 예산만큼 포인트를 받아요.",
+        "description": "두근두근! AI가 랜덤으로 정해준 예산을 지켜 생존해봐요. 사용하지 않은 예산만큼 포인트를 받아요.",
         "source_type": "duduk",
         "difficulty": "hard",
         "base_points": 0,
