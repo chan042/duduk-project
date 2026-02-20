@@ -114,8 +114,8 @@ export default function RoomPage() {
                 <Image
                     src={getCharacterImagePath()}
                     alt="Character"
-                    width={280}
-                    height={280}
+                    width={290}
+                    height={290}
                     style={{ objectFit: 'contain' }}
                     priority
                 />
@@ -170,7 +170,7 @@ const styles = {
     },
     characterContainer: {
         position: 'absolute',
-        bottom: '100px',
+        bottom: '120px',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 5,
