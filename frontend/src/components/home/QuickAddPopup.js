@@ -49,7 +49,13 @@ export default function QuickAddPopup({ onClose, onTransactionAdded, selectedDat
             setStep('confirm');
         } catch (error) {
             console.error('Failed to parse transaction:', error);
-            alert('분석에 실패했습니다. 다시 시도해주세요.');
+            const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+            const isServerBusy = error.response?.status === 503 || error.response?.status === 500;
+            if (isTimeout || isServerBusy) {
+                alert('AI 분석 서버가 바쁩니다. 잠시 후 다시 시도해주세요.');
+            } else {
+                alert('분석에 실패했습니다. 다시 시도해주세요.');
+            }
         } finally {
             setIsLoading(false);
         }

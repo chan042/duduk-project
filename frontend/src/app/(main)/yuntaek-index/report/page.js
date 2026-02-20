@@ -15,26 +15,16 @@ export default function YuntaekReportPage() {
     const showLoading = loading && !fromCache;
 
     function downloadReport() {
-        if (!reportData?.report || typeof reportData.report !== 'object') return;
-
-        const jsonStr = JSON.stringify(reportData.report, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `윤택지수_리포트_${reportData.year}년_${reportData.month}월.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        if (!reportData) return;
+        window.print();
     }
 
     if (error) {
-        return <p style={{ color: '#ef4444', textAlign: 'center', marginTop: '2rem' }}>{error}</p>;
+        return <p style={{ color: '#F04452', textAlign: 'center', marginTop: '2rem' }}>{error}</p>;
     }
 
     return (
-        <div className="report-page-container">
+        <div className="report-page-container" style={{ background: '#F2F4F6', minHeight: '100vh' }}>
             {showLoading && <LoadingOverlay message="리포트를 불러오는 중입니다..." />}
 
             <ReportHeader
@@ -53,11 +43,11 @@ export default function YuntaekReportPage() {
 
 const styles = {
     content: {
-        padding: '1.5rem',
+        padding: '20px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.5rem',
-        paddingBottom: '6rem',
+        gap: '8px',
+        paddingBottom: '100px',
         zIndex: 10,
         position: 'relative',
     },

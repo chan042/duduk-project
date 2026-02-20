@@ -16,7 +16,8 @@ export default function BottomNavigation({ onQuickAddClick }) {
             right: 0,
             backgroundColor: 'white',
             borderTop: '1px solid #eee',
-            height: '60px',
+            borderRadius: '20px 20px 0 0',
+            height: '84px',
             maxWidth: '430px',
             margin: '0 auto',
             zIndex: 100,
@@ -29,7 +30,7 @@ export default function BottomNavigation({ onQuickAddClick }) {
                 alignItems: 'center',
                 height: '100%',
                 position: 'relative',
-                padding: '0 0.5rem',
+                padding: '0 0.5rem 20px',
             }}>
                 {/* 챌린지 */}
                 <Link href="/challenge" style={{

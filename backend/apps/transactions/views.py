@@ -36,7 +36,10 @@ class ParseTransactionView(APIView):
         parsed_data = client.analyze_text(text)
         
         if not parsed_data:
-            return Response({"error": "Failed to parse text"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": "AI 분석 서버가 일시적으로 사용 불가능합니다. 잠시 후 다시 시도해주세요."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
             
         return Response(parsed_data)
 

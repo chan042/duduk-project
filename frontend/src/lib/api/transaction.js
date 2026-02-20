@@ -2,7 +2,7 @@ import client from './client';
 
 export const parseTransaction = async (text) => {
     try {
-        const response = await client.post('/api/transactions/parse/', { text });
+        const response = await client.post('/api/transactions/parse/', { text }, { timeout: 30000 });
         return response.data;
     } catch (error) {
         console.error('Parse Error:', error);

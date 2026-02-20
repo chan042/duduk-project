@@ -120,7 +120,7 @@ class GeminiClient:
         else:
             self.model = None
 
-    def _generate(self, prompt: str, max_retries: int = 3) -> Optional[dict]:
+    def _generate(self, prompt: str, max_retries: int = 1) -> Optional[dict]:
         """공통 생성 로직 (할당량 초과 시 자동 재시도)"""
         if not self.model:
             logger.warning("Gemini 모델이 초기화되지 않았습니다 (API 키 확인 필요)")
@@ -143,7 +143,7 @@ class GeminiClient:
                     or 'quota' in error_str
                 )
                 if is_rate_limit and attempt < max_retries:
-                    wait_time = 40 * (attempt + 1)
+                    wait_time = 10 * (attempt + 1)
                     logger.warning(
                         "Gemini API 할당량 초과 (시도 %d/%d). %d초 후 재시도...",
                         attempt + 1, max_retries, wait_time,

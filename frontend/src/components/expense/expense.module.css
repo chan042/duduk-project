@@ -7,6 +7,8 @@
   /* Allow growth */
   max-width: 100%;
   padding: 1rem;
+  padding-top: 0;
+  /* 상단 회색 영역 제거 */
   /* 하단 패딩 제거 (바텀 네비와 거의 맞닿게) */
   padding-bottom: 0;
   position: relative;

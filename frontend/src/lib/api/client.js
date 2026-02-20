@@ -72,8 +72,13 @@ client.interceptors.response.use(
                         // (컴포넌트에서 처리하도록 함)
                         localStorage.removeItem('accessToken');
                         localStorage.removeItem('refreshToken');
+                        window.location.href = '/login';
                         return Promise.reject(refreshError);
                     }
+                } else {
+                    // refreshToken이 없을 때 바로 로그인 화면으로
+                    localStorage.removeItem('accessToken');
+                    window.location.href = '/login';
                 }
             }
         }

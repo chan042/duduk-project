@@ -264,3 +264,36 @@ button {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* ===== 리포트 인쇄 / PDF 저장 스타일 ===== */
+
+@media print {
+
+  /* 네비게이션, 헤더 버튼 숨기기 */
+  nav,
+  header button,
+  .loading-overlay {
+    display: none !important;
+  }
+
+  /* 배경색 및 색상 강제 출력 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  /* 리포트 컨테이너 여백 정리 */
+  .report-page-container {
+    padding-bottom: 0 !important;
+  }
+
+  /* 페이지 단위 나누기 방지 */
+  section,
+  .card {
+    break-inside: avoid;
+  }
+}

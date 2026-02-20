@@ -124,7 +124,7 @@ export const getChallengeTemplates = async (tab = 'duduk') => {
         const sorted = sortByDifficulty(response.data.map(transformTemplate));
         return sorted;
     } catch (error) {
-        console.error('Get Challenge Templates Error:', error);
+        console.error('Get Challenge Templates Error:', error.message || error);
         throw error;
     }
 };
@@ -337,7 +337,7 @@ export const getUserPoints = async () => {
         const response = await client.get('/api/challenges/points/');
         return response.data;
     } catch (error) {
-        console.error('Get User Points Error:', error);
+        console.error('Get User Points Error:', error.message || error);
         throw error;
     }
 };

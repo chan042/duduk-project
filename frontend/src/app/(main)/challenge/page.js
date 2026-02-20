@@ -413,7 +413,13 @@ export default function ChallengePage() {
 
                     {/* 중앙: 포인트 표시 */}
                     <div style={styles.pointsDisplay}>
-                        <span style={styles.pointsText}>{userPoints.toLocaleString()}P</span>
+                        <div style={styles.pointsContainer}>
+                            <span style={styles.pointsLabel}>보유 포인트</span>
+                            <div style={styles.pointsValueWrapper}>
+                                <span style={styles.pointsText}>{userPoints.toLocaleString()}</span>
+                                <span style={styles.pointsUnit}>P</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -564,6 +570,7 @@ const styles = {
         background: 'var(--background-light)',
         minHeight: '100vh',
         padding: '1rem', // Calendar UI와 비슷하게 패딩 축소
+        paddingTop: '0', // 상단 회색 영역 제거
         paddingBottom: '6rem',
     },
     // Sticky Header Wrapper - 음수 top으로 headerTop이 스크롤 아웃되도록 함
@@ -605,13 +612,40 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '12px',
         flex: 1,
     },
+    pointsContainer: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '1rem',
+        background: 'white',
+        transition: 'all 0.3s ease',
+    },
+    pointsLabel: {
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        color: 'var(--text-sub)',
+    },
+    pointsValueWrapper: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     pointsText: {
-        fontSize: '2.5rem',
+        fontSize: '4.5rem',
+        fontWeight: '800',
+        color: 'var(--primary)',
+        lineHeight: '1',
+    },
+    pointsUnit: {
+        fontSize: '2rem',
         fontWeight: '700',
         color: 'var(--primary)',
+        marginLeft: '4px',
+        marginTop: '0.8rem',
+        opacity: 0.9,
     },
     headerIcons: {
         position: 'absolute',

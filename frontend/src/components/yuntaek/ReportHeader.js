@@ -37,7 +37,6 @@ const styles = {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '1rem',
-        paddingTop: '3.5rem',
         zIndex: 10,
         position: 'relative',
     },

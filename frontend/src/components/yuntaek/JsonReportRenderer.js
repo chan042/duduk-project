@@ -29,11 +29,11 @@ export default function JsonReportRenderer({ content }) {
                                 </div>
                                 <div style={styles.budgetItem}>
                                     <span style={styles.budgetLabel}>지출</span>
-                                    <span style={{ ...styles.budgetValue, color: '#ef4444' }}>{summary.budget_status.spent?.toLocaleString()}원</span>
+                                    <span style={{ ...styles.budgetValue, color: '#F04452' }}>{summary.budget_status.spent?.toLocaleString()}원</span>
                                 </div>
                                 <div style={styles.budgetItem}>
                                     <span style={styles.budgetLabel}>남은 예산</span>
-                                    <span style={{ ...styles.budgetValue, color: '#10b981' }}>{summary.budget_status.remaining?.toLocaleString()}원</span>
+                                    <span style={{ ...styles.budgetValue, color: 'var(--primary, #14b8a6)' }}>{summary.budget_status.remaining?.toLocaleString()}원</span>
                                 </div>
                             </div>
                             <p style={styles.budgetMessage}>{summary.budget_status.message}</p>
@@ -47,7 +47,7 @@ export default function JsonReportRenderer({ content }) {
                                 <div key={idx} style={styles.categoryItem}>
                                     <div style={styles.categoryHeader}>
                                         <span style={styles.categoryName}>{cat.category}</span>
-                                        <span style={styles.categoryAmount}>{cat.amount?.toLocaleString()}원</span>
+                                        <span style={{ ...styles.categoryAmount, color: '#191F28' }}>{cat.amount?.toLocaleString()}원</span>
                                     </div>
                                     {cat.percentage && (
                                         <div style={styles.progressBar}>
@@ -72,16 +72,16 @@ export default function JsonReportRenderer({ content }) {
                                 <span style={styles.scoreValue}>{yuntaek_analysis.current_score}점</span>
                             </div>
                             {yuntaek_analysis.previous_score && (
-                                <div>
+                                <div style={{ textAlign: 'right' }}>
                                     <span style={styles.scoreLabel}>전월 점수</span>
-                                    <span style={styles.scoreValue}>{yuntaek_analysis.previous_score}점</span>
+                                    <span style={styles.prevScoreValue}>{yuntaek_analysis.previous_score}점</span>
                                 </div>
                             )}
                         </div>
                         <p style={styles.scoreMessage}>{yuntaek_analysis.score_message}</p>
 
                         {yuntaek_analysis.factors && yuntaek_analysis.factors.length > 0 && (
-                            <div style={{ marginTop: '1.5rem' }}>
+                            <div style={{ marginTop: '24px' }}>
                                 <h4 style={styles.subTitle}>세부 요소</h4>
                                 {yuntaek_analysis.factors.map((factor, idx) => (
                                     <div key={idx} style={styles.factorItem}>
@@ -156,7 +156,10 @@ export default function JsonReportRenderer({ content }) {
                                     {task.action_steps && task.action_steps.length > 0 && (
                                         <ul style={styles.actionList}>
                                             {task.action_steps.map((step, i) => (
-                                                <li key={i} style={styles.actionItem}>{step}</li>
+                                                <li key={i} style={styles.actionItem}>
+                                                    <span style={styles.actionBullet}>•</span>
+                                                    {step}
+                                                </li>
                                             ))}
                                         </ul>
                                     )}
@@ -200,259 +203,309 @@ const styles = {
     container: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '2rem',
+        gap: '24px',
     },
     section: {
-        marginBottom: '1.5rem',
+        marginBottom: '0px',
     },
     sectionTitle: {
-        fontSize: '1.5rem',
+        fontSize: '20px',
         fontWeight: '700',
-        color: '#1e293b',
-        marginBottom: '1rem',
+        color: '#191F28',
+        marginBottom: '16px',
+        paddingLeft: '4px',
     },
     overview: {
-        fontSize: '1rem',
-        lineHeight: '1.7',
-        color: '#475569',
-        marginBottom: '1.5rem',
+        fontSize: '15px',
+        lineHeight: '1.6',
+        color: '#4E5968',
+        marginBottom: '20px',
+        paddingLeft: '4px',
     },
     card: {
-        background: '#fff',
-        border: '1px solid #e2e8f0',
-        borderRadius: '16px',
-        padding: '1.5rem',
-        marginBottom: '1rem',
+        background: '#FFFFFF',
+        borderRadius: '24px',
+        padding: '24px',
+        marginBottom: '16px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
     },
     cardTitle: {
-        fontSize: '1.1rem',
-        fontWeight: '600',
-        color: '#334155',
-        marginBottom: '1rem',
+        fontSize: '18px',
+        fontWeight: '700',
+        color: '#333D4B',
+        marginBottom: '20px',
     },
     budgetGrid: {
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '1rem',
-        marginBottom: '1rem',
+        gap: '8px',
+        marginBottom: '16px',
     },
     budgetItem: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.5rem',
+        gap: '4px',
+        background: '#F9FAFB',
+        padding: '12px 8px',
+        borderRadius: '16px',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     budgetLabel: {
-        fontSize: '0.85rem',
-        color: '#64748b',
+        fontSize: '12px',
+        fontWeight: '600',
+        color: '#8B95A1',
+        whiteSpace: 'nowrap',
     },
     budgetValue: {
-        fontSize: '1.1rem',
+        fontSize: '15px',
         fontWeight: '700',
-        color: '#1e293b',
+        color: '#191F28',
+        whiteSpace: 'nowrap',
+        letterSpacing: '-0.3px',
     },
     budgetMessage: {
-        fontSize: '0.95rem',
-        color: '#475569',
-        fontStyle: 'italic',
+        fontSize: '14px',
+        color: '#4E5968',
+        marginTop: '8px',
+        padding: '12px',
+        background: '#F2F4F6',
+        borderRadius: '12px',
+        textAlign: 'center',
     },
     categoryItem: {
-        marginBottom: '1rem',
+        marginBottom: '16px',
     },
     categoryHeader: {
         display: 'flex',
         justifyContent: 'space-between',
-        marginBottom: '0.5rem',
+        marginBottom: '8px',
     },
     categoryName: {
-        fontSize: '1rem',
+        fontSize: '16px',
         fontWeight: '600',
-        color: '#334155',
+        color: '#333D4B',
     },
     categoryAmount: {
-        fontSize: '1rem',
+        fontSize: '16px',
         fontWeight: '700',
-        color: '#3b82f6',
+        color: 'var(--primary, #14b8a6)',
     },
     progressBar: {
         width: '100%',
-        height: '8px',
-        background: '#f1f5f9',
-        borderRadius: '4px',
+        height: '10px',
+        background: '#F2F4F6',
+        borderRadius: '5px',
         overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)',
-        borderRadius: '4px',
+        background: 'var(--primary, #14b8a6)',
+        borderRadius: '5px',
     },
     scoreHeader: {
         display: 'flex',
         justifyContent: 'space-between',
-        marginBottom: '1rem',
+        alignItems: 'center',
+        marginBottom: '16px',
     },
     scoreLabel: {
         display: 'block',
-        fontSize: '0.85rem',
-        color: '#64748b',
-        marginBottom: '0.25rem',
+        fontSize: '14px',
+        fontWeight: '500',
+        color: '#8B95A1',
+        marginBottom: '4px',
     },
     scoreValue: {
         display: 'block',
-        fontSize: '2rem',
+        fontSize: '36px',
         fontWeight: '800',
-        color: '#10b981',
+        color: 'var(--primary, #14b8a6)',
+    },
+    prevScoreValue: {
+        display: 'block',
+        fontSize: '24px',
+        fontWeight: '700',
+        color: '#B0B8C1',
     },
     scoreMessage: {
-        fontSize: '1rem',
-        color: '#475569',
-        marginBottom: '1rem',
+        fontSize: '15px',
+        color: '#4E5968',
+        marginBottom: '20px',
+        lineHeight: '1.5',
     },
     subTitle: {
-        fontSize: '1rem',
-        fontWeight: '600',
-        color: '#334155',
-        marginBottom: '0.75rem',
+        fontSize: '16px',
+        fontWeight: '700',
+        color: '#333D4B',
+        marginBottom: '12px',
     },
     factorItem: {
-        padding: '1rem',
-        background: '#f8fafc',
-        borderRadius: '12px',
-        marginBottom: '0.75rem',
+        padding: '16px',
+        background: '#F9FAFB',
+        borderRadius: '16px',
+        marginBottom: '12px',
     },
     factorHeader: {
         display: 'flex',
         justifyContent: 'space-between',
-        marginBottom: '0.5rem',
+        alignItems: 'center',
+        marginBottom: '8px',
     },
     factorName: {
-        fontSize: '0.95rem',
+        fontSize: '15px',
         fontWeight: '600',
-        color: '#334155',
+        color: '#333D4B',
     },
     factorScore: {
-        fontSize: '0.95rem',
+        fontSize: '15px',
         fontWeight: '700',
-        color: '#3b82f6',
+        color: 'var(--primary, #14b8a6)',
     },
     tip: {
-        fontSize: '0.9rem',
-        color: '#64748b',
+        fontSize: '14px',
+        color: '#4E5968',
         margin: 0,
+        lineHeight: '1.5',
     },
     weaknessTotal: {
-        fontSize: '1.1rem',
+        fontSize: '18px',
         fontWeight: '700',
-        color: '#ef4444',
-        marginBottom: '1rem',
+        color: '#F04452',
+        marginBottom: '20px',
     },
     weaknessItem: {
-        padding: '1rem',
-        background: '#fef2f2',
-        borderLeft: '4px solid #ef4444',
-        borderRadius: '8px',
-        marginBottom: '0.75rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        padding: '16px',
+        background: '#FFF4F4',
+        borderRadius: '16px',
+        marginBottom: '12px',
     },
     weaknessDesc: {
-        fontSize: '1rem',
+        fontSize: '16px',
         fontWeight: '600',
-        color: '#1e293b',
-        margin: '0 0 0.5rem 0',
+        color: '#191F28',
+        margin: 0,
     },
     weaknessReason: {
-        fontSize: '0.9rem',
-        color: '#64748b',
-        margin: '0 0 0.5rem 0',
+        fontSize: '14px',
+        color: '#8B95A1',
+        margin: 0,
     },
     weaknessAmount: {
-        fontSize: '1rem',
+        fontSize: '16px',
         fontWeight: '700',
-        color: '#ef4444',
+        color: '#F04452',
+        marginTop: '4px',
     },
     leakageItem: {
-        padding: '1rem',
-        background: '#fff7ed',
-        borderRadius: '12px',
-        marginBottom: '0.75rem',
+        padding: '16px',
+        background: '#F9FAFB',
+        borderRadius: '16px',
+        marginBottom: '12px',
+        display: 'flex',
+        flexDirection: 'column',
     },
     leakagePattern: {
-        fontSize: '1rem',
+        fontSize: '16px',
         fontWeight: '600',
-        color: '#1e293b',
-        margin: '0 0 0.5rem 0',
+        color: '#333D4B',
+        margin: '0 0 8px 0',
     },
     leakageFreq: {
-        fontSize: '0.9rem',
-        color: '#64748b',
-        margin: '0 0 0.25rem 0',
+        fontSize: '14px',
+        color: '#8B95A1',
+        margin: '0 0 4px 0',
     },
     leakageAmount: {
-        fontSize: '0.95rem',
+        fontSize: '15px',
         fontWeight: '600',
-        color: '#f59e0b',
+        color: '#F04452',
         margin: 0,
     },
     taskItem: {
-        padding: '1.5rem',
-        background: '#f0f9ff',
-        borderRadius: '12px',
-        marginBottom: '1rem',
+        padding: '20px',
+        background: '#F9FAFB',
+        borderRadius: '16px',
+        marginBottom: '16px',
     },
     taskTitle: {
-        fontSize: '1.1rem',
+        fontSize: '16px',
         fontWeight: '700',
-        color: '#1e293b',
-        margin: '0 0 0.75rem 0',
+        color: '#191F28',
+        margin: '0 0 12px 0',
     },
     taskState: {
-        fontSize: '0.95rem',
-        color: '#64748b',
-        margin: '0 0 0.25rem 0',
+        fontSize: '14px',
+        color: '#8B95A1',
+        margin: '0 0 4px 0',
     },
     taskTarget: {
-        fontSize: '0.95rem',
-        color: '#10b981',
+        fontSize: '14px',
+        color: 'var(--primary, #14b8a6)',
         fontWeight: '600',
-        margin: '0 0 0.75rem 0',
+        margin: '0 0 12px 0',
     },
     actionList: {
-        listStyle: 'decimal',
-        paddingLeft: '1.5rem',
-        margin: '0.75rem 0',
+        listStyle: 'none',
+        padding: 0,
+        margin: '12px 0',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
     },
     actionItem: {
-        fontSize: '0.9rem',
-        color: '#475569',
-        marginBottom: '0.5rem',
+        fontSize: '14px',
+        color: '#4E5968',
+        display: 'flex',
+        alignItems: 'flex-start',
+        lineHeight: '1.5',
+    },
+    actionBullet: {
+        color: 'var(--primary, #14b8a6)',
+        fontWeight: 'bold',
+        marginRight: '8px',
     },
     savings: {
-        fontSize: '1rem',
+        fontSize: '15px',
         fontWeight: '700',
-        color: '#10b981',
-        margin: '0.75rem 0 0 0',
+        color: 'var(--primary, #14b8a6)',
+        margin: '12px 0 0 0',
+        padding: '12px 16px',
+        background: '#f0fdfa', // tailwind teal-50
+        borderRadius: '12px',
+        display: 'inline-block',
     },
     expertCard: {
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: '#fff',
-        borderRadius: '16px',
-        padding: '2rem',
+        background: '#F9FAFB',
+        color: '#191F28',
+        borderRadius: '24px',
+        padding: '24px',
+        border: '1px solid #E5E8EB',
     },
     expertText: {
-        fontSize: '1.05rem',
-        lineHeight: '1.8',
-        marginBottom: '1.5rem',
+        fontSize: '16px',
+        lineHeight: '1.6',
+        marginBottom: '20px',
+        fontWeight: '500',
     },
     expertHighlight: {
-        background: 'rgba(255, 255, 255, 0.2)',
-        padding: '1rem',
-        borderRadius: '12px',
-        marginBottom: '1rem',
-        fontSize: '1rem',
+        background: '#FFFFFF',
+        padding: '16px',
+        borderRadius: '16px',
+        marginBottom: '12px',
+        fontSize: '15px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
     },
     expertAdvice: {
-        fontSize: '1rem',
-        fontStyle: 'italic',
-        borderTop: '1px solid rgba(255, 255, 255, 0.3)',
-        paddingTop: '1rem',
-        marginTop: '1rem',
+        fontSize: '15px',
+        color: 'var(--primary, #14b8a6)',
+        fontWeight: '600',
+        paddingTop: '16px',
+        marginTop: '16px',
+        borderTop: '1px solid #E5E8EB',
+        lineHeight: '1.5',
     },
 };
