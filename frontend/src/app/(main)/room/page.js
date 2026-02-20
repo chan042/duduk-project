@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Shirt, Store, DoorClosed, Gamepad2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEquippedItems } from '@/lib/api/shop';
+import CoinRain from '@/components/room/CoinRain';
 
 export default function RoomPage() {
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const [characterType, setCharacterType] = useState('char_dog');
     const [equippedItems, setEquippedItems] = useState({
         clothing: null,
@@ -17,6 +18,32 @@ export default function RoomPage() {
         background: null
     });
     const [isLoading, setIsLoading] = useState(true);
+    const characterRef = useRef(null);
+
+    // 캐릭터 클릭 시 랜덤 대사
+    const CHARACTER_MESSAGES = [
+        '오늘 지출은 잘 관리되고 있나요?',
+        '게임을 통해 포인트를 얻을 수 있어요.',
+        '가끔씩 하늘을 날아다니는 꿈을 꿔요.',
+        '오늘 하루도 수고 많았어요!',
+        '오늘은 어떤 챌린지에 참여하나요?',
+        '작은 절약이 큰 행복을 만들어요!',
+        '예산을 초과하면 나도 슬퍼요...',
+        '같이 두둑한 지갑 만들어봐요!',
+        '나를 위한 소비는 가치있죠!',
+        '제 패션 어때요? 전 너무 마음에 들어요!',
+    ];
+    const [characterSpeech, setCharacterSpeech] = useState(null);
+    const [speechVisible, setSpeechVisible] = useState(false);
+    const speechTimerRef = useRef(null);
+
+    const handleCharacterClick = () => {
+        const msg = CHARACTER_MESSAGES[Math.floor(Math.random() * CHARACTER_MESSAGES.length)];
+        setCharacterSpeech(msg);
+        setSpeechVisible(true);
+        if (speechTimerRef.current) clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = setTimeout(() => setSpeechVisible(false), 3000);
+    };
 
     // 사용자 캐릭터 타입 설정
     useEffect(() => {
@@ -109,8 +136,54 @@ export default function RoomPage() {
                 </div>
             </div>
 
-            {/* 캐릭터 */}
-            <div style={styles.characterContainer}>
+            {/* 코인 비 */}
+            <CoinRain characterRef={characterRef} onPointEarned={refreshUser} />
+
+            {/* 캐릭터 + 말풍선 */}
+            <div
+                ref={characterRef}
+                style={styles.characterContainer}
+                onClick={handleCharacterClick}
+            >
+                {/* 말풍선 */}
+                {characterSpeech && (
+                    <div style={{
+                        position: 'absolute',
+                        bottom: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        marginBottom: '20px',
+                        backgroundColor: '#fdf6e3',
+                        padding: '20px 22px 14px 22px',
+                        borderRadius: '20px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                        fontSize: '0.85rem',
+                        fontWeight: '500',
+                        color: '#5c4a3a',
+                        whiteSpace: 'nowrap',
+                        zIndex: 30,
+                        opacity: speechVisible ? 1 : 0,
+                        transition: 'opacity 0.4s ease',
+                        pointerEvents: 'none',
+                    }}>
+                        <div style={{
+                            position: 'absolute',
+                            top: '-20px',
+                            left: '4px',
+                            backgroundColor: '#7a3e48',
+                            color: 'white',
+                            padding: '4px 12px',
+                            borderRadius: '10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            whiteSpace: 'nowrap',
+                        }}>
+                            {user?.character_name || '두둑이'}
+                        </div>
+                        {characterSpeech}
+
+                    </div>
+                )}
                 <Image
                     src={getCharacterImagePath()}
                     alt="Character"

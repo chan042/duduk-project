@@ -616,13 +616,13 @@ const styles = {
     },
     nameTag: {
         position: 'absolute',
-        top: '-8px',
+        top: '-22px',
         left: '16px',
         backgroundColor: '#7a3e48', // Dark burgundy like the image
         color: 'white',
-        padding: '4px 12px',
+        padding: '5px 14px',
         borderRadius: '12px', // More rounded
-        fontSize: '0.7rem',
+        fontSize: '0.85rem',
         fontWeight: 'bold',
         whiteSpace: 'nowrap',
     },
