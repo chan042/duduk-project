@@ -21,15 +21,15 @@ export default function CoinRain({ characterRef, onPointEarned }) {
     useEffect(() => {
         isRunning.current = true;
 
-        // 5구간에 골고루 하나씩 배치
-        const initialCoins = Array.from({ length: 5 }, (_, i) => {
-            const zoneStart = i * 16 + 5;
-            const zoneWidth = 14;
+        // 10구간에 골고루 하나씩 배치
+        const initialCoins = Array.from({ length: 10 }, (_, i) => {
+            const zoneStart = i * 9 + 3;
+            const zoneWidth = 7;
             return {
                 id: `coin-${Date.now()}-${i}`,
                 left: zoneStart + Math.random() * zoneWidth,
                 speed: Math.random() * 0.6 + 1.4,  // 1.4~2.0 px/frame
-                startDelay: i * 1500 + Math.random() * 1000, // 각 코인마다 최대 2.5초 차이
+                startDelay: Math.random() * 1200, // 0~1.2초 사이 랜덤 시작 (동시에 여러개 떨어짐)
                 startTime: null,
                 currentY: -60,
                 size: Math.random() * 8 + 34, // 34~42px

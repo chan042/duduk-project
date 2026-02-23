@@ -435,7 +435,7 @@ export default function FlappyGame({ onClose }) {
                         />
                         {/* 좌상단 방으로 돌아가기 아이콘 */}
                         <button onClick={onClose} style={styles.roomIconButton}>
-                            <DoorClosed color="#333" size={20} />
+                            <DoorClosed color="#333" size={26} />
                         </button>
                         <div style={styles.startContent}>
                             <div

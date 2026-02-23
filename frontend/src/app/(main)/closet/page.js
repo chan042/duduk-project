@@ -179,7 +179,7 @@ export default function ClosetPage() {
                 {/* Navigation Icons */}
                 <div style={styles.navIcons}>
                     <button onClick={() => router.push('/room')} style={styles.iconButton}>
-                        <DoorClosed color="#333" size={20} />
+                        <DoorClosed color="#333" size={26} />
                     </button>
                 </div>
 

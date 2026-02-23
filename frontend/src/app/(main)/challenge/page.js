@@ -427,7 +427,7 @@ export default function ChallengePage() {
                     {/* 아이콘과 버튼 */}
                     <div style={styles.headerIcons}>
                         <button style={styles.iconButton} onClick={() => router.push('/room')}>
-                            <DoorClosed size={20} color="var(--primary)" />
+                            <DoorClosed size={26} color="var(--primary)" />
                         </button>
                     </div>
 
