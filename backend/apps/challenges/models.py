@@ -324,6 +324,9 @@ class UserChallenge(models.Model):
                 else:
                     locked.penalty_points = 0
 
+                # 실패 확정 즉시 daily_logs 삭제
+                locked.daily_logs.all().delete()
+
             locked._handle_completion_side_effects(is_success)
 
             if not is_success and not notify_reason:

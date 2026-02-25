@@ -836,15 +836,17 @@ export default function ChallengeDetailModal({
                             )}
                             {/* Failed */}
                             {isFailed && (
-                                <button
-                                    style={{ ...styles.primaryButton, background: '#EF4444' }}
-                                    onClick={() => {
-                                        onRetry?.(challenge);
-                                        onClose();
-                                    }}
-                                >
-                                    다시 도전하기
-                                </button>
+                                <div style={styles.buttonRow}>
+                                    <button
+                                        style={{ ...styles.primaryButton, background: '#EF4444' }}
+                                        onClick={() => {
+                                            onRetry?.(challenge);
+                                            onClose();
+                                        }}
+                                    >
+                                        재도전
+                                    </button>
+                                </div>
                             )}
 
                             {/* Active */}

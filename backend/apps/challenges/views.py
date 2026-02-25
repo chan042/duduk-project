@@ -399,9 +399,6 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-
-        user_challenge.daily_logs.all().delete()
-
         # 챌린지 상태 초기화
         now = timezone.now()
         duration_days = user_challenge.duration_days

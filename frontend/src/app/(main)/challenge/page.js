@@ -54,7 +54,6 @@ const challengeTabs = [
     { id: 'duduk', label: '두둑' },
     { id: 'user', label: '사용자' },
     { id: 'ongoing', label: '도전중' },
-    { id: 'completed', label: '완료' },
     { id: 'failed', label: '실패' },
 ];
 
@@ -62,6 +61,8 @@ export default function ChallengePage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState('all');
     const [userPoints, setUserPoints] = useState(0);
+    const [displayPoints, setDisplayPoints] = useState(0); // 카운트업 애니메이션용
+    const animationRef = useRef(null);
     const [selectedChallenge, setSelectedChallenge] = useState(null);
     const [challenges, setChallenges] = useState([]);
     const [ongoingChallenges, setOngoingChallenges] = useState([]);
@@ -77,6 +78,44 @@ export default function ChallengePage() {
     const [aiGeneratedChallenge, setAiGeneratedChallenge] = useState(null);
     const [lastGenerateInput, setLastGenerateInput] = useState({ details: '', difficulty: '' });
     const [isSavingAI, setIsSavingAI] = useState(false);
+    // 포인트 카운트업 애니메이션
+    useEffect(() => {
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
+
+        const start = displayPoints;
+        const end = userPoints;
+        if (start === end) return;
+
+        const duration = 800; // ms
+        const startTime = performance.now();
+
+        const animate = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress); // easeOutExpo
+
+            setDisplayPoints(Math.round(start + (end - start) * eased));
+
+            if (progress < 1) animationRef.current = requestAnimationFrame(animate);
+        };
+
+        animationRef.current = requestAnimationFrame(animate);
+
+        return () => {
+            if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userPoints]);
+
+    // 포인트만 갱신(별도 API 없어도 dashboard로 가능)
+    const fetchUserPoints = useCallback(async () => {
+        try {
+            const dashboard = await getChallengeDashboard();
+            setUserPoints(dashboard.points || 0);
+        } catch (err) {
+            console.error('포인트 조회 실패:', err);
+        }
+    }, []);
     // 챌린지 데이터 로드
     const fetchChallenges = useCallback(async () => {
         setLoading(true);
@@ -114,6 +153,7 @@ export default function ChallengePage() {
                     const ongoingTemplateIds = new Set(ongoing.map((c) => c.templateId).filter(Boolean));
                     const ongoingIds = new Set(ongoing.map((c) => c.id));
 
+
                     // 완료된 챌린지의 템플릿 ID 목록
                     const completedTemplateIds = new Set(completedChallenges.map((c) => c.templateId).filter(Boolean));
 
@@ -125,6 +165,7 @@ export default function ChallengePage() {
                     // 사용자 챌린지: active/ready/completed 상태 제외
                     const filteredUserChallenges = userChallengesAll.filter((c) =>
                         !ongoingIds.has(c.id) && !['active', 'ready', 'completed'].includes(c.status)
+
                     );
 
                     // 이미 포함된 항목 키 추적 (템플릿/챌린지 중복 제거)
@@ -160,10 +201,13 @@ export default function ChallengePage() {
 
                 case 'duduk':
                     // 두둑 탭: 두둑 템플릿 + 진행중인 챌린지
+
                     const dudukOngoing = ongoing.filter((c) => c.sourceType === 'duduk');
+
                     // 진행중인 챌린지의 템플릿 ID 목록
                     const dudukOngoingTemplateIds = new Set(dudukOngoing.map((c) => c.templateId).filter(Boolean));
                     // 진행중이 아닌 템플릿만 필터링
+
                     const dudukFiltered = dudukTemplates.filter((t) => !dudukOngoingTemplateIds.has(t.id));
                     // 두덕 진행중 챌린지 + 나머지 템플릿 병합
                     data = [
@@ -183,8 +227,9 @@ export default function ChallengePage() {
                     const userFiltered = userTemplates.filter(t =>
                         !userOngoingIds.has(t.id) && !['active', 'ready'].includes(t.status)
                     );
-                    // 사용자 진행중 챌린지 + 나머지 병합
+                    // 완료 + 사용자 진행중 챌린지 + 나머지 병합
                     data = [
+
                         ...userOngoing,
                         ...userFiltered
                     ];
@@ -439,7 +484,7 @@ export default function ChallengePage() {
                         <div style={styles.pointsContainer}>
                             <span style={styles.pointsLabel}>보유 포인트</span>
                             <div style={styles.pointsValueWrapper}>
-                                <span style={styles.pointsText}>{userPoints.toLocaleString()}</span>
+                                <span style={styles.pointsText}>{displayPoints.toLocaleString()}</span>
                                 <span style={styles.pointsUnit}>P</span>
                             </div>
                         </div>
