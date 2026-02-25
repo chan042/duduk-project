@@ -37,25 +37,19 @@ export default function RoomPage() {
     const [transitionSpeechVisible, setTransitionSpeechVisible] = useState(false);
     const transitionTimerRef = useRef(null);
 
-    // 하루 1회 방문 체크 (테스트를 위해 항상 문 화면 표시)
+    // 하루 1회 방문 체크
     useEffect(() => {
-        // TODO: 테스트 완료 후 아래 주석 해제
-        // const today = getTodayString();
-        // const lastVisit = localStorage.getItem(LOCALSTORAGE_KEY);
-        // if (lastVisit !== today) {
-        //     setIsFirstVisitToday(true);
-        //     setDoorOpened(false);
-        //     setShowCoinRain(false);
-        // } else {
-        //     setIsFirstVisitToday(false);
-        //     setDoorOpened(true);
-        //     setShowCoinRain(false);
-        // }
-
-        // 테스트: 항상 문 화면 표시
-        setIsFirstVisitToday(true);
-        setDoorOpened(false);
-        setShowCoinRain(false);
+        const today = getTodayString();
+        const lastVisit = localStorage.getItem(LOCALSTORAGE_KEY);
+        if (lastVisit !== today) {
+            setIsFirstVisitToday(true);
+            setDoorOpened(false);
+            setShowCoinRain(false);
+        } else {
+            setIsFirstVisitToday(false);
+            setDoorOpened(true);
+            setShowCoinRain(false);
+        }
     }, []);
 
     // 문 클릭 핸들러
