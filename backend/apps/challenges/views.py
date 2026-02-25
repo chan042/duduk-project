@@ -14,7 +14,7 @@ from .constants import (
     CONDITION_TYPE_PHOTO_VERIFICATION,
     COMPARE_TYPE_LAST_MONTH_WEEK,
 )
-from .signals import _evaluate_success
+from .signals import _evaluate_success, _update_photo_progress
 from .serializers import (
     ChallengeTemplateSerializer, ChallengeTemplateListSerializer,
     UserChallengeSerializer, UserChallengeListSerializer,
@@ -26,6 +26,30 @@ from .serializers import (
     _get_template_availability
 )
 from external.gemini.client import GeminiClient
+
+
+def _get_template_queryset_for_user(user, tab=None):
+    queryset = ChallengeTemplate.objects.filter(is_active=True)
+
+    if tab == 'duduk':
+        queryset = queryset.filter(source_type='duduk')
+    elif tab == 'event':
+        now = timezone.now()
+        queryset = queryset.filter(
+            source_type='event',
+            event_start_at__lte=now,
+            event_end_at__gte=now,
+        )
+
+    latest_challenge = UserChallenge.objects.filter(
+        user=user,
+        template=OuterRef('pk')
+    ).order_by('-created_at')
+
+    return queryset.annotate(
+        my_challenge_id=Subquery(latest_challenge.values('id')[:1]),
+        my_challenge_status=Subquery(latest_challenge.values('status')[:1]),
+    ).order_by('display_order', '-created_at')
 
 
 class ChallengeTemplateViewSet(viewsets.ReadOnlyModelViewSet):
@@ -44,33 +68,8 @@ class ChallengeTemplateViewSet(viewsets.ReadOnlyModelViewSet):
         return ChallengeTemplateSerializer
     
     def get_queryset(self):
-        queryset = super().get_queryset()
         tab = self.request.query_params.get('tab')
-        
-        if tab == 'duduk':
-            queryset = queryset.filter(source_type='duduk')
-        elif tab == 'event':
-            queryset = queryset.filter(source_type='event')
-            # 이벤트 챌린지는 현재 활성 상태인 것만
-            now = timezone.now()
-            queryset = queryset.filter(
-                event_start_at__lte=now,
-                event_end_at__gte=now
-            )
-        
-        # 사용자별 챌린지 정보 Annotate
-        if self.request.user.is_authenticated:
-            latest_challenge = UserChallenge.objects.filter(
-                user=self.request.user,
-                template=OuterRef('pk')
-            ).order_by('-created_at')
-
-            queryset = queryset.annotate(
-                my_challenge_id=Subquery(latest_challenge.values('id')[:1]),
-                my_challenge_status=Subquery(latest_challenge.values('status')[:1])
-            )
-
-        return queryset.order_by('display_order', '-created_at')
+        return _get_template_queryset_for_user(self.request.user, tab=tab)
 
     @action(detail=True, methods=['post'])
     def preview_input(self, request, pk=None):
@@ -157,7 +156,6 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(source_type=source_type)
         
         return queryset.order_by('-started_at')
-
     def create(self, request, *args, **kwargs):
         """템플릿 기반 챌린지 시작"""
         serializer = UserChallengeCreateSerializer(
@@ -411,7 +409,7 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
 
         user_challenge.status = 'active' if start_at <= now else 'ready'
         user_challenge.started_at = start_at
-        user_challenge.ends_at = start_at + timezone.timedelta(days=duration_days)
+        user_challenge.ends_at = start_at + timezone.timedelta(days=duration_days - 1)
         user_challenge.attempt_number += 1
         user_challenge.final_spent = None
         user_challenge.earned_points = 0
@@ -584,50 +582,6 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
-    def check_daily(self, request, pk=None):
-        """일일 체크"""
-        user_challenge = self.get_object()
-        
-        if user_challenge.status != 'active':
-            return Response(
-                {'error': '진행 중인 챌린지만 체크할 수 있습니다.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if not user_challenge.requires_daily_check:
-            return Response(
-                {'error': '일일 체크가 필요한 챌린지가 아닙니다.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        today = timezone.now().date()
-        log, created = ChallengeDailyLog.objects.get_or_create(
-            user_challenge=user_challenge,
-            log_date=today,
-            defaults={'is_checked': True, 'checked_at': timezone.now()}
-        )
-        
-        if not created and log.is_checked:
-            return Response(
-                {'error': '오늘은 이미 체크했습니다.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if not log.is_checked:
-            log.is_checked = True
-            log.checked_at = timezone.now()
-            log.save()
-        
-        # progress 업데이트
-        self._update_daily_check_progress(user_challenge)
-        
-        return Response({
-            'message': '체크 완료!',
-            'log': ChallengeDailyLogSerializer(log).data,
-            'progress': user_challenge.progress
-        })
-
-    @action(detail=True, methods=['post'])
     def upload_photo(self, request, pk=None):
         """사진 인증 업로드"""
         user_challenge = self.get_object()
@@ -696,11 +650,11 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
         log.photo_urls = photo_urls
         log.save(update_fields=['photo_urls', 'updated_at'])
         
+        success_conditions = user_challenge.success_conditions or {}
         # progress 업데이트
-        self._update_photo_progress(user_challenge)
+        _update_photo_progress(user_challenge, success_conditions)
 
         # photo_verification + once 타입은 즉시 완료 처리
-        success_conditions = user_challenge.success_conditions or {}
         if success_conditions.get('type') == CONDITION_TYPE_PHOTO_VERIFICATION and user_challenge.photo_frequency in (None, 'once'):
             progress = user_challenge.progress or {}
             if _evaluate_success(user_challenge, progress, success_conditions):
@@ -713,96 +667,56 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
             'verification': verification,
         })
 
-    def _update_daily_check_progress(self, user_challenge):
-        """일일 체크 progress 업데이트"""
-        checked_count = 0
-        daily_status = []
-        for log in user_challenge.daily_logs.order_by('log_date'):
-            has_spending_input = (log.transaction_count or 0) > 0
-            done = bool(log.is_checked or has_spending_input)
-            if done:
-                checked_count += 1
-            daily_status.append({
-                "date": str(log.log_date),
-                "checked": bool(log.is_checked),
-                "has_spending_input": has_spending_input,
-                "done": done,
-                "amount": log.spent_amount,
-            })
 
-        if user_challenge.started_at:
-            today = timezone.now().date()
-            start_date = user_challenge.started_at.date()
-            end_date = min(today, user_challenge.ends_at.date() if user_challenge.ends_at else today)
-            elapsed_days = (end_date - start_date).days + 1 if end_date >= start_date else 0
-        else:
-            elapsed_days = 0
-        total_days = user_challenge.duration_days
-        denominator = max(1, min(total_days, elapsed_days)) if total_days > 0 else 1
-        percentage = round((checked_count / denominator) * 100, 1) if denominator > 0 else 0
-        
-        progress = {
-            "type": "daily_check",
-            "checked_days": checked_count,
-            "total_days": total_days,
-            "elapsed_days": elapsed_days,
-            "percentage": min(100, percentage),
-            "daily_status": daily_status,
-            "is_on_track": checked_count >= elapsed_days
-        }
-        
-        user_challenge.update_progress(progress)
+class ChallengeDashboardView(APIView):
+    """
+    챌린지 대시보드 통합 API
+    - 템플릿/진행중/완료/실패/사용자 챌린지를 한 번에 반환
+    """
+    permission_classes = [IsAuthenticated]
 
-    def _update_photo_progress(self, user_challenge):
-        """사진 인증 progress 업데이트"""
-        total_photos = 0
-        photos = []
-        
-        for log in user_challenge.daily_logs.order_by('log_date'):
-            for photo in (log.photo_urls or []):
-                is_verified = bool(photo.get('verified', False))
-                if not is_verified:
-                    continue
-                total_photos += 1
-                photos.append({
-                    "date": str(log.log_date),
-                    "url": photo.get('url'),
-                    "verified": True
-                })
+    def get(self, request):
+        user = request.user
 
-        success_conditions = user_challenge.success_conditions or {}
-        photo_condition = success_conditions.get('photo_condition', '')
-        mode = user_challenge.photo_frequency or 'once'
-        required_count = success_conditions.get('required_photos', 1)
+        UserChallenge.objects.filter(
+            user=user,
+            status='ready',
+            started_at__lte=timezone.now()
+        ).update(status='active')
 
-        if user_challenge.photo_frequency == 'daily':
-            required_count = user_challenge.duration_days
-            percentage = round((total_photos / required_count) * 100, 1) if required_count > 0 else 0
-        elif '중고 거래' in photo_condition:
-            if user_challenge.started_at:
-                today = timezone.now().date()
-                start_date = user_challenge.started_at.date()
-                end_date = min(today, user_challenge.ends_at.date() if user_challenge.ends_at else today)
-                elapsed_days = (end_date - start_date).days + 1 if end_date >= start_date else 0
-            else:
-                elapsed_days = 0
-            total_days = user_challenge.duration_days or 1
-            percentage = round((elapsed_days / total_days) * 100, 1)
-        else:
-            percentage = round((total_photos / required_count) * 100, 1) if required_count > 0 else 0
-        
-        progress = {
-            "type": "photo",
-            "photo_count": total_photos,
-            "required_count": required_count,
-            "percentage": min(100, percentage),
-            "photos": photos,
-            "is_on_track": total_photos > 0,
-            "mode": mode,
-        }
-        
-        user_challenge.update_progress(progress)
+        templates_duduk = _get_template_queryset_for_user(user, tab='duduk')
+        templates_event = _get_template_queryset_for_user(user, tab='event')
 
+        user_challenges = UserChallenge.objects.filter(user=user).order_by('-started_at')
+        active = user_challenges.filter(status='active')
+        ready = user_challenges.filter(status='ready')
+        ongoing = user_challenges.filter(status__in=['active', 'ready'])
+        completed = user_challenges.filter(status='completed')
+        failed = user_challenges.filter(status='failed')
+        custom_ai = user_challenges.filter(source_type__in=['custom', 'ai'])
+
+        challenge_serializer_kwargs = {'many': True}
+        template_serializer_kwargs = {'many': True, 'context': {'request': request}}
+
+        return Response({
+            'points': UserPointsSerializer({
+                'points': user.points,
+                'total_points_earned': user.total_points_earned,
+                'total_points_used': user.total_points_used,
+            }).data,
+            'templates': {
+                'duduk': ChallengeTemplateListSerializer(templates_duduk, **template_serializer_kwargs).data,
+                'event': ChallengeTemplateListSerializer(templates_event, **template_serializer_kwargs).data,
+            },
+            'challenges': {
+                'active': UserChallengeListSerializer(active, **challenge_serializer_kwargs).data,
+                'ready': UserChallengeListSerializer(ready, **challenge_serializer_kwargs).data,
+                'ongoing': UserChallengeListSerializer(ongoing, **challenge_serializer_kwargs).data,
+                'completed': UserChallengeListSerializer(completed, **challenge_serializer_kwargs).data,
+                'failed': UserChallengeListSerializer(failed, **challenge_serializer_kwargs).data,
+                'user': UserChallengeListSerializer(custom_ai, **challenge_serializer_kwargs).data,
+            }
+        })
 
 class UserPointsView(APIView):
     """

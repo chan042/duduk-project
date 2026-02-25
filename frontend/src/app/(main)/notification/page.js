@@ -16,11 +16,28 @@ export default function NotificationPage() {
         fetchNotifications();
     }, [fetchNotifications]);
 
+    const getSafeRedirect = (url) => {
+        if (typeof url !== 'string') {
+            return '/';
+        }
+
+        const normalized = url.trim();
+        if (!normalized.startsWith('/') || normalized.startsWith('//') || normalized.includes('\\')) {
+            return '/';
+        }
+
+        if (/[\u0000-\u001F\u007F]/.test(normalized)) {
+            return '/';
+        }
+
+        return normalized;
+    };
+
     const handleNotificationClick = async (notification) => {
         if (!notification.is_read) {
             markAsRead(notification.id);
         }
-        router.push(notification.redirect_url);
+        router.push(getSafeRedirect(notification.redirect_url));
     };
 
     if (loading) {

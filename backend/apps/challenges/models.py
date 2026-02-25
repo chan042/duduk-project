@@ -1,6 +1,15 @@
-from django.db import models
+import logging
+
+from django.db import models, transaction
+from django.db.models import F, Value
+from django.db.models.functions import Greatest
 from django.conf import settings
 from django.utils import timezone
+from apps.challenges.services.failure_reason import infer_failure_reason
+from apps.challenges.services.safe_formula import FormulaEvaluationError, evaluate_formula
+
+
+logger = logging.getLogger(__name__)
 
 
 class ChallengeTemplate(models.Model):
@@ -272,33 +281,91 @@ class UserChallenge(models.Model):
         self.progress = progress_data
         self.save(update_fields=['progress', 'updated_at'])
 
-    def complete_challenge(self, is_success: bool, final_spent: int = None):
+    def complete_challenge(self, is_success: bool, final_spent: int = None, failure_reason: str = None):
         """챌린지 완료 처리"""
-        if self.status in {'completed', 'failed'}:
-            return
+        notify_reason = failure_reason
 
-        self.status = 'completed' if is_success else 'failed'
-        self.completed_at = timezone.now()
-        if final_spent is not None:
-            self.final_spent = final_spent
-        
-        if is_success:
-            # 포인트 계산 (실제 지급은 claim_reward에서 수행)
-            self.earned_points = self._calculate_points()
-            # 보너스 체크
-            if self._check_bonus_condition():
-                self.bonus_earned = True
-                self.earned_points += self.bonus_points or 0
-        else:
-            # 패널티 계산
-            if self.has_penalty:
-                self.penalty_points = self._calculate_penalty()
-                self.user.points = max(0, self.user.points - self.penalty_points)
-                self.user.save(update_fields=['points'])
+        with transaction.atomic():
+            locked = UserChallenge.objects.select_for_update().select_related('user').get(pk=self.pk)
+            if locked.status in {'completed', 'failed'}:
+                self.refresh_from_db()
+                return
 
-        self._handle_completion_side_effects(is_success)
-        
-        self.save()
+            locked.status = 'completed' if is_success else 'failed'
+            locked.completed_at = timezone.now()
+            if final_spent is not None:
+                locked.final_spent = int(final_spent)
+
+            user_model = locked.user.__class__
+
+            if is_success:
+                locked.penalty_points = 0
+                locked.earned_points = locked._calculate_points()
+                if locked._check_bonus_condition():
+                    locked.bonus_earned = True
+                    locked.earned_points += locked.bonus_points or 0
+                else:
+                    locked.bonus_earned = False
+
+                if locked.earned_points:
+                    user_model.objects.filter(pk=locked.user_id).update(
+                        points=F('points') + locked.earned_points,
+                        total_points_earned=F('total_points_earned') + locked.earned_points,
+                    )
+            else:
+                locked.earned_points = 0
+                locked.bonus_earned = False
+                if locked.has_penalty:
+                    locked.penalty_points = locked._calculate_penalty()
+                    if locked.penalty_points:
+                        user_model.objects.filter(pk=locked.user_id).update(
+                            points=Greatest(F('points') - locked.penalty_points, Value(0)),
+                        )
+                else:
+                    locked.penalty_points = 0
+
+            locked._handle_completion_side_effects(is_success)
+
+            if not is_success and not notify_reason:
+                notify_reason = infer_failure_reason(locked, final_spent=locked.final_spent)
+
+            locked.save(update_fields=[
+                'status',
+                'completed_at',
+                'final_spent',
+                'earned_points',
+                'penalty_points',
+                'bonus_earned',
+                'progress',
+                'updated_at',
+            ])
+
+            transaction.on_commit(
+                lambda challenge_id=locked.id, success=is_success, reason=notify_reason:
+                UserChallenge._send_result_notification_after_commit(challenge_id, success, reason)
+            )
+
+        self.refresh_from_db()
+
+    @staticmethod
+    def _send_result_notification_after_commit(challenge_id: int, is_success: bool, failure_reason: str = None):
+        """트랜잭션 커밋 이후 챌린지 결과 알림 발송"""
+        try:
+            from apps.notifications.services import create_challenge_result_notification
+
+            challenge = UserChallenge.objects.select_related('user').get(pk=challenge_id)
+
+            create_challenge_result_notification(
+                user_challenge=challenge,
+                is_success=is_success,
+                failure_reason=failure_reason,
+            )
+        except Exception:
+            logger.exception(
+                "Challenge result notification failed (challenge_id=%s, is_success=%s)",
+                challenge_id,
+                is_success,
+            )
 
     def claim_reward(self):
         """보상 수령 처리 - 포인트 지급"""
@@ -326,19 +393,13 @@ class UserChallenge(models.Model):
         progress['target'] = random_budget
         self.progress = progress
 
-        try:
-            from apps.notifications.services import create_challenge_notification
-
-            status_text = "성공" if is_success else "실패"
-            spent = self.final_spent if self.final_spent is not None else progress.get('current', 0)
-            create_challenge_notification(
-                user=self.user,
-                title=f"{self.name} {status_text}",
-                message=f"숨겨진 예산은 {random_budget:,}원이었어요. 최종 지출은 {int(spent):,}원입니다.",
-            )
-        except Exception:
-            # 알림 실패가 완료 처리 자체를 막지 않도록 무시
-            pass
+        spent = self.final_spent if self.final_spent is not None else progress.get('current', 0)
+        detail = (
+            f"숨겨진 예산은 {random_budget:,}원이었어요. "
+            f"최종 지출은 {int(spent):,}원입니다."
+        )
+        progress["result_detail"] = detail
+        self.progress = progress
 
     def _calculate_points(self):
         """포인트 계산
@@ -352,30 +413,19 @@ class UserChallenge(models.Model):
         """
         if not self.points_formula:
             return self.base_points
-        
+
         try:
-            target = self.success_conditions.get('target_amount', 0)
-            spent = self.final_spent or 0
-            saved = max(0, target - spent)
-            random_budget = int((self.system_generated_values or {}).get('random_budget') or 0)
-            
-            formula = self.points_formula
-            formula = formula.replace('{spent}', str(spent))
-            formula = formula.replace('{target}', str(target))
-            formula = formula.replace('{saved}', str(saved))
-            formula = formula.replace('{base}', str(self.base_points))
-            formula = formula.replace('{actual_spent}', str(spent))
-            formula = formula.replace('{random_budget}', str(random_budget))
-            formula = formula.replace('actual_spent', str(spent))
-            formula = formula.replace('random_budget', str(random_budget))
-            
-            result = eval(formula)
-            
+            result = evaluate_formula(self.points_formula, self._build_formula_variables())
             if self.max_points:
                 result = min(result, self.max_points)
-            
+
             return max(0, int(result))
-        except Exception:
+        except FormulaEvaluationError:
+            logger.warning(
+                "Invalid points_formula on challenge id=%s: %s",
+                self.id,
+                self.points_formula,
+            )
             return self.base_points
 
     def _calculate_penalty(self):
@@ -389,30 +439,40 @@ class UserChallenge(models.Model):
         """
         if not self.penalty_formula:
             return 0
-        
+
         try:
-            target = self.success_conditions.get('target_amount', 0)
-            spent = self.final_spent or 0
-            over = max(0, spent - target)
-            random_budget = int((self.system_generated_values or {}).get('random_budget') or 0)
-            
-            formula = self.penalty_formula
-            formula = formula.replace('{spent}', str(spent))
-            formula = formula.replace('{target}', str(target))
-            formula = formula.replace('{over}', str(over))
-            formula = formula.replace('{actual_spent}', str(spent))
-            formula = formula.replace('{random_budget}', str(random_budget))
-            formula = formula.replace('actual_spent', str(spent))
-            formula = formula.replace('random_budget', str(random_budget))
-            
-            result = eval(formula)
-            
+            result = evaluate_formula(self.penalty_formula, self._build_formula_variables())
             if self.max_penalty:
                 result = min(result, self.max_penalty)
-            
+
             return max(0, int(result))
-        except Exception:
+        except FormulaEvaluationError:
+            logger.warning(
+                "Invalid penalty_formula on challenge id=%s: %s",
+                self.id,
+                self.penalty_formula,
+            )
             return 0
+
+    def _build_formula_variables(self):
+        success_conditions = self.success_conditions or {}
+        target = int(
+            success_conditions.get('target_amount')
+            or (self.user_input_values or {}).get('target_amount')
+            or 0
+        )
+        spent = int(self.final_spent or 0)
+        random_budget = int((self.system_generated_values or {}).get('random_budget') or 0)
+
+        return {
+            'spent': spent,
+            'target': target,
+            'saved': max(0, target - spent),
+            'over': max(0, spent - target),
+            'base': int(self.base_points or 0),
+            'actual_spent': spent,
+            'random_budget': random_budget,
+        }
 
     def _check_bonus_condition(self):
         """보너스 조건 체크

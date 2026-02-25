@@ -1,5 +1,6 @@
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from apps.challenges.services.daily_check_sync import sync_daily_check_log_with_confirmation
 
 from rest_framework import viewsets, status
 from rest_framework.generics import RetrieveUpdateDestroyAPIView
@@ -9,7 +10,6 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from collections import defaultdict
 import calendar
 
@@ -18,6 +18,7 @@ from .serializers import TransactionSerializer
 from external.gemini.client import GeminiClient
 
 User = get_user_model()
+
 
 class ParseTransactionView(APIView):
     """
@@ -255,6 +256,12 @@ class SpendingConfirmationView(APIView):
             user=request.user,
             date=target_date,
             defaults={'is_no_spending': is_no_spending}
+        )
+
+        sync_daily_check_log_with_confirmation(
+            user=request.user,
+            target_date=target_date,
+            is_no_spending=is_no_spending,
         )
         
         return Response({

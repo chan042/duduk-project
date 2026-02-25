@@ -11,7 +11,7 @@ def create_notification(user, notification_type, title, message, **kwargs):
     
     Args:
         user: 알림을 받을 사용자
-        notification_type: 알림 타입 (COACHING, MONTHLY_REPORT)
+        notification_type: 알림 타입 (COACHING, MONTHLY_REPORT, CHALLENGE)
         title: 알림 제목
         message: 알림 메시지
         **kwargs: related_id, related_year, related_month 등 추가 필드
@@ -43,7 +43,7 @@ def create_coaching_notification(user, coaching):
     """
     return create_notification(
         user=user,
-        notification_type='COACHING',
+        notification_type=Notification.NotificationType.COACHING,
         title='새로운 코칭이 생성되었습니다',
         message=f'{coaching.title} - {coaching.subject}',
         related_id=coaching.id
@@ -64,7 +64,7 @@ def create_monthly_report_notification(user, year, month):
     """
     return create_notification(
         user=user,
-        notification_type='MONTHLY_REPORT',
+        notification_type=Notification.NotificationType.MONTHLY_REPORT,
         title='윤택지수와 AI 분석 리포트가 생성되었습니다',
         message=f'{year}년 {month}월 윤택지수와 AI 분석 리포트를 확인해보세요!',
         related_year=year,
@@ -78,8 +78,33 @@ def create_challenge_notification(user, title, message, **kwargs):
     """
     return create_notification(
         user=user,
-        notification_type='CHALLENGE',
+        notification_type=Notification.NotificationType.CHALLENGE,
         title=title,
         message=message,
         related_id=kwargs.get('related_id'),
+    )
+
+
+def _format_challenge_title(challenge_name: str, is_success: bool) -> str:
+    name = (challenge_name or '').strip() or '챌린지'
+    title_name = name if name.endswith('챌린지') else f'{name} 챌린지'
+    status_text = '성공했습니다.' if is_success else '실패했습니다.'
+    return f'{title_name} {status_text}'
+
+
+def create_challenge_result_notification(user_challenge, is_success: bool, failure_reason: str = None):
+    """
+    챌린지 결과 알림 생성
+    """
+    title = _format_challenge_title(user_challenge.name, is_success)
+    if is_success:
+        message = '보상받기를 눌러 포인트를 획득하세요.'
+    else:
+        message = (failure_reason or '').strip() or '성공 조건을 충족하지 못했습니다.'
+
+    return create_challenge_notification(
+        user=user_challenge.user,
+        title=title,
+        message=message,
+        related_id=user_challenge.id,
     )

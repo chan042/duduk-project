@@ -36,8 +36,8 @@ export default function ExpenseContainer() {
     const [loading, setLoading] = useState(true);
 
     // 현재 날짜 기준으로 년/월 설정
-    const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-    const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+    const [currentYear, setCurrentYear] = useState(null);
+    const [currentMonth, setCurrentMonth] = useState(null);
 
     const [monthlyStats, setMonthlyStats] = useState({
         totalSpent: 0,
@@ -48,7 +48,16 @@ export default function ExpenseContainer() {
     const [characterType, setCharacterType] = useState('char_cat');
     const [dateJoined, setDateJoined] = useState(null);
 
+    useEffect(() => {
+        const now = new Date();
+        setCurrentYear(now.getFullYear());
+        setCurrentMonth(now.getMonth() + 1);
+    }, []);
+
     const fetchData = useCallback(async () => {
+        if (currentYear === null || currentMonth === null) {
+            return;
+        }
         setLoading(true);
         try {
             // 지출 내역 조회
@@ -104,6 +113,7 @@ export default function ExpenseContainer() {
 
     // 이전 월로 이동
     const goToPrevMonth = () => {
+        if (currentYear === null || currentMonth === null) return;
         if (currentMonth === 1) {
             setCurrentYear(currentYear - 1);
             setCurrentMonth(12);
@@ -123,6 +133,7 @@ export default function ExpenseContainer() {
 
     // 다음 월로 이동
     const goToNextMonth = () => {
+        if (currentYear === null || currentMonth === null) return;
         if (currentMonth === 12) {
             setCurrentYear(currentYear + 1);
             setCurrentMonth(1);
@@ -215,6 +226,14 @@ export default function ExpenseContainer() {
             window.removeEventListener('scroll', handleScroll);
         };
     }, [isTopScrolledAway]);
+
+    if (currentYear === null || currentMonth === null) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.loadingContainer}>로딩 중...</div>
+            </div>
+        );
+    }
 
     return (
         <div className={styles.container}>

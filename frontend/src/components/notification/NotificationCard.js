@@ -1,6 +1,7 @@
 "use client";
 
-import { MessageCircle, TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { MessageCircle, Target, TrendingUp } from 'lucide-react';
 
 export function formatRelativeDate(dateString) {
     const date = new Date(dateString);
@@ -20,9 +21,22 @@ export function formatRelativeDate(dateString) {
 const ICON_MAP = {
     COACHING: <MessageCircle size={24} color="var(--primary)" />,
     MONTHLY_REPORT: <TrendingUp size={24} color="var(--success)" />,
+    CHALLENGE: <Target size={24} color="var(--primary)" />,
 };
 
 export default function NotificationCard({ notification, onClick }) {
+    const [relativeDate, setRelativeDate] = useState('');
+
+    useEffect(() => {
+        const updateRelativeDate = () => {
+            setRelativeDate(formatRelativeDate(notification.created_at));
+        };
+
+        updateRelativeDate();
+        const timer = setInterval(updateRelativeDate, 60000);
+        return () => clearInterval(timer);
+    }, [notification.created_at]);
+
     const icon = ICON_MAP[notification.notification_type] || (
         <MessageCircle size={24} color="var(--text-gray)" />
     );
@@ -42,7 +56,7 @@ export default function NotificationCard({ notification, onClick }) {
             <div style={styles.content}>
                 <h3 style={styles.title}>{notification.title}</h3>
                 <p style={styles.message}>{notification.message}</p>
-                <span style={styles.time}>{formatRelativeDate(notification.created_at)}</span>
+                <span style={styles.time}>{relativeDate}</span>
             </div>
         </div>
     );

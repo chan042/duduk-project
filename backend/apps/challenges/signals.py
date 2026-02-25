@@ -22,6 +22,17 @@ from .constants import (
     COMPARE_TYPE_FIXED_EXPENSE,
     COMPARE_TYPE_NEXT_MONTH_CATEGORY,
 )
+from .services.failure_reason import (
+    infer_failure_reason,
+    reason_amount_exceeded,
+    reason_compare_exceeded,
+    reason_zero_spend_violation,
+    reason_photo_not_verified_yesterday,
+    reason_one_plus_one_photo_missing,
+    reason_amount_range_exceeded,
+    reason_daily_rule_violation,
+    reason_random_budget_exceeded,
+)
 
 
 def _contains_convenience_store_keyword(text: str) -> bool:
@@ -490,7 +501,8 @@ def _check_auto_judgement(user_challenge, transaction_date=None, category=None, 
     if now >= user_challenge.ends_at:
         is_success = _evaluate_success(user_challenge, progress, success_conditions)
         final_spent = progress.get('current', 0)
-        user_challenge.complete_challenge(is_success, final_spent)
+        failure_reason = None if is_success else infer_failure_reason(user_challenge, final_spent=final_spent)
+        user_challenge.complete_challenge(is_success, final_spent, failure_reason=failure_reason)
         return
 
     # 챌린지 유형별 즉시 실패 조건 확인
@@ -514,11 +526,19 @@ def _check_amount_limit_failure(user_challenge, progress, success_conditions, tr
     if target > 0:
         # 목표 금액이 있는 경우: 초과 시 즉시 실패
         if current > target:
-            user_challenge.complete_challenge(False, current)
+            user_challenge.complete_challenge(
+                False,
+                current,
+                failure_reason=reason_amount_exceeded(target, current),
+            )
     else:
         # 목표 금액이 0인 경우 (무지출 챌린지): 지출 발생 시 즉시 실패
         if current > 0:
-            user_challenge.complete_challenge(False, current)
+            user_challenge.complete_challenge(
+                False,
+                current,
+                failure_reason=reason_zero_spend_violation(),
+            )
 
 
 def _check_compare_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None, store=None):
@@ -530,21 +550,37 @@ def _check_compare_failure(user_challenge, progress, success_conditions, transac
     if compare_type == COMPARE_TYPE_LAST_MONTH_WEEK:
         # 지난달 주차 지출보다 초과하면 즉시 실패
         if current > compare_base:
-            user_challenge.complete_challenge(False, current)
+            user_challenge.complete_challenge(
+                False,
+                current,
+                failure_reason=reason_compare_exceeded(compare_base, current, compare_type),
+            )
     elif compare_type == COMPARE_TYPE_FIXED_EXPENSE:
         # 고정비 다이어트 - 이번주 고정비 >= 이전 고정비면 즉시 실패
         if current >= compare_base and current > 0:
-            user_challenge.complete_challenge(False, current)
+            user_challenge.complete_challenge(
+                False,
+                current,
+                failure_reason=reason_compare_exceeded(compare_base, current, compare_type),
+            )
     elif compare_type == COMPARE_TYPE_NEXT_MONTH_CATEGORY:
         # 미래의 나에게 - (a+1)달 카테고리 지출이 a달 초과 시 즉시 실패
         if progress.get('phase') == 'next_month' and current > compare_base:
-            user_challenge.complete_challenge(False, current)
+            user_challenge.complete_challenge(
+                False,
+                current,
+                failure_reason=reason_compare_exceeded(compare_base, current, compare_type),
+            )
 
 
 def _check_zero_spend_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None, store=None):
     """zero_spend 타입 즉시 실패 체크 (예: 3일 연속 무지출, 외식/배달 X)"""
     if progress.get('is_violated', False):
-        user_challenge.complete_challenge(False, progress.get('violation_amount', 0))
+        user_challenge.complete_challenge(
+            False,
+            progress.get('violation_amount', 0),
+            failure_reason=reason_zero_spend_violation(),
+        )
 
 
 def _check_amount_limit_with_photo_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None, store=None):
@@ -554,7 +590,11 @@ def _check_amount_limit_with_photo_failure(user_challenge, progress, success_con
         target = int(target)
         current = progress.get('current', 0)
         if current > target:
-            user_challenge.complete_challenge(False, current)
+            user_challenge.complete_challenge(
+                False,
+                current,
+                failure_reason=reason_amount_exceeded(target, current),
+            )
             return
 
     # 하루라도 사진 미인증 시 즉시 실패 (전날까지 체크)
@@ -580,13 +620,21 @@ def _check_amount_range_failure(user_challenge, progress, success_conditions, tr
         upper_limit = target * (1 + tolerance_percent / 100)
         current = progress.get('current', 0)
         if current > upper_limit:
-            user_challenge.complete_challenge(False, current)
+            user_challenge.complete_challenge(
+                False,
+                current,
+                failure_reason=reason_amount_range_exceeded(target, tolerance_percent, current),
+            )
 
 
 def _check_daily_rule_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None, store=None):
     """daily_rule 타입 즉시 실패 체크 (예: 무00의 날)"""
     if progress.get('has_violation', False):
-        user_challenge.complete_challenge(False, progress.get('current', 0))
+        user_challenge.complete_challenge(
+            False,
+            progress.get('current', 0),
+            failure_reason=reason_daily_rule_violation(),
+        )
 
 
 def _check_random_budget_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None, store=None):
@@ -596,7 +644,11 @@ def _check_random_budget_failure(user_challenge, progress, success_conditions, t
         random_budget = int(random_budget)
         current = progress.get('current', 0)
         if current > random_budget:
-            user_challenge.complete_challenge(False, current)
+            user_challenge.complete_challenge(
+                False,
+                current,
+                failure_reason=reason_random_budget_exceeded(random_budget, current),
+            )
 
 
 def _check_custom_failure(user_challenge, progress, success_conditions, transaction_date=None, category=None, store=None):
@@ -607,11 +659,19 @@ def _check_custom_failure(user_challenge, progress, success_conditions, transact
     if target > 0:
         # 목표 금액이 있는 경우: 초과 시 즉시 실패
         if current > target:
-            user_challenge.complete_challenge(False, current)
+            user_challenge.complete_challenge(
+                False,
+                current,
+                failure_reason=reason_amount_exceeded(target, current),
+            )
     else:
         # 목표 금액이 0인 경우 (zero_spend 스타일): 지출 발생 시 즉시 실패
         if progress.get('is_violated', False) or current > 0:
-            user_challenge.complete_challenge(False, current)
+            user_challenge.complete_challenge(
+                False,
+                current,
+                failure_reason=reason_zero_spend_violation(),
+            )
 
 
 # condition_type별 즉시 실패 체크 핸들러 매핑
@@ -623,8 +683,9 @@ IMMEDIATE_FAILURE_HANDLERS = {
     CONDITION_TYPE_PHOTO_VERIFICATION: _check_photo_verification_failure,
     CONDITION_TYPE_AMOUNT_RANGE: _check_amount_range_failure,
     CONDITION_TYPE_DAILY_RULE: _check_daily_rule_failure,
+    CONDITION_TYPE_RANDOM_BUDGET: None,
     CONDITION_TYPE_CUSTOM: _check_custom_failure,
-    CONDITION_TYPE_DAILY_CHECK: None,  # daily_check는 즉시 실패 조건 없음
+    CONDITION_TYPE_DAILY_CHECK: None,
 }
 
 
@@ -640,7 +701,11 @@ def _check_photo_missing_failure(user_challenge, current_date):
         while date_iter <= yesterday:
             log = user_challenge.daily_logs.filter(log_date=date_iter).first()
             if not log or _count_verified_photos(log) == 0:
-                user_challenge.complete_challenge(False, user_challenge.progress.get('current', 0))
+                user_challenge.complete_challenge(
+                    False,
+                    user_challenge.progress.get('current', 0),
+                    failure_reason=reason_photo_not_verified_yesterday(),
+                )
                 return
             date_iter += timedelta(days=1)
 
@@ -660,7 +725,11 @@ def _check_one_plus_one_failure(user_challenge, transaction_date):
             if convenience_spent > 0:
                 # 편의점 지출이 있는데 사진 인증이 없으면 실패
                 if _count_verified_photos(log) == 0:
-                    user_challenge.complete_challenge(False, user_challenge.progress.get('current', 0))
+                    user_challenge.complete_challenge(
+                        False,
+                        user_challenge.progress.get('current', 0),
+                        failure_reason=reason_one_plus_one_photo_missing(),
+                    )
                     return
 
 

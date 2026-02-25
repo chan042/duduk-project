@@ -10,17 +10,17 @@ class Notification(models.Model):
     - 코칭 생성 알림
     - 월간 리포트 생성 알림 (윤택지수 + AI 리포트)
     """
-    NOTIFICATION_TYPES = (
-        ('COACHING', '코칭 생성'),
-        ('MONTHLY_REPORT', '월간 리포트 생성'),
-    )
+    class NotificationType(models.TextChoices):
+        COACHING = 'COACHING', '코칭 생성'
+        MONTHLY_REPORT = 'MONTHLY_REPORT', '월간 리포트 생성'
+        CHALLENGE = 'CHALLENGE', '챌린지'
     
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='notifications'
     )
-    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
+    notification_type = models.CharField(max_length=20, choices=NotificationType.choices)
     title = models.CharField(max_length=200)
     message = models.TextField()
     is_read = models.BooleanField(default=False)
@@ -52,8 +52,8 @@ class Notification(models.Model):
     
     def get_redirect_url(self):
         """알림 클릭 시 이동할 URL 반환"""
-        if self.notification_type == 'COACHING':
-            return '/coaching'
-        elif self.notification_type == 'MONTHLY_REPORT':
-            return '/yuntaek-index'
-        return '/'
+        return {
+            self.NotificationType.COACHING: '/coaching',
+            self.NotificationType.MONTHLY_REPORT: '/yuntaek-index',
+            self.NotificationType.CHALLENGE: '/challenge',
+        }.get(self.notification_type, '/')

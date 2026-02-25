@@ -50,12 +50,12 @@ const normalizeDailyRules = (dailyRules) => {
     return normalized;
 };
 
-const getChallengeStartDayIndex = (challenge) => {
+const getChallengeStartDayIndex = (challenge, fallbackDayIndex = 1) => {
     const startedAt = challenge?.startedAt;
-    if (!startedAt) return new Date().getDay();
+    if (!startedAt) return fallbackDayIndex;
 
     const parsed = new Date(startedAt);
-    if (Number.isNaN(parsed.getTime())) return new Date().getDay();
+    if (Number.isNaN(parsed.getTime())) return fallbackDayIndex;
     return parsed.getDay();
 };
 
@@ -74,13 +74,13 @@ const isCategoryInput = (input) => {
 /**
  * 챌린지 시작일로부터 dayOffset번째 날이 오늘인지 반환
  */
-const isTodayByOffset = (startedAt, dayOffset) => {
-    if (!startedAt) return false;
+const isTodayByOffset = (startedAt, dayOffset, todayDateString) => {
+    if (!startedAt || !todayDateString) return false;
     const start = new Date(startedAt);
     if (isNaN(start.getTime())) return false;
     const d = new Date(start);
     d.setDate(d.getDate() + dayOffset);
-    return d.toDateString() === new Date().toDateString();
+    return d.toDateString() === todayDateString;
 };
 
 
@@ -105,6 +105,7 @@ export default function ChallengeDetailModal({
     const [duplicateTooltip, setDuplicateTooltip] = useState(null);
     const [comparePreview, setComparePreview] = useState(null);
     const [isComparePreviewLoading, setIsComparePreviewLoading] = useState(false);
+    const [todayContext, setTodayContext] = useState({ dateKey: '', dateString: '' });
     const fileInputRef = useRef(null);
     const modalRef = useRef(null);
     const duplicateTooltipTimerRef = useRef(null);
@@ -148,6 +149,17 @@ export default function ChallengeDetailModal({
                 clearTimeout(duplicateTooltipTimerRef.current);
             }
         };
+    }, []);
+
+    useEffect(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        setTodayContext({
+            dateKey: `${year}-${month}-${day}`,
+            dateString: now.toDateString(),
+        });
     }, []);
 
     const showDuplicateTooltip = (dayKey) => {
@@ -393,7 +405,11 @@ export default function ChallengeDetailModal({
                                             const catColor = category
                                                 ? (CATEGORY_COLORS[category] || 'var(--primary)')
                                                 : '#9CA3AF';
-                                            const isToday = isTodayByOffset(challenge?.startedAt, idx);
+                                            const isToday = isTodayByOffset(
+                                                challenge?.startedAt,
+                                                idx,
+                                                todayContext.dateString
+                                            );
 
                                             return (
                                                 <div key={day.key} style={styles.weeklyCalendarCell}>

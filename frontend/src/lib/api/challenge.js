@@ -169,6 +169,39 @@ export const getChallenges = async (tab = 'duduk') => {
 };
 
 /**
+ * 챌린지 대시보드 통합 조회
+ * - 템플릿/상태별 챌린지/포인트를 한 번에 반환
+ */
+export const getChallengeDashboard = async () => {
+    try {
+        const response = await client.get('/api/challenges/dashboard/');
+        const payload = response.data || {};
+        const templates = payload.templates || {};
+        const challengeBuckets = payload.challenges || {};
+
+        return {
+            points: payload.points?.points || 0,
+            pointsDetail: payload.points || { points: 0, total_points_earned: 0, total_points_used: 0 },
+            templates: {
+                duduk: sortByDifficulty((templates.duduk || []).map(transformTemplate)),
+                event: sortByDifficulty((templates.event || []).map(transformTemplate)),
+            },
+            challenges: {
+                active: (challengeBuckets.active || []).map(transformUserChallenge),
+                ready: (challengeBuckets.ready || []).map(transformUserChallenge),
+                ongoing: (challengeBuckets.ongoing || []).map(transformUserChallenge),
+                completed: (challengeBuckets.completed || []).map(transformUserChallenge),
+                failed: (challengeBuckets.failed || []).map(transformUserChallenge),
+                user: sortByDifficulty((challengeBuckets.user || []).map(transformUserChallenge)),
+            },
+        };
+    } catch (error) {
+        console.error('Get Challenge Dashboard Error:', error.message || error);
+        throw error;
+    }
+};
+
+/**
  * 내 챌린지 목록 조회
  * @param {string} status
  */
@@ -278,20 +311,6 @@ export const retryChallenge = async (id) => {
         return transformUserChallenge(response.data);
     } catch (error) {
         console.error('Retry Challenge Error:', error);
-        throw error;
-    }
-};
-
-/**
- * 일일 체크
- * @param {number} id
- */
-export const checkDaily = async (id) => {
-    try {
-        const response = await client.post(`/api/challenges/my/${id}/check_daily/`);
-        return response.data;
-    } catch (error) {
-        console.error('Check Daily Error:', error);
         throw error;
     }
 };

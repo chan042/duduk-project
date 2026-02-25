@@ -7,9 +7,9 @@
 3. 종료 시점 도달 챌린지 자동 완료/실패 판정
 4. 미래의 나에게 메시지 알림(다음 달 1일)
 """
-from datetime import timedelta, date
+from datetime import timedelta, date, datetime, time
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from apps.challenges.models import UserChallenge, ChallengeDailyLog
@@ -20,6 +20,16 @@ from apps.challenges.constants import (
     CONDITION_TYPE_AMOUNT_LIMIT_WITH_PHOTO,
     CONDITION_TYPE_PHOTO_VERIFICATION,
     COMPARE_TYPE_NEXT_MONTH_CATEGORY,
+)
+from apps.challenges.services.failure_reason import (
+    infer_failure_reason,
+    reason_daily_check_missing,
+    reason_photo_not_verified_yesterday,
+    reason_one_plus_one_photo_missing,
+)
+from apps.challenges.services.daily_check_sync import (
+    sync_daily_check_logs_from_confirmations,
+    is_no_spending_confirmed,
 )
 from apps.notifications.services import create_challenge_notification
 
@@ -45,13 +55,39 @@ def _sum_convenience_spending(log) -> int:
 class Command(BaseCommand):
     help = "일일 챌린지 체크 - 매일 00:01에 실행"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--date",
+            type=str,
+            help="판정 기준 날짜(YYYY-MM-DD). 기본값은 오늘",
+        )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="DB를 변경하지 않고 결과만 출력",
+        )
+
     def handle(self, *args, **options):
-        now = timezone.now()
-        today = now.date()
+        run_date_raw = options.get("date")
+        dry_run = bool(options.get("dry_run"))
+
+        if run_date_raw:
+            try:
+                today = date.fromisoformat(run_date_raw)
+            except ValueError as exc:
+                raise CommandError("`--date`는 YYYY-MM-DD 형식이어야 합니다.") from exc
+            now = timezone.make_aware(
+                datetime.combine(today, time(hour=0, minute=1)),
+                timezone.get_current_timezone(),
+            )
+        else:
+            now = timezone.now()
+            today = now.date()
+
         yesterday = (now - timedelta(days=1)).date()
 
-        self.stdout.write(f"일일 챌린지 체크 시작: {now}")
-        self.stdout.write(f"체크 대상 날짜(일일 실패): {yesterday}")
+        self.stdout.write(f"일일 챌린지 체크 시작: {now} (dry_run={dry_run})")
+        self.stdout.write(f"판정 기준일(today): {today}, 체크 대상 날짜(일일 실패): {yesterday}")
 
         active_challenges = UserChallenge.objects.filter(status="active").select_related("user")
 
@@ -65,10 +101,14 @@ class Command(BaseCommand):
             # daily_check 타입은 누락 로그를 미리 생성 (진행률/실패 판정 안정화)
             success_conditions = uc.success_conditions or {}
             if success_conditions.get("type") == CONDITION_TYPE_DAILY_CHECK:
-                self._ensure_daily_logs(uc, today)
+                if not dry_run:
+                    self._ensure_daily_logs(uc, today)
+                    start_date = uc.started_at.date()
+                    end_date = min(today, uc.ends_at.date() if uc.ends_at else today)
+                    sync_daily_check_logs_from_confirmations(uc, start_date, end_date)
 
             # 1) 거래가 없던 날도 progress가 갱신되도록 일괄 업데이트
-            if uc.started_at.date() <= today:
+            if uc.started_at.date() <= today and not dry_run:
                 _update_challenge_progress(uc)
 
             if uc.status != "active":
@@ -80,20 +120,22 @@ class Command(BaseCommand):
                 condition_type = success_conditions.get("type", "")
 
                 if condition_type == CONDITION_TYPE_DAILY_CHECK:
-                    if self._check_daily_check_failure(uc, yesterday):
+                    if self._check_daily_check_failure(uc, yesterday, dry_run=dry_run):
                         failed_count += 1
                         self.stdout.write(self.style.WARNING(f"미라클 두둑! 실패: {uc.user.username} - {uc.name}"))
                         continue
 
                 elif condition_type == CONDITION_TYPE_AMOUNT_LIMIT_WITH_PHOTO:
-                    if self._check_photo_missing_failure(uc, yesterday):
+                    if self._check_photo_missing_failure(uc, yesterday, dry_run=dry_run):
                         failed_count += 1
                         self.stdout.write(self.style.WARNING(f"현금 챌린지 실패: {uc.user.username} - {uc.name}"))
                         continue
 
                 elif condition_type == CONDITION_TYPE_PHOTO_VERIFICATION:
                     photo_condition = success_conditions.get("photo_condition", "")
-                    if "1+1" in photo_condition and self._check_one_plus_one_failure(uc, yesterday):
+                    if "1+1" in photo_condition and self._check_one_plus_one_failure(
+                        uc, yesterday, dry_run=dry_run
+                    ):
                         failed_count += 1
                         self.stdout.write(self.style.WARNING(f"원플원 러버 실패: {uc.user.username} - {uc.name}"))
                         continue
@@ -102,15 +144,18 @@ class Command(BaseCommand):
                 continue
 
             # 3) 미래의 나에게: 다음 달 1일 메시지 알림
-            self._send_future_message_notification(uc, today)
+            if not dry_run:
+                self._send_future_message_notification(uc, today)
 
             # 4) 종료 시점 자동 판정
             if uc.ends_at and now >= uc.ends_at and uc.status == "active":
                 progress = uc.progress or {}
                 success_conditions = uc.success_conditions or {}
                 is_success = _evaluate_success(uc, progress, success_conditions)
-                final_spent = progress.get("current", 0)
-                uc.complete_challenge(is_success, final_spent)
+                if not dry_run:
+                    final_spent = progress.get("current", 0)
+                    failure_reason = None if is_success else infer_failure_reason(uc, final_spent=final_spent)
+                    uc.complete_challenge(is_success, final_spent, failure_reason=failure_reason)
                 finalized_count += 1
 
         self.stdout.write(
@@ -119,7 +164,7 @@ class Command(BaseCommand):
             )
         )
 
-    def _check_daily_check_failure(self, user_challenge, check_date):
+    def _check_daily_check_failure(self, user_challenge, check_date, dry_run=False):
         """
         미라클 두둑:
         - 전날 지출 입력(거래 발생) 또는 무지출 체크가 없으면 실패
@@ -130,9 +175,16 @@ class Command(BaseCommand):
 
         log = user_challenge.daily_logs.filter(log_date=check_date).first()
         has_input = bool(log and (log.is_checked or (log.transaction_count or 0) > 0))
+        if not has_input and is_no_spending_confirmed(user_challenge.user_id, check_date):
+            has_input = True
 
         if not has_input:
-            user_challenge.complete_challenge(False, user_challenge.progress.get("current", 0))
+            if not dry_run:
+                user_challenge.complete_challenge(
+                    False,
+                    user_challenge.progress.get("current", 0),
+                    failure_reason=reason_daily_check_missing(),
+                )
             return True
 
         return False
@@ -171,7 +223,7 @@ class Command(BaseCommand):
         if to_create:
             ChallengeDailyLog.objects.bulk_create(to_create)
 
-    def _check_photo_missing_failure(self, user_challenge, check_date):
+    def _check_photo_missing_failure(self, user_challenge, check_date, dry_run=False):
         """
         현금 챌린지: 전날 사진 미인증 시 실패
         """
@@ -181,12 +233,17 @@ class Command(BaseCommand):
 
         log = user_challenge.daily_logs.filter(log_date=check_date).first()
         if not log or _count_verified_photos(log) == 0:
-            user_challenge.complete_challenge(False, user_challenge.progress.get("current", 0))
+            if not dry_run:
+                user_challenge.complete_challenge(
+                    False,
+                    user_challenge.progress.get("current", 0),
+                    failure_reason=reason_photo_not_verified_yesterday(),
+                )
             return True
 
         return False
 
-    def _check_one_plus_one_failure(self, user_challenge, check_date):
+    def _check_one_plus_one_failure(self, user_challenge, check_date, dry_run=False):
         """
         원플원 러버: 전날 편의점 소비가 있었는데 사진 인증이 없으면 실패
         """
@@ -200,7 +257,12 @@ class Command(BaseCommand):
 
         convenience_spent = _sum_convenience_spending(log)
         if convenience_spent > 0 and _count_verified_photos(log) == 0:
-            user_challenge.complete_challenge(False, user_challenge.progress.get("current", 0))
+            if not dry_run:
+                user_challenge.complete_challenge(
+                    False,
+                    user_challenge.progress.get("current", 0),
+                    failure_reason=reason_one_plus_one_photo_missing(),
+                )
             return True
 
         return False

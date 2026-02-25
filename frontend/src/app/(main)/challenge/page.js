@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 /**
  * [파일 역할]
@@ -8,27 +8,20 @@
  * - AI Insight 섹션 추가
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Sparkles, DoorClosed } from 'lucide-react';
+import { Plus, DoorClosed } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 
 // 컴포넌트
 import ChallengeTabs from '@/components/challenge/ChallengeTabs';
 import ChallengeCard from '@/components/challenge/ChallengeCard';
-import ChallengeDetailModal from '@/components/challenge/ChallengeDetailModal';
-import CustomChallengeModal from '@/components/challenge/CustomChallengeModal';
-import AIGeneratedChallengeModal from '@/components/challenge/AIGeneratedChallengeModal';
 
 // API
 import {
-    getChallengeTemplates,
-    getMyChallenges,
-    getOngoingChallenges,
-    getUserChallenges,
+    getChallengeDashboard,
     startChallenge,
     retryChallenge,
     cancelChallenge,
-    getUserPoints,
-    createUserChallenge,
     generateAIChallenge,
     startAIChallenge,
     deleteChallenge,
@@ -37,6 +30,21 @@ import {
     claimReward,
 } from '@/lib/api/challenge';
 import { fileToBase64, validateImageFile } from '@/lib/utils/imageUtils';
+
+const ChallengeDetailModal = dynamic(
+    () => import('@/components/challenge/ChallengeDetailModal'),
+    { ssr: false }
+);
+
+const CustomChallengeModal = dynamic(
+    () => import('@/components/challenge/CustomChallengeModal'),
+    { ssr: false }
+);
+
+const AIGeneratedChallengeModal = dynamic(
+    () => import('@/components/challenge/AIGeneratedChallengeModal'),
+    { ssr: false }
+);
 
 
 
@@ -69,90 +77,80 @@ export default function ChallengePage() {
     const [aiGeneratedChallenge, setAiGeneratedChallenge] = useState(null);
     const [lastGenerateInput, setLastGenerateInput] = useState({ details: '', difficulty: '' });
     const [isSavingAI, setIsSavingAI] = useState(false);
-
-
-    // 포인트 조회
-    const fetchUserPoints = useCallback(async () => {
-        try {
-            const data = await getUserPoints();
-            setUserPoints(data.points);
-        } catch (err) {
-            console.error('포인트 조회 실패:', err);
-        }
-    }, []);
-
-
-
     // 챌린지 데이터 로드
     const fetchChallenges = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
+            const challengeKeys = (challenge) => {
+                const keys = [`c:${challenge.id}`];
+                if (challenge.templateId) {
+                    keys.push(`t:${challenge.templateId}`);
+                }
+                return keys;
+            };
+
+            const dedupeById = (items) => Array.from(new Map((items || []).map((item) => [item.id, item])).values());
+
+            const dashboard = await getChallengeDashboard();
+            setUserPoints(dashboard.points || 0);
+
             let data = [];
             let ongoing = [];
+            const dudukTemplates = dashboard.templates?.duduk || [];
+            const eventTemplates = dashboard.templates?.event || [];
+            const allTemplates = [...dudukTemplates, ...eventTemplates];
+
+            const ongoingChallengesFromApi = dashboard.challenges?.ongoing || [];
+            const completedChallenges = dashboard.challenges?.completed || [];
+            const failedChallenges = dashboard.challenges?.failed || [];
+            const userChallengesAll = dashboard.challenges?.user || [];
+
+            ongoing = dedupeById(ongoingChallengesFromApi);
 
             switch (activeTab) {
                 case 'all':
-                    // 전체 탭: 모든 템플릿 + 사용자 챌린지 + 실패/완료 챌린지 포함
-                    // 1. 두둑 템플릿 + 이벤트 템플릿
-                    const allDudukTemplates = await getChallengeTemplates('duduk');
-                    let allEventTemplates = [];
-                    try {
-                        allEventTemplates = await getChallengeTemplates('event');
-                    } catch (e) {
-                        // 이벤트 템플릿이 없을 때 무시
-                    }
-                    const allTemplates = [...allDudukTemplates, ...allEventTemplates];
-
-                    // 2. 사용자 챌린지 (AI, 커스텀)
-                    const userChallengesAll = await getUserChallenges();
-
-                    // 3. 진행중, 실패, 완료 챌린지
-                    const allOngoing = await getOngoingChallenges();
-                    const readyChallenges = await getMyChallenges('ready');
-                    const rawOngoing = [...allOngoing, ...readyChallenges];
-                    ongoing = Array.from(new Map(rawOngoing.map(c => [c.id, c])).values());
-
-                    const failedChallenges = await getMyChallenges('failed');
-                    const completedChallenges = await getMyChallenges('completed');
-
                     // 진행중인 챌린지의 템플릿 ID/챌린지 ID 목록
-                    const ongoingTemplateIds = ongoing.map(c => c.templateId);
-                    const ongoingIds = ongoing.map(c => c.id);
+                    const ongoingTemplateIds = new Set(ongoing.map((c) => c.templateId).filter(Boolean));
+                    const ongoingIds = new Set(ongoing.map((c) => c.id));
 
                     // 완료된 챌린지의 템플릿 ID 목록
-                    const completedTemplateIds = new Set(completedChallenges.map(c => c.templateId).filter(Boolean));
+                    const completedTemplateIds = new Set(completedChallenges.map((c) => c.templateId).filter(Boolean));
 
                     // 진행중이 아닌 & 완료 챌린지가 없는 템플릿만 필터링
-                    const filteredTemplates = allTemplates.filter(t =>
-                        !ongoingTemplateIds.includes(t.id) && !completedTemplateIds.has(t.id)
+                    const filteredTemplates = allTemplates.filter((t) =>
+                        !ongoingTemplateIds.has(t.id) && !completedTemplateIds.has(t.id)
                     );
 
                     // 사용자 챌린지: active/ready/completed 상태 제외
-                    const filteredUserChallenges = userChallengesAll.filter(c =>
-                        !ongoingIds.includes(c.id) && !['active', 'ready', 'completed'].includes(c.status)
+                    const filteredUserChallenges = userChallengesAll.filter((c) =>
+                        !ongoingIds.has(c.id) && !['active', 'ready', 'completed'].includes(c.status)
                     );
 
-                    // 이미 포함된 템플릿 ID 추적
-                    const existingTemplateIds = new Set([
-                        ...filteredTemplates.map(t => t.id),
-                        ...filteredUserChallenges.map(c => c.templateId || c.id)
-                    ]);
-
-                    // 실패 챌린지: 중복 제외
-                    const uniqueFailedChallenges = failedChallenges.filter(c =>
-                        !existingTemplateIds.has(c.templateId) && !existingTemplateIds.has(c.id)
-                    );
-
-                    // 완료 챌린지: 최신 완료순 정렬 (completedAt 내림차순)
-                    const sortedCompletedChallenges = [...completedChallenges].sort((a, b) => {
-                        const dateA = a.completedAt ? new Date(a.completedAt) : new Date(0);
-                        const dateB = b.completedAt ? new Date(b.completedAt) : new Date(0);
-                        return dateB - dateA;
+                    // 이미 포함된 항목 키 추적 (템플릿/챌린지 중복 제거)
+                    const existingKeys = new Set(filteredTemplates.map((t) => `t:${t.id}`));
+                    filteredUserChallenges.forEach((challenge) => {
+                        challengeKeys(challenge).forEach((key) => existingKeys.add(key));
                     });
 
+                    const uniqueFailedChallenges = failedChallenges.filter((challenge) => {
+                        return !challengeKeys(challenge).some((key) => existingKeys.has(key));
+                    });
+                    uniqueFailedChallenges.forEach((challenge) => {
+                        challengeKeys(challenge).forEach((key) => existingKeys.add(key));
+                    });
+
+                    // 완료 챌린지: 중복 제거 후 최신 완료순 정렬 (completedAt 내림차순)
+                    const uniqueCompletedChallenges = completedChallenges
+                        .filter((challenge) => !challengeKeys(challenge).some((key) => existingKeys.has(key)))
+                        .sort((a, b) => {
+                            const dateA = a.completedAt ? new Date(a.completedAt) : new Date(0);
+                            const dateB = b.completedAt ? new Date(b.completedAt) : new Date(0);
+                            return dateB - dateA;
+                        });
+
                     data = [
-                        ...sortedCompletedChallenges,
+                        ...uniqueCompletedChallenges,
                         ...filteredTemplates,
                         ...filteredUserChallenges,
                         ...uniqueFailedChallenges,
@@ -162,17 +160,14 @@ export default function ChallengePage() {
 
                 case 'duduk':
                     // 두둑 탭: 두둑 템플릿 + 진행중인 챌린지
-                    const dudukTemplates = await getChallengeTemplates('duduk');
-                    const dudukOngoing = await getOngoingChallenges();
+                    const dudukOngoing = ongoing.filter((c) => c.sourceType === 'duduk');
                     // 진행중인 챌린지의 템플릿 ID 목록
-                    const dudukOngoingTemplateIds = dudukOngoing
-                        .filter(c => c.sourceType === 'duduk')
-                        .map(c => c.templateId);
+                    const dudukOngoingTemplateIds = new Set(dudukOngoing.map((c) => c.templateId).filter(Boolean));
                     // 진행중이 아닌 템플릿만 필터링
-                    const dudukFiltered = dudukTemplates.filter(t => !dudukOngoingTemplateIds.includes(t.id));
+                    const dudukFiltered = dudukTemplates.filter((t) => !dudukOngoingTemplateIds.has(t.id));
                     // 두덕 진행중 챌린지 + 나머지 템플릿 병합
                     data = [
-                        ...dudukOngoing.filter(c => c.sourceType === 'duduk'),
+                        ...dudukOngoing,
                         ...dudukFiltered
                     ];
                     setOngoingChallenges([]);
@@ -180,19 +175,17 @@ export default function ChallengePage() {
 
                 case 'user':
                     // 사용자 탭: 사용자가 만든 챌린지 + AI 생성 챌린지
-                    const userTemplates = await getUserChallenges();
-                    const userOngoing = await getOngoingChallenges();
+                    const userTemplates = userChallengesAll;
+                    const userOngoing = ongoing.filter(c => c.sourceType === 'custom' || c.sourceType === 'ai');
                     // 진행중인 사용자/AI 챌린지 ID 목록
-                    const userOngoingIds = userOngoing
-                        .filter(c => c.sourceType === 'custom' || c.sourceType === 'ai')
-                        .map(c => c.id);
+                    const userOngoingIds = new Set(userOngoing.map((c) => c.id));
                     // 진행중이 아닌 챌린지만 필터링
                     const userFiltered = userTemplates.filter(t =>
-                        !userOngoingIds.includes(t.id) && !['active', 'ready'].includes(t.status)
+                        !userOngoingIds.has(t.id) && !['active', 'ready'].includes(t.status)
                     );
                     // 사용자 진행중 챌린지 + 나머지 병합
                     data = [
-                        ...userOngoing.filter(c => c.sourceType === 'custom' || c.sourceType === 'ai'),
+                        ...userOngoing,
                         ...userFiltered
                     ];
                     setOngoingChallenges([]);
@@ -200,27 +193,24 @@ export default function ChallengePage() {
 
                 case 'ongoing':
                     // 진행중 탭: active + ready 상태 모두 포함
-                    const activeData = await getOngoingChallenges();
-                    const readyData = await getMyChallenges('ready');
-                    const rawData = [...activeData, ...readyData];
-                    data = Array.from(new Map(rawData.map(c => [c.id, c])).values());
+                    data = ongoing;
                     setOngoingChallenges([]);
                     break;
 
                 case 'completed':
                     // 완료 탭
-                    data = await getMyChallenges('completed');
+                    data = completedChallenges;
                     setOngoingChallenges([]);
                     break;
 
                 case 'failed':
                     // 실패 탭
-                    data = await getMyChallenges('failed');
+                    data = failedChallenges;
                     setOngoingChallenges([]);
                     break;
 
                 default:
-                    data = await getChallengeTemplates('duduk');
+                    data = dudukTemplates;
                     setOngoingChallenges([]);
             }
             setChallenges(data);
@@ -233,11 +223,6 @@ export default function ChallengePage() {
             setLoading(false);
         }
     }, [activeTab]);
-
-    // 초기 로드
-    useEffect(() => {
-        fetchUserPoints();
-    }, [fetchUserPoints]);
 
     // 탭 변경 시 데이터 로드
     useEffect(() => {
@@ -256,7 +241,6 @@ export default function ChallengePage() {
         try {
             await cancelChallenge(challenge.id);
             await fetchChallenges();
-            await fetchUserPoints();
             setSelectedChallenge(null);
             alert('챌린지가 취소되었습니다.');
         } catch (err) {
@@ -304,6 +288,7 @@ export default function ChallengePage() {
             alert(serverMessage);
         }
     };
+
     // 챌린지 시작
     const handleStartChallenge = async (challenge, userInputs = {}) => {
         try {
@@ -351,7 +336,6 @@ export default function ChallengePage() {
             const challengeId = challenge.userChallengeId || challenge.id;
             await retryChallenge(challengeId);
             await fetchChallenges();
-            await fetchUserPoints();
             setSelectedChallenge(null);
             alert('챌린지를 다시 시작합니다!');
         } catch (err) {
@@ -562,8 +546,7 @@ export default function ChallengePage() {
                 </>
             )}
 
-            {/* 하단 여백 (BottomNavigation 때문) */}
-            <div style={{ height: '100px' }}></div>
+
 
             {/* 챌린지 직접 만들기 버튼 (Glassmorphism) */}
             <button style={styles.floatingCreateButton} onClick={handleCreateChallenge}>
@@ -615,9 +598,9 @@ const styles = {
     container: {
         background: 'var(--background-light)',
         minHeight: '100vh',
-        padding: '1rem', // Calendar UI와 비슷하게 패딩 축소
-        paddingTop: '0', // 상단 회색 영역 제거
-        paddingBottom: '6rem',
+        padding: '1rem',
+        paddingTop: '0',
+        overflow: 'hidden',
     },
     // Sticky Header Wrapper
     headerWrapper: {
@@ -724,7 +707,7 @@ const styles = {
     },
     floatingCreateButton: {
         position: 'fixed',
-        bottom: '85px',
+        bottom: 'calc(84px + env(safe-area-inset-bottom, 0px) + 8px)',
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
