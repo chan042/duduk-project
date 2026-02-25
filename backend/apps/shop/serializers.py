@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ShopItem, UserInventory
+from .models import ShopItem, UserInventory, UserEquipped
 from apps.users.models import User
 
 class ShopItemSerializer(serializers.ModelSerializer):
@@ -59,3 +59,27 @@ class UserPointSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username', 'points']
+
+
+class UserEquippedSerializer(serializers.ModelSerializer):
+    """
+    사용자 착장 상태를 반환하기 위한 시리얼라이저입니다.
+    각 슬롯의 아이템 상세 정보를 포함합니다.
+    """
+    clothing = ShopItemSerializer(read_only=True)
+    item = ShopItemSerializer(read_only=True)
+    background = ShopItemSerializer(read_only=True)
+
+    class Meta:
+        model = UserEquipped
+        fields = ['clothing', 'item', 'background', 'updated_at']
+
+
+class UserEquippedWriteSerializer(serializers.Serializer):
+    """
+    착장 저장 요청을 검증하기 위한 시리얼라이저입니다.
+    각 슬롯에 ShopItem ID 또는 null을 받습니다.
+    """
+    clothing_id = serializers.IntegerField(allow_null=True, required=False)
+    item_id = serializers.IntegerField(allow_null=True, required=False)
+    background_id = serializers.IntegerField(allow_null=True, required=False)

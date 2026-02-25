@@ -109,16 +109,19 @@ export default function RoomPage() {
         }
     }, [user]);
 
-    // 착장 상태 로드 (localStorage)
+    // 착장 상태 로드 (백엔드 API)
     useEffect(() => {
-        setIsLoading(true);
-        const data = getEquippedItems();
-        setEquippedItems({
-            clothing: data.clothing || null,
-            item: data.item || null,
-            background: data.background || null
-        });
-        setIsLoading(false);
+        const loadEquipped = async () => {
+            setIsLoading(true);
+            const data = await getEquippedItems();
+            setEquippedItems({
+                clothing: data.clothing || null,
+                item: data.item || null,
+                background: data.background || null
+            });
+            setIsLoading(false);
+        };
+        loadEquipped();
     }, []);
 
     // 캐릭터 이미지 경로 생성 (image_key 사용)
@@ -220,7 +223,7 @@ export default function RoomPage() {
                     <div style={styles.doorSpeechNameTag}>
                         {charName}
                     </div>
-                    오늘도 와주셨군요! {charName}가 기다리고 있어요. 방문을 열어 환영해주세요!
+                    오늘도 와주셨군요! {charName}(이)가 기다리고 있어요. 방문을 열어 환영해주세요!
                 </div>
             </div>
         );

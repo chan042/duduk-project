@@ -122,8 +122,10 @@ export default function CoachingPage() {
                     loading={loading}
                     onStartChallenge={handleStartChallengeFromCoaching}
                 />
-                {/* 나머지 카드 전달 (최대 5개) */}
-                <CompletedCoachingList cards={olderCards} />
+                {/* 나머지 카드 전달 (최대 5개) - 5개 초과일 때만 표시 */}
+                {olderCards.length > 0 && (
+                    <CompletedCoachingList cards={olderCards} />
+                )}
             </main>
 
             {/* AI 생성 챌린지 미리보기 모달 */}

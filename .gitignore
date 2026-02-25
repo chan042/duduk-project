@@ -11,6 +11,7 @@ __pycache__/
 *.pyc
 .env
 db.sqlite3
+backend/venv/
 
 # Node/Next.js
 node_modules/

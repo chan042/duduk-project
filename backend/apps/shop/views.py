@@ -6,12 +6,14 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 import random
 
-from .models import ShopItem, UserInventory
+from .models import ShopItem, UserInventory, UserEquipped
 from .serializers import (
-    ShopItemSerializer, 
-    UserInventorySerializer, 
-    PurchaseRequestSerializer, 
-    UserPointSerializer
+    ShopItemSerializer,
+    UserInventorySerializer,
+    PurchaseRequestSerializer,
+    UserPointSerializer,
+    UserEquippedSerializer,
+    UserEquippedWriteSerializer,
 )
 
 class ShopItemListView(APIView):
@@ -173,3 +175,58 @@ class GachaView(APIView):
 
         except Exception as e:
             return Response({"message": f"가챠 처리 중 오류가 발생했습니다: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UserEquippedView(APIView):
+    """
+    사용자의 착장 상태를 조회하거나 저장하는 뷰입니다.
+    - GET: 현재 착장 정보 반환
+    - PUT: 착장 저장 (인벤토리 소유 여부 검증 포함)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            equipped = request.user.equipped
+        except UserEquipped.DoesNotExist:
+            # 착장 레코드가 없으면 빈 착장 반환
+            return Response({'clothing': None, 'item': None, 'background': None})
+
+        serializer = UserEquippedSerializer(equipped, context={'request': request})
+        return Response(serializer.data)
+
+    def put(self, request):
+        write_serializer = UserEquippedWriteSerializer(data=request.data)
+        if not write_serializer.is_valid():
+            return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = write_serializer.validated_data
+        user = request.user
+
+        def resolve_item(slot_id, expected_category):
+            """ID가 주어졌을 때 해당 아이템이 유저 인벤토리에 있는지 검증 후 반환."""
+            if slot_id is None:
+                return None
+            try:
+                shop_item = ShopItem.objects.get(id=slot_id, category=expected_category.upper(), is_active=True)
+            except ShopItem.DoesNotExist:
+                raise ValueError(f"존재하지 않는 아이템입니다. (id={slot_id})")
+            if not UserInventory.objects.filter(user=user, shop_item=shop_item).exists():
+                raise ValueError(f"보유하지 않은 아이템입니다. (id={slot_id})")
+            return shop_item
+
+        try:
+            clothing = resolve_item(data.get('clothing_id'), 'CLOTHING')
+            item = resolve_item(data.get('item_id'), 'ITEM')
+            background = resolve_item(data.get('background_id'), 'BACKGROUND')
+        except ValueError as e:
+            return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        equipped, _ = UserEquipped.objects.get_or_create(user=user)
+        equipped.clothing = clothing
+        equipped.item = item
+        equipped.background = background
+        equipped.save()
+
+        serializer = UserEquippedSerializer(equipped, context={'request': request})
+        return Response(serializer.data)

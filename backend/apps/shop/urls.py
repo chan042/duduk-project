@@ -4,7 +4,8 @@ from .views import (
     UserInventoryView,
     UserPointView,
     PurchaseItemView,
-    GachaView
+    GachaView,
+    UserEquippedView,
 )
 
 urlpatterns = [
@@ -22,4 +23,7 @@ urlpatterns = [
     
     # 가챠 실행 (POST /api/shop/gacha/)
     path('gacha/', GachaView.as_view(), name='gacha'),
+
+    # 착장 조회/저장 (GET,PUT /api/shop/equipped/)
+    path('equipped/', UserEquippedView.as_view(), name='user-equipped'),
 ]

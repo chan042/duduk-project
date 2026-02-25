@@ -85,18 +85,17 @@ export const playGacha = async () => {
     }
 };
 
-const EQUIPPED_STORAGE_KEY = 'duduk_equipped_items';
-
 /**
- * 착장 상태 조회 (localStorage)
+ * 착장 상태 조회 (백엔드 API)
  */
-export const getEquippedItems = () => {
+export const getEquippedItems = async () => {
     try {
-        const stored = localStorage.getItem(EQUIPPED_STORAGE_KEY);
-        if (stored) {
-            return JSON.parse(stored);
-        }
-        return { clothing: null, item: null, background: null };
+        const response = await client.get('/api/shop/equipped/');
+        return {
+            clothing: response.data.clothing || null,
+            item: response.data.item || null,
+            background: response.data.background || null,
+        };
     } catch (error) {
         console.error('Get Equipped Items Error:', error);
         return { clothing: null, item: null, background: null };
@@ -104,12 +103,16 @@ export const getEquippedItems = () => {
 };
 
 /**
- * 착장 상태 저장 (localStorage)
- * @param {object} equippedItems - { clothing: {...}, item: {...}, background: {...} }
+ * 착장 상태 저장 (백엔드 API)
+ * @param {object} equippedItems - { clothing: {...}|null, item: {...}|null, background: {...}|null }
  */
-export const saveEquippedItems = (equippedItems) => {
+export const saveEquippedItems = async (equippedItems) => {
     try {
-        localStorage.setItem(EQUIPPED_STORAGE_KEY, JSON.stringify(equippedItems));
+        await client.put('/api/shop/equipped/', {
+            clothing_id: equippedItems.clothing?.id ?? null,
+            item_id: equippedItems.item?.id ?? null,
+            background_id: equippedItems.background?.id ?? null,
+        });
         return true;
     } catch (error) {
         console.error('Save Equipped Items Error:', error);

@@ -63,8 +63,8 @@ export default function ClosetPage() {
                 });
                 setInventory(formattedInventory);
 
-                // 착장 상태는 localStorage에서 가져옴
-                const equippedData = getEquippedItems();
+                // 착장 상태는 백엔드 API에서 가져옴
+                const equippedData = await getEquippedItems();
                 setWearingItems({
                     clothing: equippedData.clothing?.id || null,
                     item: equippedData.item?.id || null,
@@ -109,7 +109,7 @@ export default function ClosetPage() {
         setSelectedItem(null);
     };
 
-    const handleSaveLook = () => {
+    const handleSaveLook = async () => {
         setIsSaving(true);
 
         // 현재 착장 중인 아이템 정보 수집
@@ -119,7 +119,7 @@ export default function ClosetPage() {
             background: inventory.find(i => i.id === wearingItems.background) || null
         };
 
-        const success = saveEquippedItems(equippedData);
+        const success = await saveEquippedItems(equippedData);
         setIsSaving(false);
 
         if (success) {

@@ -26,6 +26,18 @@ export default function CustomChallengeModal({
         }
     }, [isOpen, initialDetails, initialDifficulty]);
 
+    // 모달이 열렸을 때 배경 스크롤 잠금
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isOpen]);
+
     // 모달 닫을 때 입력값 초기화
     const handleClose = () => {
         setDetails('');

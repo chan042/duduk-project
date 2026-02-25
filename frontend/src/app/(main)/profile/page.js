@@ -5,7 +5,7 @@
  * - 사용자 프로필 페이지 UI를 구현합니다.
  * - 사용자 정보 표시, 로그아웃, 회원탈퇴 기능을 제공합니다.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, Trash2, User, Mail, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,18 @@ export default function ProfilePage() {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [editData, setEditData] = useState({});
+
+    // 오버레이가 열렸을 때 배경 스크롤 잠금
+    useEffect(() => {
+        if (showDeleteModal || showInfoModal) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [showDeleteModal, showInfoModal]);
 
     // 프로필 이미지 변경 처리
 

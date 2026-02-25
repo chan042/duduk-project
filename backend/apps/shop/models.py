@@ -56,3 +56,45 @@ class UserInventory(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.shop_item.name}"
+
+
+class UserEquipped(models.Model):
+    """
+    사용자의 현재 착장 상태를 저장하는 모델입니다.
+    유저당 하나의 레코드만 존재합니다.
+    """
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='equipped',
+        verbose_name='사용자'
+    )
+    clothing = models.ForeignKey(
+        ShopItem,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='equipped_as_clothing',
+        verbose_name='착용 의상'
+    )
+    item = models.ForeignKey(
+        ShopItem,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='equipped_as_item',
+        verbose_name='착용 아이템'
+    )
+    background = models.ForeignKey(
+        ShopItem,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='equipped_as_background',
+        verbose_name='적용 배경'
+    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='마지막 수정일')
+
+    class Meta:
+        verbose_name = '사용자 착장'
+        verbose_name_plural = '사용자 착장 목록'
+
+    def __str__(self):
+        return f"{self.user.username} 착장"
