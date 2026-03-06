@@ -7,7 +7,7 @@ import BottomNavigation from '@/components/common/BottomNavigation';
 import QuickAddPopup from '@/components/home/QuickAddPopup';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 
-const HIDE_BOTTOM_NAV_ROUTES = ['/room', '/shop', '/closet'];
+const HIDE_BOTTOM_NAV_ROUTES = ['/room', '/shop', '/closet', '/chatbot'];
 
 export default function ClientLayout({ children }) {
     const [isPopupOpen, setIsPopupOpen] = useState(false);

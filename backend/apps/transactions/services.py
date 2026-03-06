@@ -1,6 +1,6 @@
 from django.utils import timezone
 from collections import defaultdict
-from datetime import timedelta
+from datetime import timedelta, datetime
 import calendar
 from .models import MonthlyLog, DailyBudgetSnapshot, DailySpendingConfirmation
 
@@ -35,7 +35,7 @@ def get_daily_status(user, year, month, transactions):
     # 1일부터 말일까지 순회하며 상태 계산
     for day in range(1, last_day + 1):
         # 날짜 객체 생성
-        current_date = timezone.datetime(target_year, target_month, day).date()
+        current_date = datetime(target_year, target_month, day).date()
         date_str = current_date.strftime('%Y-%m-%d')
         
         # 미래 날짜는 상태 계산 안함
@@ -149,7 +149,7 @@ def create_daily_budget_snapshot(user, target_date):
 
     # 해당 날짜 이전까지의 지출 계산 (그 날 기준)
     from .models import Transaction
-    range_start = timezone.datetime(year, month, 1).date()
+    range_start = datetime(year, month, 1).date()
     
     # 1. 어제까지의 지출 (권장 예산 계산용)
     transactions_yesterday = Transaction.objects.filter(
@@ -241,7 +241,7 @@ def get_daily_budget_for_date(user, target_date):
         
         # 그 날 기준으로 이전까지의 지출만 계산
         from .models import Transaction
-        range_start = timezone.datetime(year, month, 1).date()
+        range_start = datetime(year, month, 1).date()
         # 1. 어제까지의 지출
         transactions_yesterday = Transaction.objects.filter(
             user=user, 

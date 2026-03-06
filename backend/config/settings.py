@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'apps.challenges',
     'apps.shop',
     'apps.notifications',
+    'apps.chatbot',
 ]
 
 AUTH_USER_MODEL = 'users.User'

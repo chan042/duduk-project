@@ -6,15 +6,17 @@ import { ChevronLeft } from 'lucide-react';
 import ChatMessage from '@/components/chatbot/ChatMessage';
 import ChatInput from '@/components/chatbot/ChatInput';
 import { useAuth } from '@/contexts/AuthContext';
+import { createChatSession, sendChatMessage } from '@/lib/api/chatbot';
 
 export default function ChatbotPage() {
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const messagesEndRef = useRef(null);
+    const sessionIdRef = useRef(null); // 대화 세션 ID 보관
 
     // 초기 상태에 인사말(assistant) 메시지 하나 추가
     const [messages, setMessages] = useState([
-        { id: 1, role: 'assistant', content: '안녕하세요! 저는 소비를 도와주는 챗봇이에요. 무엇을 도와드릴까요?' }
+        { id: 1, role: 'assistant', content: '안녕하세요! 저는 Duduk 상담사에요. 무엇을 도와드릴까요?' }
     ]);
     const [isTyping, setIsTyping] = useState(false);
 
@@ -27,23 +29,60 @@ export default function ChatbotPage() {
         scrollToBottom();
     }, [messages, isTyping]);
 
+    // 컴포넌트 마운트 시 대화 세션 생성
+    useEffect(() => {
+        if (loading) return;
+        const initSession = async () => {
+            try {
+                const session = await createChatSession();
+                sessionIdRef.current = session.id;
+            } catch (error) {
+                console.error('챗봇 세션 생성 실패:', error);
+            }
+        };
+        initSession();
+    }, [loading]);
+
     // 사용자가 메시지 전송
-    const handleSendMessage = (text) => {
+    const handleSendMessage = async (text) => {
         const newUserMsg = { id: Date.now(), role: 'user', content: text };
         setMessages((prev) => [...prev, newUserMsg]);
-
-        // 임시 로직: AI 응답 시뮬레이션
         setIsTyping(true);
-        setTimeout(() => {
-            const newAssistantMsg = {
-                id: Date.now() + 1,
-                role: 'assistant',
-                content: '현재 개발 중인 기능입니다! 곧 똑똑한 소비 조언으로 찾아뵐게요.'
-            };
-            setMessages((prev) => [...prev, newAssistantMsg]);
+
+        try {
+            // 세션 ID가 없으면 재시도로 세션 생성
+            if (!sessionIdRef.current) {
+                const session = await createChatSession();
+                sessionIdRef.current = session.id;
+            }
+
+            const result = await sendChatMessage(sessionIdRef.current, text);
+            const assistantMsg = result.assistant_message;
+
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: assistantMsg.id,
+                    role: assistantMsg.role,
+                    content: assistantMsg.content,
+                },
+            ]);
+        } catch (error) {
+            console.error('메시지 전송 실패:', error);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: Date.now() + 1,
+                    role: 'assistant',
+                    content: '죄송해요, 일시적인 오류가 발생했어요. 잠시 후 다시 시도해주세요. 🙏',
+                },
+            ]);
+        } finally {
             setIsTyping(false);
-        }, 1500);
+        }
     };
+
+    if (loading) return null;
 
     return (
         <div style={{
@@ -82,7 +121,7 @@ export default function ChatbotPage() {
                     <ChevronLeft size={24} />
                 </button>
                 <div style={{ flex: 1, textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', marginRight: '40px' }}>
-                    소비 코치
+                    Duduk Chat
                 </div>
             </div>
 
@@ -124,7 +163,7 @@ export default function ChatbotPage() {
 
             {/* 하단 입력 영역 */}
             <div style={{ flexShrink: 0 }}>
-                <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
+                <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} characterName={user?.character_name || '두둑이'} />
             </div>
 
             <style jsx>{`

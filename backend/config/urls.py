@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/challenges/', include('apps.challenges.urls')),
     path('api/shop/', include('apps.shop.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
+    path('api/chatbot/', include('apps.chatbot.urls')),
 ]
 
 from django.conf import settings

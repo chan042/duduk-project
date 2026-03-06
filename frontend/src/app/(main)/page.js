@@ -5,6 +5,7 @@ import ChallengeList from '@/components/home/ChallengeList';
 import TotalSpending from '@/components/home/TotalSpending';
 import CategorySpending from '@/components/home/CategorySpending';
 import RecentTransactions from '@/components/home/RecentTransactions';
+import ChatbotFloatingButton from '@/components/home/ChatbotFloatingButton';
 
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -26,6 +27,7 @@ export default function Home() {
       <TotalSpending key={`total-${refreshKey}`} />
       <CategorySpending key={`category-${refreshKey}`} />
       <RecentTransactions key={`recent-${refreshKey}`} />
+      <ChatbotFloatingButton />
     </main>
   );
 }
