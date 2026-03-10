@@ -14,8 +14,8 @@ class ClovaOCRClient:
     """Simple wrapper for Naver Clova OCR V2 API."""
 
     def __init__(self):
-        self.ocr_url = os.environ.get("CLOVA_OCR_URL") or os.environ.get("NEXT_PUBLIC_CLOVA_OCR_URL")
-        self.ocr_secret = os.environ.get("CLOVA_OCR_SECRET") or os.environ.get("NEXT_PUBLIC_CLOVA_OCR_SECRET")
+        self.ocr_url = os.environ.get("CLOVA_OCR_URL")
+        self.ocr_secret = os.environ.get("CLOVA_OCR_SECRET")
 
     @property
     def is_configured(self) -> bool:
@@ -79,4 +79,3 @@ class ClovaOCRClient:
                 lines.append(text.strip())
 
         return "\n".join(lines).strip() if lines else None
-

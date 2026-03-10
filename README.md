@@ -17,7 +17,7 @@
 <br>
 <img src="https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=white"/>
 <img src="https://img.shields.io/badge/DRF-A30000?style=for-the-badge&logo=django&logoColor=white"/>
-<img src="https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=google&logoColor=white"/>
+<img src="https://img.shields.io/badge/Google-Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white"/>
 <br>
 <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white"/>
 <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white"/>
@@ -77,7 +77,7 @@
 | **Backend** | **Django 5.2** | 강력하고 안전한 Python 웹 프레임워크 |
 | | **Django REST Framework** | RESTful API 설계 및 구현 |
 | | **Simple JWT** | 안전한 사용자 인증 처리 |
-| **AI / Data** | **Google Gemini API** | 2.5 Flash 모델을 이용한 자연어 처리 및 코칭 생성 |
+| **AI / Data** | **Google Gemini API** | Gemini 모델을 이용한 자연어 처리, 비전 분석, 웹 검색 기반 코칭 생성 |
 | **Infrastructure** | **Docker & Compose** | 컨테이너 기반의 개발 및 배포 환경 구축 |
 | | **PostgreSQL 15** | 관계형 데이터베이스 |
 
@@ -97,6 +97,14 @@ cd duduk-project
 ### 2. 환경 변수 설정 (.env)
 
 프로젝트 루트 경로에 `.env` 파일을 생성하고 아래 내용을 채워주세요.
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL_COACHING=gemini-2.5-flash
+GEMINI_MODEL_ANALYSIS=gemini-2.5-flash
+```
+
+`GEMINI_API_KEY` 대신 `GOOGLE_API_KEY`도 사용할 수 있습니다. 코칭/분석 키를 분리하려면 `GEMINI_API_KEY_COACHING`, `GEMINI_API_KEY_ANALYSIS`를 설정하면 됩니다.
 
 
 ### 3. 프로젝트 실행
@@ -124,7 +132,7 @@ duduk-project/
 │   ├── 📂 apps/               # 도메인별 앱 분리 (DDD 구조 지향)
 │   │   ├── 👤 users/          # 사용자 인증 및 프로필
 │   │   ├── 💳 transactions/   # 가계부 CRUD 및 예산 로직
-│   │   ├── 🤖 coaching/       # Gemini AI 연동 및 프롬프트 관리
+│   │   ├── 🤖 coaching/       # Gemini 기반 AI 연동 및 프롬프트 관리
 │   │   └── 🏆 challenges/     # 챌린지 로직
 │   ├── 📂 config/             # Django 설정
 │   ├── 📂 external/           # 외부 API 클라이언트 (Gemini)
@@ -140,4 +148,3 @@ duduk-project/
 ```
 
 .
-

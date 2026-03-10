@@ -861,7 +861,7 @@ class BaseChallengeStartSerializer(serializers.Serializer):
                 "checked_conditions": []
             }
 
-    def _create_user_challenge(self, validated_data, source_coaching=None, generated_by='gemini'):
+    def _create_user_challenge(self, validated_data, source_coaching=None, generated_by='gpt'):
         """UserChallenge 생성 공통 로직"""
         user = self.context['request'].user
 
@@ -912,7 +912,7 @@ class AIChallengeStartSerializer(BaseChallengeStartSerializer):
     """AI 챌린지 시작 직렬화"""
 
     def create(self, validated_data):
-        return self._create_user_challenge(validated_data, generated_by='gemini')
+        return self._create_user_challenge(validated_data, generated_by='gpt')
 
 
 class CoachingChallengeStartSerializer(BaseChallengeStartSerializer):
@@ -935,5 +935,5 @@ class CoachingChallengeStartSerializer(BaseChallengeStartSerializer):
         return self._create_user_challenge(
             validated_data,
             source_coaching=source_coaching,
-            generated_by='gemini_coaching'
+            generated_by='gpt_coaching'
         )

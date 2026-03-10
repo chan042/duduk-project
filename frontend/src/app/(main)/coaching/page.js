@@ -50,6 +50,7 @@ export default function CoachingPage() {
                     analysis: item.analysis,
                     description: item.coaching_content,
                     estimated_savings: item.estimated_savings,
+                    sources: item.sources || [],
                     icon: getIconForSubject(item.subject),
                     created_at: item.created_at
                 }));

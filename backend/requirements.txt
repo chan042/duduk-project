@@ -1,7 +1,6 @@
 # backend/requirements.txt
 django
 psycopg2-binary
-google-generativeai
 django-cors-headers
 djangorestframework
 django-filter
@@ -12,3 +11,5 @@ django-allauth==0.61.1
 google-auth==2.28.0
 celery==5.3.4
 redis==5.0.1
+google-genai
+pydantic

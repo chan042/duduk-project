@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional, Tuple
 
 import requests
 
-from external.gemini.client import GeminiClient
+from external.ai.client import AIClient
 from external.clova.client import ClovaOCRClient
 
 
@@ -94,8 +94,8 @@ class PhotoVerificationService:
         expected_remaining = max(0, target_amount - current_spent)
         tolerance = int((user_challenge.success_conditions or {}).get("photo_amount_tolerance") or 0)
 
-        gemini = GeminiClient(purpose="analysis")
-        result = gemini.analyze_cash_photo(
+        ai_client = AIClient(purpose="analysis")
+        result = ai_client.analyze_cash_photo(
             image_base64=image_base64,
             expected_remaining=expected_remaining,
             mime_type=mime_type,
@@ -149,8 +149,8 @@ class PhotoVerificationService:
         }
 
     def _verify_marketplace_post(self, image_base64: str, mime_type: str) -> Dict[str, Any]:
-        gemini = GeminiClient(purpose="analysis")
-        result = gemini.analyze_marketplace_post_photo(
+        ai_client = AIClient(purpose="analysis")
+        result = ai_client.analyze_marketplace_post_photo(
             image_base64=image_base64,
             mime_type=mime_type,
         )
@@ -188,8 +188,8 @@ class PhotoVerificationService:
                 image_format = mime_type.split("/")[-1].lower().strip()
             ocr_text = ocr_client.extract_text(image_base64=image_base64, image_format=image_format)
 
-        gemini = GeminiClient(purpose="analysis")
-        result = gemini.analyze_one_plus_one_photo(
+        ai_client = AIClient(purpose="analysis")
+        result = ai_client.analyze_one_plus_one_photo(
             image_base64=image_base64,
             ocr_text=ocr_text or "",
             mime_type=mime_type,

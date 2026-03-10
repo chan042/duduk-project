@@ -15,7 +15,7 @@ import calendar
 
 from .models import Transaction, MonthlyLog
 from .serializers import TransactionSerializer
-from external.gemini.client import GeminiClient
+from external.ai.client import AIClient
 
 User = get_user_model()
 
@@ -33,7 +33,7 @@ class ParseTransactionView(APIView):
             return Response({"error": "No text provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Gemini AI 클라이언트를 사용하여 텍스트 분석
-        client = GeminiClient(purpose="analysis")
+        client = AIClient(purpose="analysis")
         parsed_data = client.analyze_text(text)
         
         if not parsed_data:

@@ -18,7 +18,7 @@ from .services import (
     get_target_month,
     is_new_user_for_month,
     collect_report_data,
-    save_report_cache,
+    ensure_score_snapshot,
     save_report_and_persona,
 )
 
@@ -82,7 +82,7 @@ class YuntaekScoreView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        from .yuntaek_score import get_yuntaek_score
+        from .yuntaek_score import YuntaekScoreAnalysisError
 
         year, month = get_target_month(
             request.query_params.get('year'),
@@ -96,10 +96,29 @@ class YuntaekScoreView(APIView):
                 'year': year,
                 'month': month,
                 'breakdown': {},
+                'generated_at': None,
+                'cached': False,
                 'is_new_user': True,
             })
 
-        score_data = get_yuntaek_score(request.user, year, month)
+        try:
+            score_data, monthly_report, was_cached = ensure_score_snapshot(
+                request.user,
+                year,
+                month,
+            )
+        except YuntaekScoreAnalysisError as exc:
+            logger.error("윤택지수 스냅샷 조회 중 오류: %s", exc, exc_info=True)
+            return Response(
+                {'error': '윤택지수 분석이 아직 완료되지 않았습니다. 잠시 후 다시 시도해주세요.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except Exception as exc:
+            logger.error("윤택지수 조회 중 오류: %s", exc, exc_info=True)
+            return Response(
+                {'error': '윤택지수를 불러오는 중 오류가 발생했습니다.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         return Response({
             'total_score': score_data.get('total_score', 0),
@@ -107,6 +126,8 @@ class YuntaekScoreView(APIView):
             'year': year,
             'month': month,
             'breakdown': score_data.get('breakdown', {}),
+            'generated_at': monthly_report.score_generated_at if monthly_report else None,
+            'cached': was_cached,
             'is_new_user': False,
         })
 
@@ -125,7 +146,8 @@ class MonthlyReportView(APIView):
 
     def get(self, request):
         from .models import MonthlyReport
-        from external.gemini.client import GeminiClient
+        from external.ai.client import AIClient
+        from .yuntaek_score import YuntaekScoreAnalysisError
 
         year, month = get_target_month(
             request.query_params.get('year'),
@@ -138,12 +160,12 @@ class MonthlyReportView(APIView):
             user=request.user, year=year, month=month
         ).first()
 
-        if cached_report and not refresh:
+        if cached_report and cached_report.report_content and not refresh:
             return Response({
                 'year': year,
                 'month': month,
                 'report': cached_report.report_content,
-                'generated_at': cached_report.created_at,
+                'generated_at': cached_report.updated_at,
                 'cached': True,
                 'is_new_user': False,
             })
@@ -161,8 +183,9 @@ class MonthlyReportView(APIView):
 
         # 데이터 수집 + AI 리포트 생성
         try:
-            report_data = collect_report_data(request.user, year, month)
-            client = GeminiClient(purpose="analysis")
+            score_data, _, _ = ensure_score_snapshot(request.user, year, month)
+            report_data = collect_report_data(request.user, year, month, score_data=score_data)
+            client = AIClient(purpose="analysis")
             ai_result = client.generate_monthly_report(report_data)
 
             if not ai_result or not isinstance(ai_result, dict):
@@ -174,6 +197,12 @@ class MonthlyReportView(APIView):
             # 리포트 저장 + 페르소나 업데이트
             saved, report_content = save_report_and_persona(
                 request.user, year, month, ai_result
+            )
+        except YuntaekScoreAnalysisError as e:
+            logger.error("리포트 생성을 위한 윤택지수 스냅샷 생성 실패: %s", e, exc_info=True)
+            return Response(
+                {'error': '윤택지수 분석이 아직 완료되지 않았습니다. 잠시 후 다시 시도해주세요.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         except Exception as e:
             logger.error(f"월간 리포트 생성 중 오류: {e}", exc_info=True)

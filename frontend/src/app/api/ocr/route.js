@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 /**
  * 영수증 OCR API Route
  * 클라이언트에서 이미지를 받아 네이버 Clova OCR API를 호출하고
- * 텍스트 추출하여 Gemini API로 전달
+ * 텍스트를 추출한 뒤 백엔드 Gemini 파싱 API로 전달
  */
 
 // OCR 응답에서 텍스트 추출
@@ -84,8 +84,8 @@ export async function POST(request) {
             );
         }
 
-        const ocrSecret = process.env.NEXT_PUBLIC_CLOVA_OCR_SECRET;
-        const ocrUrl = process.env.NEXT_PUBLIC_CLOVA_OCR_URL;
+        const ocrSecret = process.env.CLOVA_OCR_SECRET;
+        const ocrUrl = process.env.CLOVA_OCR_URL;
 
         // 환경 변수 디버깅 로그
         if (process.env.NODE_ENV === 'development') {
@@ -97,8 +97,8 @@ export async function POST(request) {
 
         if (!ocrSecret || !ocrUrl) {
             console.error('[OCR] 환경 변수 미설정:', {
-                NEXT_PUBLIC_CLOVA_OCR_SECRET: ocrSecret ? '설정됨' : '미설정',
-                NEXT_PUBLIC_CLOVA_OCR_URL: ocrUrl ? '설정됨' : '미설정'
+                CLOVA_OCR_SECRET: ocrSecret ? '설정됨' : '미설정',
+                CLOVA_OCR_URL: ocrUrl ? '설정됨' : '미설정'
             });
             return NextResponse.json(
                 { error: 'OCR 서비스 설정 오류: 환경 변수가 설정되지 않았습니다. 서버를 재시작해주세요.' },
@@ -167,7 +167,7 @@ export async function POST(request) {
             );
         }
 
-        // 백엔드 Gemini API를 호출하여 지출 정보 분석
+        // 백엔드 Gemini 파싱 API를 호출하여 지출 정보 분석
         const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
         try {
@@ -180,20 +180,20 @@ export async function POST(request) {
                 headers['Authorization'] = `Bearer ${token}`;
             }
 
-            const geminiResponse = await fetch(`${backendUrl}/api/transactions/parse/`, {
+            const aiResponse = await fetch(`${backendUrl}/api/transactions/parse/`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ text: extractedText })
             });
 
-            if (!geminiResponse.ok) {
+            if (!aiResponse.ok) {
                 return NextResponse.json(
-                    { error: `AI 분석에 실패했습니다. (상태: ${geminiResponse.status})` },
+                    { error: `AI 분석에 실패했습니다. (상태: ${aiResponse.status})` },
                     { status: 500 }
                 );
             }
 
-            const parsedData = await geminiResponse.json();
+            const parsedData = await aiResponse.json();
 
             // 파싱 실패 응답 처리
             if (parsedData.error) {
@@ -222,10 +222,10 @@ export async function POST(request) {
                 },
                 rawText: extractedText  // 디버깅용
             });
-        } catch (geminiError) {
-            console.error('[OCR] Gemini API 호출 오류:', geminiError.message);
+        } catch (aiError) {
+            console.error('[OCR] Gemini 파싱 API 호출 오류:', aiError.message);
             return NextResponse.json(
-                { error: `AI 분석 서비스 연결에 실패했습니다: ${geminiError.message}` },
+                { error: `AI 분석 서비스 연결에 실패했습니다: ${aiError.message}` },
                 { status: 500 }
             );
         }

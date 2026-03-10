@@ -19,13 +19,12 @@ def generate_monthly_reports_for_all_users():
     이 작업은 Celery Beat 스케줄러에 의해 자동으로 실행됩니다.
     """
     from apps.users.models import MonthlyReport
-    from apps.users.yuntaek_score import get_yuntaek_score
-    from external.gemini.client import GeminiClient
+    from external.ai.client import AIClient
     from apps.users.services import (
         get_previous_month,
         is_new_user_for_month,
         collect_report_data,
-        save_report_cache,
+        ensure_score_snapshot,
         save_report_and_persona,
     )
     from apps.notifications.services import create_monthly_report_notification
@@ -46,21 +45,24 @@ def generate_monthly_reports_for_all_users():
                 logger.info(f"사용자 {user.id}는 {year}년 {month}월 신규 사용자입니다. 리포트 생성 스킵.")
                 continue
 
-            # 윤택지수 계산 (알림은 AI 리포트와 함께 생성)
+            # 윤택지수 스냅샷 생성
             try:
-                yuntaek_score = get_yuntaek_score(user, year, month)
-                logger.info(f"사용자 {user.id}의 윤택지수 계산 완료")
+                score_data, _, _ = ensure_score_snapshot(user, year, month)
+                logger.info(f"사용자 {user.id}의 윤택지수 스냅샷 생성 완료")
             except Exception as e:
-                logger.error(f"사용자 {user.id}의 윤택지수 계산 실패: {e}")
+                logger.error(f"사용자 {user.id}의 윤택지수 스냅샷 생성 실패: {e}")
+                fail_count += 1
+                continue
 
             # 이미 해당 월의 AI 리포트가 있으면 스킵
-            if MonthlyReport.objects.filter(user=user, year=year, month=month).exists():
+            existing_report = MonthlyReport.objects.filter(user=user, year=year, month=month).first()
+            if existing_report and existing_report.report_content:
                 logger.info(f"사용자 {user.id}의 {year}년 {month}월 AI 리포트는 이미 존재합니다.")
                 continue
 
             # 데이터 수집 + AI 리포트 생성
-            report_data = collect_report_data(user, year, month)
-            client = GeminiClient(purpose="analysis")
+            report_data = collect_report_data(user, year, month, score_data=score_data)
+            client = AIClient(purpose="analysis")
             ai_result = client.generate_monthly_report(report_data)
 
             if not ai_result or not isinstance(ai_result, dict):

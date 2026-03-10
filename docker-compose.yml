@@ -9,9 +9,6 @@
 # 2. backend: Django API 서버 (포트 8000)
 # 3. frontend: Next.js 웹 서버 (포트 3000)
 
-# 사용할 Docker Compose 파일의 버전
-version: '3.8'
-
 # 이곳에 우리 프로젝트의 서비스(앱)들을 정의합니다.
 services:
   #################
@@ -59,8 +56,8 @@ services:
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
       - BACKEND_INTERNAL_URL=http://backend:8000
-    env_file:
-      - .env
+      - CLOVA_OCR_SECRET=${CLOVA_OCR_SECRET:-}
+      - CLOVA_OCR_URL=${CLOVA_OCR_URL:-}
 
   #################
   # 4. Celery Worker

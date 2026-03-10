@@ -6,8 +6,6 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from apps.transactions.models import Transaction
-from external.gemini.client import GeminiClient
-
 User = get_user_model()
 
 class CoachingAdviceView(APIView):
@@ -46,6 +44,7 @@ class CoachingAdviceView(APIView):
                 "analysis": c.analysis,
                 "coaching_content": c.coaching_content,
                 "estimated_savings": c.estimated_savings,
+                "sources": c.sources,
                 "created_at": c.created_at
             })
             

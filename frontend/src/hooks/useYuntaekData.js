@@ -17,10 +17,20 @@ const SCORE_DETAILS_MAP = [
 
 /** 조회 대상 연/월 (전월) 계산 */
 function getTargetYearMonth() {
-    const now = new Date();
-    const month = now.getMonth() === 0 ? 12 : now.getMonth();
-    const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    return { year, month };
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: 'numeric',
+    });
+    const parts = formatter.formatToParts(new Date());
+    const currentYear = Number(parts.find((part) => part.type === 'year')?.value);
+    const currentMonth = Number(parts.find((part) => part.type === 'month')?.value);
+
+    if (currentMonth === 1) {
+        return { year: currentYear - 1, month: 12 };
+    }
+
+    return { year: currentYear, month: currentMonth - 1 };
 }
 
 // ─── localStorage 캐싱 ───
@@ -89,9 +99,10 @@ export function useYuntaekScore() {
 
     useEffect(() => {
         const fetchScore = async () => {
+            let cached = null;
             try {
                 const { year, month } = getTargetYearMonth();
-                const cached = getFromCache('score', year, month);
+                cached = getFromCache('score', year, month);
 
                 if (cached) {
                     if (cached.is_new_user) {
@@ -104,7 +115,7 @@ export function useYuntaekScore() {
                     setLoading(false);
                 }
 
-                const data = await getYuntaekScore();
+                const data = await getYuntaekScore(year, month);
 
                 if (data.is_new_user) {
                     setIsNewUser(true);
@@ -115,9 +126,12 @@ export function useYuntaekScore() {
 
                 saveToCache('score', data);
                 setFromCache(false);
+                setError(null);
             } catch (err) {
                 console.error('윤택지수 로딩 오류:', err);
-                setError(err.response?.data?.error || err.message || '윤택지수를 불러오는데 실패했습니다.');
+                if (!cached) {
+                    setError(err.response?.data?.error || err.message || '윤택지수를 불러오는데 실패했습니다.');
+                }
             } finally {
                 setLoading(false);
             }
@@ -155,9 +169,10 @@ export function useYuntaekReport() {
 
     useEffect(() => {
         const fetchReport = async () => {
+            let cached = null;
             try {
                 const { year, month } = getTargetYearMonth();
-                const cached = getFromCache('report', year, month);
+                cached = getFromCache('report', year, month);
 
                 if (cached) {
                     applyReportData(cached);
@@ -165,14 +180,17 @@ export function useYuntaekReport() {
                     setLoading(false);
                 }
 
-                const data = await getYuntaekReport();
+                const data = await getYuntaekReport(year, month);
                 applyReportData(data);
 
                 saveToCache('report', data);
                 setFromCache(false);
+                setError(null);
             } catch (err) {
                 console.error('리포트 로딩 오류:', err);
-                setError(err.response?.data?.error || err.message || '리포트를 불러오는데 실패했습니다.');
+                if (!cached) {
+                    setError(err.response?.data?.error || err.message || '리포트를 불러오는데 실패했습니다.');
+                }
             } finally {
                 setLoading(false);
             }

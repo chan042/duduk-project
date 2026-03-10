@@ -11,16 +11,19 @@
 - 성장 소비: 10점 (AI 분석)
 """
 
-from datetime import date, datetime
-from decimal import Decimal
+from datetime import date
 import statistics
 
-from django.db.models import Sum, Count
-from django.utils import timezone
+from django.db.models import Sum
 
-from apps.transactions.models import Transaction, MonthlyLog
+from apps.transactions.models import Transaction
 from apps.challenges.models import UserChallenge
-from external.gemini.client import GeminiClient
+from external.ai.client import AIClient
+from .services import get_month_date_range, get_monthly_budget_snapshot, get_previous_month
+
+
+class YuntaekScoreAnalysisError(Exception):
+    """윤택지수 AI 분석 실패."""
 
 
 class YuntaekScoreCalculator:
@@ -53,14 +56,14 @@ class YuntaekScoreCalculator:
         # 캐싱
         self._date_range = None
         self._monthly_budget = None
-        self._gemini_client = None
+        self._ai_client = None
 
     @property
-    def gemini_client(self):
-        """GeminiClient lazy initialization — AI 분석 메서드에서 공유"""
-        if self._gemini_client is None:
-            self._gemini_client = GeminiClient(purpose="analysis")
-        return self._gemini_client
+    def ai_client(self):
+        """AIClient lazy initialization — AI 분석 메서드에서 공유"""
+        if self._ai_client is None:
+            self._ai_client = AIClient(purpose="analysis")
+        return self._ai_client
         
     def calculate(self) -> dict:
         """윤택지수 전체 계산"""
@@ -257,10 +260,12 @@ class YuntaekScoreCalculator:
         
         client.py에서 사용자의 거래 내역을 분석하여 건강 점수 반환
         """
-        health_score = self.gemini_client.analyze_health_score(self.user.id, self.year, self.month)
+        health_score = self.ai_client.analyze_health_score(self.user.id, self.year, self.month)
+        if health_score is None:
+            raise YuntaekScoreAnalysisError('건강 점수 AI 분석에 실패했습니다.')
         
         # AI가 반환한 점수를 최대값으로 제한
-        score = min(int(health_score or 0), self.MAX_HEALTH_SCORE)
+        score = min(int(health_score), self.MAX_HEALTH_SCORE)
         
         return int(score)
     
@@ -275,19 +280,20 @@ class YuntaekScoreCalculator:
         - 오히려 증가 시: 0점
         """
         # 이번 달 누수 지출액
-        current_leakage = self.gemini_client.analyze_leakage_spending(self.user.id, self.year, self.month) or 0
+        current_leakage = self.ai_client.analyze_leakage_spending(self.user.id, self.year, self.month)
+        if current_leakage is None:
+            raise YuntaekScoreAnalysisError('누수 지출 분석에 실패했습니다.')
 
         # 지난 달 누수 지출액
-        if self.month == 1:
-            prev_year, prev_month = self.year - 1, 12
-        else:
-            prev_year, prev_month = self.year, self.month - 1
+        prev_year, prev_month = get_previous_month(self.year, self.month)
 
-        prev_leakage = self.gemini_client.analyze_leakage_spending(self.user.id, prev_year, prev_month) or 0
+        prev_leakage = self.ai_client.analyze_leakage_spending(self.user.id, prev_year, prev_month)
+        if prev_leakage is None:
+            raise YuntaekScoreAnalysisError('전월 누수 지출 분석에 실패했습니다.')
         
         # 점수 계산
         if prev_leakage == 0:
-            score = self.MAX_LEAKAGE_IMPROVEMENT_SCORE
+            score = self.MAX_LEAKAGE_IMPROVEMENT_SCORE if current_leakage == 0 else 0
         else:
             improvement_rate = 1 - (current_leakage / prev_leakage)
             
@@ -322,7 +328,9 @@ class YuntaekScoreCalculator:
         if total_spent == 0:
             return 0
         
-        growth_amount = self.gemini_client.analyze_growth_spending(self.user.id, self.year, self.month) or 0
+        growth_amount = self.ai_client.analyze_growth_spending(self.user.id, self.year, self.month)
+        if growth_amount is None:
+            raise YuntaekScoreAnalysisError('성장 소비 분석에 실패했습니다.')
         
         # 권장 금액: 월 총 지출의 7%
         recommended_amount = total_spent * 0.07
@@ -340,33 +348,16 @@ class YuntaekScoreCalculator:
         """해당 월의 예산 가져오기"""
         if self._monthly_budget is not None:
             return self._monthly_budget
-            
-        monthly_log = MonthlyLog.objects.filter(
-            user=self.user,
-            year=self.year,
-            month=self.month
-        ).values_list('monthly_budget', flat=True).first()
-        
-        if monthly_log:
-            self._monthly_budget = Decimal(monthly_log)
-        else:
-            self._monthly_budget = self.user.monthly_budget or Decimal(0)
-            
+
+        self._monthly_budget = get_monthly_budget_snapshot(self.user, self.year, self.month)
         return self._monthly_budget
     
     def _get_month_date_range(self) -> tuple:
         """해당 월의 시작일과 종료일 반환"""
         if self._date_range is not None:
             return self._date_range
-            
-        start_date = timezone.make_aware(datetime(self.year, self.month, 1))
-        
-        if self.month == 12:
-            end_date = timezone.make_aware(datetime(self.year + 1, 1, 1))
-        else:
-            end_date = timezone.make_aware(datetime(self.year, self.month + 1, 1))
-        
-        self._date_range = (start_date, end_date)
+
+        self._date_range = get_month_date_range(self.year, self.month)
         return self._date_range
 
 

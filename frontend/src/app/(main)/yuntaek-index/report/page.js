@@ -19,7 +19,7 @@ export default function YuntaekReportPage() {
         window.print();
     }
 
-    if (error) {
+    if (error && !reportData) {
         return <p style={{ color: '#F04452', textAlign: 'center', marginTop: '2rem' }}>{error}</p>;
     }
 

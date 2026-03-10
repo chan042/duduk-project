@@ -190,6 +190,48 @@ export default function CoachingDetailPopup({ isOpen, onClose, data, onStartChal
                                 {data.analysis || "분석 내용이 없습니다."}
                             </p>
                         </div>
+
+                        {Array.isArray(data.sources) && data.sources.length > 0 && (
+                            <div style={{
+                                backgroundColor: '#fff7ed',
+                                borderRadius: '20px',
+                                padding: '1.25rem 1.5rem',
+                                border: '1px solid #fed7aa'
+                            }}>
+                                <h4 style={{
+                                    fontSize: '0.95rem',
+                                    fontWeight: '700',
+                                    color: '#9a3412',
+                                    margin: '0 0 0.85rem 0',
+                                    letterSpacing: '-0.02em'
+                                }}>
+                                    검색 출처
+                                </h4>
+                                <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.6rem'
+                                }}>
+                                    {data.sources.map((source, index) => (
+                                        <a
+                                            key={`${source.url}-${index}`}
+                                            href={source.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{
+                                                color: '#c2410c',
+                                                textDecoration: 'none',
+                                                fontSize: '0.92rem',
+                                                lineHeight: '1.5',
+                                                wordBreak: 'break-all'
+                                            }}
+                                        >
+                                            {source.title || source.url}
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 

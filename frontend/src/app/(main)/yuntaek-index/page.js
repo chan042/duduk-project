@@ -14,11 +14,12 @@ export default function YuntaekIndexPage() {
 
     // 캐시에서 데이터를 가져온 경우 로딩 표시 안 함
     const loading = (scoreLoading || reportLoading) && !(scoreFromCache || reportFromCache);
-    const error = scoreError || reportError;
     const isNewUser = scoreNewUser || reportNewUser;
+    const fatalError = scoreError && !scoreData && !isNewUser;
+    const summaryText = reportSummary || (reportError ? '리포트를 아직 불러오지 못했습니다. 잠시 후 다시 시도해주세요.' : '');
 
-    if (error) {
-        return <p style={{ color: '#ef4444', textAlign: 'center', marginTop: '2rem' }}>{error}</p>;
+    if (fatalError) {
+        return <p style={{ color: '#ef4444', textAlign: 'center', marginTop: '2rem' }}>{scoreError}</p>;
     }
 
     return (
@@ -34,10 +35,11 @@ export default function YuntaekIndexPage() {
             />
 
             <ReportSummary
-                summary={reportSummary}
+                summary={summaryText}
                 year={scoreData?.year}
                 month={scoreData?.month}
                 isNewUser={isNewUser}
+                canViewMore={!reportError && Boolean(reportSummary)}
                 onViewMore={() => router.push('/yuntaek-index/report')}
             />
         </div>

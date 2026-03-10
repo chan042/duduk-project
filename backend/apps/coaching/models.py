@@ -6,11 +6,12 @@ class Coaching(models.Model):
     AI가 생성한 코칭 카드 데이터
     """
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='coachings')
-    title = models.CharField(max_length=100, default="소비 코칭") # 코칭 제목 (분석 요약)
-    subject = models.CharField(max_length=50) # 주제: 행동 변화 제안, 누수 소비, 위치 기반 대안, 키워드 기반 대안
-    analysis = models.TextField() # 소비 분석
-    coaching_content = models.TextField() # 코칭 내용
-    estimated_savings = models.IntegerField(default=0) # 예상 절약액
+    title = models.CharField(max_length=100, default="소비 코칭")  # 코칭 제목 (분석 요약)
+    subject = models.CharField(max_length=50)  # 주제: 행동 변화 제안, 누수 소비, 위치 기반 대안, 키워드 기반 대안
+    analysis = models.TextField()  # 소비 분석
+    coaching_content = models.TextField()  # 코칭 내용
+    estimated_savings = models.IntegerField(default=0)  # 예상 절약액
+    sources = models.JSONField(default=list, blank=True)  # 웹 검색 출처
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

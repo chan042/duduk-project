@@ -2,7 +2,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from apps.transactions.models import Transaction
 from apps.coaching.models import Coaching
-from external.gemini.client import GeminiClient
+from external.ai.client import AIClient
 
 @receiver(post_save, sender=Transaction)
 def generate_coaching_if_needed(sender, instance, created, **kwargs):
@@ -32,7 +32,7 @@ def generate_coaching_if_needed(sender, instance, created, **kwargs):
             for t in context_transactions:
                 transaction_list_str += f"- {t.date.strftime('%Y-%m-%d')} {t.category} / {t.item} ({t.store}) / {t.amount}원\n"
 
-            client = GeminiClient(purpose="coaching")
+            client = AIClient(purpose="coaching")
             advice_data = client.get_advice(transaction_list_str)
             
             if advice_data:
@@ -42,7 +42,8 @@ def generate_coaching_if_needed(sender, instance, created, **kwargs):
                     title=advice_data.get('title', '소비 코칭'),
                     analysis=advice_data.get('analysis', ''),
                     coaching_content=advice_data.get('coaching_content', ''),
-                    estimated_savings=advice_data.get('estimated_savings', 0)
+                    estimated_savings=advice_data.get('estimated_savings', 0),
+                    sources=advice_data.get('sources', []),
                 )
                 
                 # 알림 생성

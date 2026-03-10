@@ -2,7 +2,7 @@
 
 import NewUserGuide from './NewUserGuide';
 
-export default function ReportSummary({ summary, year, month, isNewUser, onViewMore }) {
+export default function ReportSummary({ summary, year, month, isNewUser, canViewMore = false, onViewMore }) {
     return (
         <section className="rainbow-border fade-in" style={{ ...styles.reportSection, animationDelay: '0.5s' }}>
             <div style={styles.reportHeader}>
@@ -22,7 +22,7 @@ export default function ReportSummary({ summary, year, month, isNewUser, onViewM
             </div>
 
             {/* 신규 사용자가 아닌 경우에만 더보기 버튼 표시 */}
-            {!isNewUser && summary && (
+            {!isNewUser && canViewMore && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                     <button
                         onClick={onViewMore}

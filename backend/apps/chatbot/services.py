@@ -5,19 +5,15 @@
 - Gemini API를 호출하여 개인화된 소비 코칭 응답을 생성합니다.
 - 대화 이력을 ChatMessage 모델에 저장합니다.
 """
-import json
 import logging
-import os
-from pathlib import Path
 from typing import Optional
 
-import google.generativeai as genai
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 # 프롬프트 설정 파일 로드
-from external.gemini.client import DUDU_PROMPT_CONFIG
+from external.ai.client import AIClient, DUDU_PROMPT_CONFIG
 
 
 class DuduChatService:
@@ -28,13 +24,7 @@ class DuduChatService:
     """
 
     def __init__(self):
-        api_key = os.environ.get("GEMINI_API_KEY_COACHING")
-        if api_key:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel("gemini-2.5-flash-lite")
-        else:
-            self.model = None
-            logger.warning("GEMINI_API_KEY_COACHING 환경변수가 설정되지 않았습니다.")
+        self.ai_client = AIClient(purpose="coaching")
 
     # ------------------------------------------------------------------ #
     # 컨텍스트 수집
@@ -229,38 +219,34 @@ class DuduChatService:
         )
         history = list(reversed(history_qs))  # 오래된 순으로
 
-        history_text = ""
-        for msg in history:
-            speaker = "사용자" if msg.role == "user" else "두두"
-            history_text += f"{speaker}: {msg.content}\n"
+        history_messages = [
+            {
+                "role": msg.role,
+                "content": msg.content,
+            }
+            for msg in history
+        ]
 
-        # 5) 최종 프롬프트 조합
-        full_prompt = (
-            f"{system_prompt}\n\n"
-            f"[이전 대화]\n{history_text}\n"
-            f"사용자: {user_message_content}\n"
-            f"두두:"
-        )
-
-        # 6) Gemini 호출
-        if not self.model:
+        # 5) Gemini 호출
+        if not self.ai_client.client:
             assistant_content = "죄송해요, 지금 AI 서비스에 일시적인 문제가 생겼어요. 잠시 후 다시 시도해주세요. 😅"
         else:
-            try:
-                response = self.model.generate_content(full_prompt)
-                assistant_content = response.text.strip()
-            except Exception as e:
-                logger.error(f"Gemini 채팅 응답 생성 오류: {e}", exc_info=True)
+            assistant_content = self.ai_client.generate_chat_reply(
+                system_prompt=system_prompt,
+                history=history_messages,
+                user_message_content=user_message_content,
+            )
+            if not assistant_content:
                 assistant_content = "죄송해요, 잠시 연결이 불안정해요. 조금 뒤에 다시 말씀해주세요. 🙏"
 
-        # 7) AI 응답 저장
+        # 6) AI 응답 저장
         assistant_msg = ChatMessage.objects.create(
             session=session,
             role="assistant",
             content=assistant_content,
         )
 
-        # 8) 세션 updated_at 갱신
+        # 7) 세션 updated_at 갱신
         session.save(update_fields=["updated_at"])
 
         return user_msg, assistant_msg

@@ -25,7 +25,7 @@ from .serializers import (
     CoachingChallengeGenerateSerializer, CoachingChallengePreviewSerializer, CoachingChallengeStartSerializer,
     _get_template_availability
 )
-from external.gemini.client import GeminiClient
+from external.ai.client import AIClient
 
 
 def _get_template_queryset_for_user(user, tab=None):
@@ -203,8 +203,8 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
         user_spending_summary = self._get_user_spending_summary(request.user)
 
         # Gemini로 챌린지 생성
-        gemini_client = GeminiClient(purpose="coaching")
-        generated_challenge = gemini_client.generate_challenge(
+        ai_client = AIClient(purpose="coaching")
+        generated_challenge = ai_client.generate_challenge(
             details=details,
             difficulty=difficulty,
             user_spending_summary=user_spending_summary
@@ -307,8 +307,8 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
         }
 
         # Gemini로 챌린지 생성
-        gemini_client = GeminiClient(purpose="coaching")
-        generated_challenge = gemini_client.generate_challenge_from_coaching(
+        ai_client = AIClient(purpose="coaching")
+        generated_challenge = ai_client.generate_challenge_from_coaching(
             coaching_data=coaching_data,
             difficulty=difficulty
         )

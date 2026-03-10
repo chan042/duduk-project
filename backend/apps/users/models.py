@@ -95,9 +95,23 @@ class MonthlyReport(models.Model):
     AI 월간 분석 리포트 캐싱 모델.
     사용자별, 연월별로 하나의 리포트만 저장됩니다.
     """
+    class ScoreStatus(models.TextChoices):
+        PENDING = 'PENDING', '대기'
+        READY = 'READY', '완료'
+        FAILED = 'FAILED', '실패'
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='monthly_reports')
     year = models.IntegerField(verbose_name='연도')
     month = models.IntegerField(verbose_name='월')
+    score_snapshot = models.JSONField(verbose_name='윤택지수 스냅샷', default=dict, blank=True)
+    score_generated_at = models.DateTimeField(null=True, blank=True, verbose_name='점수 생성일시')
+    score_status = models.CharField(
+        max_length=20,
+        choices=ScoreStatus.choices,
+        default=ScoreStatus.PENDING,
+        verbose_name='점수 상태',
+    )
+    score_error = models.TextField(blank=True, default='', verbose_name='점수 생성 오류')
     report_content = models.JSONField(verbose_name='리포트 내용', default=dict)
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='생성일시')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='수정일시')
