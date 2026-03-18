@@ -7,6 +7,7 @@ import { regenerateYuntaekData } from '@/lib/api/yuntaek';
 import YuntaekScoreCard from '@/components/yuntaek/YuntaekScoreCard';
 import ReportSummary from '@/components/yuntaek/ReportSummary';
 import LoadingOverlay from '@/components/common/LoadingOverlay';
+import { Swords } from 'lucide-react';
 
 
 export default function YuntaekIndexPage() {
@@ -97,6 +98,16 @@ export default function YuntaekIndexPage() {
                 canViewMore={!reportError && Boolean(reportSummary)}
                 onViewMore={() => router.push('/yuntaek-index/report')}
             />
+
+            {/* 윤택지수 대결하기 플로팅 버튼 */}
+            <button
+                className="floating-battle-btn"
+                onClick={() => router.push('/challenge-battle/search')}
+                style={styles.floatingBattleButton}
+            >
+                <Swords size={20} />
+                <span>윤택지수 대결하기</span>
+            </button>
         </div>
     );
 }
@@ -141,4 +152,27 @@ const styles = {
         margin: '0 0 1rem',
         textAlign: 'center',
     },
+    floatingBattleButton: {
+        position: 'fixed',
+        bottom: 'calc(84px + env(safe-area-inset-bottom, 0px) + 8px)',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+        padding: '12px 24px',
+        borderRadius: '9999px',
+        background: 'rgba(255, 255, 255, 0.3)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        border: '1px solid rgba(255, 255, 255, 0.25)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
+        color: 'var(--primary)',
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        cursor: 'pointer',
+        zIndex: 100,
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+    }
 };

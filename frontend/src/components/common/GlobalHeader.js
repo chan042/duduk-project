@@ -52,7 +52,49 @@ export default function GlobalHeader() {
             };
         }
 
+        if (pathname === '/challenge-battle/search') {
+            return {
+                title: ' ',
+                left: (
+                    <button onClick={() => router.push('/yuntaek-index')} style={styles.backButton}>
+                        <ChevronLeft size={24} />
+                    </button>
+                )
+            };
+        }
 
+        if (pathname === '/challenge-battle/progress') {
+            return {
+                title: ' ',
+                left: (
+                    <button onClick={() => router.push('/yuntaek-index')} style={styles.backButton}>
+                        <ChevronLeft size={24} />
+                    </button>
+                )
+            };
+        }
+
+        if (pathname === '/challenge-battle/result') {
+            return {
+                title: '대결 결과',
+                left: (
+                    <button onClick={() => router.push('/yuntaek-index')} style={styles.backButton}>
+                        <ChevronLeft size={24} />
+                    </button>
+                )
+            };
+        }
+
+        if (pathname === '/challenge-battle/result2') {
+            return {
+                title: '대결 결과',
+                left: (
+                    <button onClick={() => router.push('/yuntaek-index')} style={styles.backButton}>
+                        <ChevronLeft size={24} />
+                    </button>
+                )
+            };
+        }
 
         return null;
     };
