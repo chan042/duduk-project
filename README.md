@@ -1,4 +1,4 @@
-# 💰 Duduk (두둑) - AI 소비 코칭 서비스
+# Duduk (두둑) - 초개인화 AI 소비 코칭 서비스
 
 <div align="center">
 
