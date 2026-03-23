@@ -8,79 +8,24 @@ import { useState, useRef, useEffect } from 'react';
 import { X, Camera, Image, ChevronDown, Star, Calendar, CheckCircle, Sparkles } from 'lucide-react';
 import { CATEGORIES, getCategoryIcon, CATEGORY_COLORS } from '../common/CategoryIcons';
 import { useChallenge } from './useChallenge';
-import { getDifficultyLabel, getDifficultyStyle } from '@/lib/challengeUtils';
+import {
+    getChallengeDdayLabel,
+    getChallengeStartDayIndex,
+    getDifficultyLabel,
+    getDifficultyStyle,
+    getOrderedWeekDays,
+    isTodayByOffset,
+    normalizeDailyRules,
+    WEEK_DAYS,
+} from '@/lib/challengeUtils';
 import { previewTemplateInput } from '@/lib/api/challenge';
 
-const WEEK_DAYS = [
-    { key: 'sun', label: 'SUN', index: 0, shortLabel: '일' },
-    { key: 'mon', label: 'MON', index: 1, shortLabel: '월' },
-    { key: 'tue', label: 'TUE', index: 2, shortLabel: '화' },
-    { key: 'wed', label: 'WED', index: 3, shortLabel: '수' },
-    { key: 'thu', label: 'THU', index: 4, shortLabel: '목' },
-    { key: 'fri', label: 'FRI', index: 5, shortLabel: '금' },
-    { key: 'sat', label: 'SAT', index: 6, shortLabel: '토' },
-];
-
 const FORBIDDEN_INPUT_KEYS = WEEK_DAYS.map((day) => `${day.key}_forbidden`);
-
-const normalizeWeekdayKey = (rawKey) => {
-    const key = String(rawKey || '').trim().toLowerCase();
-
-    if (key.includes('sun') || key === '일') return 'sun';
-    if (key.includes('mon') || key === '월') return 'mon';
-    if (key.includes('tue') || key === '화') return 'tue';
-    if (key.includes('wed') || key === '수') return 'wed';
-    if (key.includes('thu') || key === '목') return 'thu';
-    if (key.includes('fri') || key === '금') return 'fri';
-    if (key.includes('sat') || key === '토') return 'sat';
-
-    return null;
-};
-
-const normalizeDailyRules = (dailyRules) => {
-    const normalized = {};
-
-    Object.entries(dailyRules || {}).forEach(([day, category]) => {
-        const dayKey = normalizeWeekdayKey(day);
-        if (dayKey) {
-            normalized[dayKey] = category;
-        }
-    });
-
-    return normalized;
-};
-
-const getChallengeStartDayIndex = (challenge, fallbackDayIndex = 1) => {
-    const startedAt = challenge?.startedAt;
-    if (!startedAt) return fallbackDayIndex;
-
-    const parsed = new Date(startedAt);
-    if (Number.isNaN(parsed.getTime())) return fallbackDayIndex;
-    return parsed.getDay();
-};
-
-const getOrderedWeekDays = (startDayIndex) => {
-    const startIndex = WEEK_DAYS.findIndex((day) => day.index === startDayIndex);
-    if (startIndex < 0) return WEEK_DAYS;
-    return [...WEEK_DAYS.slice(startIndex), ...WEEK_DAYS.slice(0, startIndex)];
-};
 
 const isCategoryInput = (input) => {
     const key = String(input?.key || '').toLowerCase();
     const label = String(input?.label || '').toLowerCase();
     return key.includes('category') || label.includes('카테고리') || label.includes('category');
-};
-
-/**
- * 챌린지 시작일로부터 dayOffset번째 날이 오늘인지 반환
- */
-const isTodayByOffset = (startedAt, dayOffset, todayDateString) => {
-    if (!startedAt || !todayDateString) return false;
-    const start = new Date(startedAt);
-    if (isNaN(start.getTime())) return false;
-    const d = new Date(start);
-    d.setDate(d.getDate() + dayOffset);
-    return d.toDateString() === todayDateString;
 };
 
 
@@ -239,13 +184,6 @@ export default function ChallengeDetailModal({
         }
     };
 
-    // 남은 일수 계산
-    const getDaysLeft = () => {
-        if (challenge.daysLeft !== undefined) return challenge.daysLeft;
-        if (challenge.remainingDays !== undefined) return challenge.remainingDays;
-        return challenge.durationDays || challenge.duration || 7;
-    };
-
     // 진행률 퍼센트
     const getProgressPercent = () => {
         if (progressData.percentage !== undefined) return Math.round(progressData.percentage);
@@ -355,7 +293,9 @@ export default function ChallengeDetailModal({
                                 <div style={styles.statTextBox}>
                                     <span style={styles.statLabel}>기간</span>
                                     <span style={{ ...styles.statValue, color: 'var(--primary)' }}>
-                                        {isActive ? `D-${getDaysLeft()}` : `${String(challenge.duration || 7).replace('일', '')}일`}
+                                        {isActive
+                                            ? getChallengeDdayLabel(challenge)
+                                            : `${String(challenge.duration || 7).replace('일', '')}일`}
                                     </span>
                                 </div>
                             </div>

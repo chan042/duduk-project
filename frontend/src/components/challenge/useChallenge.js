@@ -12,8 +12,9 @@ import { getProgressPercent, getProgressData, getProgressText } from '@/lib/chal
  * @param {boolean} isOngoing
  */
 export const useChallenge = (challenge, isOngoing = false) => {
-    const progressPercent = getProgressPercent(challenge?.progress);
-    const progressData = getProgressData(challenge?.progress || challenge?.progressData);
+    const progress = challenge?.progress;
+    const progressPercent = getProgressPercent(progress);
+    const progressData = getProgressData(progress);
 
     const isActive = challenge?.status === 'active';
     const isFailed = challenge?.status === 'failed' || !!challenge?.failedDate;
@@ -53,10 +54,7 @@ export const useChallenge = (challenge, isOngoing = false) => {
      * 진행률 텍스트 반환
      */
     const getProgressDisplayText = () => {
-        return getProgressText(
-            challenge?.progressData || challenge?.progress,
-            challenge?.durationDays
-        );
+        return getProgressText(progress, challenge?.durationDays);
     };
 
     /**

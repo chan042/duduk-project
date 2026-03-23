@@ -320,8 +320,7 @@ export default function ChallengePage() {
                 if (!prev) return prev;
                 return {
                     ...prev,
-                    progressData: result.progress,
-                    progress: result.progress?.percentage ?? prev.progress,
+                    progress: result.progress || prev.progress,
                 };
             });
             alert(result?.verification?.reason_message || '사진 인증이 완료되었습니다.');

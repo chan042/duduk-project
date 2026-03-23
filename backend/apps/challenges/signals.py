@@ -33,6 +33,13 @@ from .services.failure_reason import (
     reason_daily_rule_violation,
     reason_random_budget_exceeded,
 )
+from .services.finalization import refresh_user_challenge_states
+from .services.lifecycle import (
+    get_challenge_end_date,
+    get_challenge_start_date,
+    is_challenge_expired,
+    resolve_reference_date,
+)
 
 
 def _contains_convenience_store_keyword(text: str) -> bool:
@@ -52,11 +59,12 @@ def _iter_elapsed_dates(user_challenge):
     """
     챌린지 시작일부터 현재(또는 종료일)까지의 날짜를 순회.
     """
-    if not user_challenge.started_at:
+    start_date = get_challenge_start_date(user_challenge)
+    if not start_date:
         return []
-    start_date = user_challenge.started_at.date()
-    today = timezone.now().date()
-    end_bound = user_challenge.ends_at.date() if user_challenge.ends_at else today
+
+    today = resolve_reference_date(timezone.now())
+    end_bound = get_challenge_end_date(user_challenge) or today
     end_date = min(today, end_bound)
     if end_date < start_date:
         return []
@@ -122,12 +130,7 @@ def update_challenge_progress_on_transaction(sender, instance, created, **kwargs
     store = instance.store
     transaction_date = instance.date.date() if hasattr(instance.date, 'date') else instance.date
 
-    # started_at이 지난 'ready' 챌린지 자동 활성화
-    UserChallenge.objects.filter(
-        user=user,
-        status='ready',
-        started_at__date__lte=transaction_date
-    ).update(status='active')
+    refresh_user_challenge_states(user, reference=transaction_date)
 
     # 진행 중인 챌린지 조회
     active_challenges = UserChallenge.objects.filter(
@@ -329,9 +332,9 @@ def _build_future_compare_progress(user_challenge, success_conditions):
     - 다음 달: 다음 달/이번 달(기준) 비교 표시
     """
     target_category = user_challenge.user_input_values.get('target_category', '')
-    now = timezone.now().date()
-    started_at = user_challenge.started_at or timezone.now()
-    start_year, start_month = started_at.year, started_at.month
+    now = timezone.localdate()
+    start_date = get_challenge_start_date(user_challenge) or now
+    start_year, start_month = start_date.year, start_date.month
     next_year, next_month = _next_month(start_year, start_month)
 
     start_month_start, start_month_end = _month_bounds(start_year, start_month)
@@ -495,10 +498,10 @@ def _check_auto_judgement(user_challenge, transaction_date=None, category=None, 
     progress = user_challenge.progress or {}
     success_conditions = user_challenge.success_conditions or {}
 
-    now = timezone.now()
+    today = resolve_reference_date(transaction_date or timezone.now())
 
     # 기한 만료 확인
-    if now >= user_challenge.ends_at:
+    if is_challenge_expired(user_challenge, today):
         is_success = _evaluate_success(user_challenge, progress, success_conditions)
         final_spent = progress.get('current', 0)
         failure_reason = None if is_success else infer_failure_reason(user_challenge, final_spent=final_spent)
@@ -692,7 +695,9 @@ IMMEDIATE_FAILURE_HANDLERS = {
 
 def _check_photo_missing_failure(user_challenge, current_date):
     """현금 챌린지: 전날까지 사진 미인증 체크"""
-    start_date = user_challenge.started_at.date()
+    start_date = get_challenge_start_date(user_challenge)
+    if not start_date:
+        return
     yesterday = current_date - timedelta(days=1)
 
     if yesterday >= start_date:
@@ -716,7 +721,9 @@ def _check_one_plus_one_failure(user_challenge, transaction_date):
         return
 
     # 전날까지의 편의점 지출에 대해 사진 인증 확인
-    start_date = user_challenge.started_at.date()
+    start_date = get_challenge_start_date(user_challenge)
+    if not start_date:
+        return
     yesterday = transaction_date - timedelta(days=1)
 
     if yesterday >= start_date:
@@ -864,8 +871,10 @@ def _evaluate_success(user_challenge, progress, success_conditions):
                 return False
 
         # 모든 날 사진 인증 확인
-        start_date = user_challenge.started_at.date()
-        end_date = user_challenge.ends_at.date()
+        start_date = get_challenge_start_date(user_challenge)
+        end_date = get_challenge_end_date(user_challenge)
+        if not start_date or not end_date:
+            return False
         from datetime import timedelta
         date_iter = start_date
         while date_iter <= end_date:

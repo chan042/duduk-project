@@ -12,8 +12,8 @@ from datetime import timedelta, date, datetime, time
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from apps.challenges.models import UserChallenge, ChallengeDailyLog
-from apps.challenges.signals import _update_challenge_progress, _evaluate_success
+from apps.challenges.models import UserChallenge
+from apps.challenges.signals import _update_challenge_progress
 from apps.challenges.constants import (
     CONVENIENCE_STORE_KEYWORDS,
     CONDITION_TYPE_DAILY_CHECK,
@@ -22,15 +22,17 @@ from apps.challenges.constants import (
     COMPARE_TYPE_NEXT_MONTH_CATEGORY,
 )
 from apps.challenges.services.failure_reason import (
-    infer_failure_reason,
     reason_daily_check_missing,
     reason_photo_not_verified_yesterday,
     reason_one_plus_one_photo_missing,
 )
 from apps.challenges.services.daily_check_sync import (
+    ensure_daily_check_logs,
     sync_daily_check_logs_from_confirmations,
     is_no_spending_confirmed,
 )
+from apps.challenges.services.finalization import finalize_expired_challenge
+from apps.challenges.services.lifecycle import get_challenge_end_date, get_challenge_start_date
 from apps.notifications.services import create_challenge_notification
 
 
@@ -82,9 +84,9 @@ class Command(BaseCommand):
             )
         else:
             now = timezone.now()
-            today = now.date()
+            today = timezone.localdate()
 
-        yesterday = (now - timedelta(days=1)).date()
+        yesterday = today - timedelta(days=1)
 
         self.stdout.write(f"일일 챌린지 체크 시작: {now} (dry_run={dry_run})")
         self.stdout.write(f"판정 기준일(today): {today}, 체크 대상 날짜(일일 실패): {yesterday}")
@@ -102,20 +104,23 @@ class Command(BaseCommand):
             success_conditions = uc.success_conditions or {}
             if success_conditions.get("type") == CONDITION_TYPE_DAILY_CHECK:
                 if not dry_run:
-                    self._ensure_daily_logs(uc, today)
-                    start_date = uc.started_at.date()
-                    end_date = min(today, uc.ends_at.date() if uc.ends_at else today)
+                    start_date = get_challenge_start_date(uc)
+                    end_date = min(today, get_challenge_end_date(uc) or today)
+                    if not start_date:
+                        continue
+                    ensure_daily_check_logs(uc, end_date)
                     sync_daily_check_logs_from_confirmations(uc, start_date, end_date)
 
             # 1) 거래가 없던 날도 progress가 갱신되도록 일괄 업데이트
-            if uc.started_at.date() <= today and not dry_run:
+            start_date = get_challenge_start_date(uc)
+            if start_date and start_date <= today and not dry_run:
                 _update_challenge_progress(uc)
 
             if uc.status != "active":
                 continue
 
             # 2) 전일 미입력/미인증 실패 조건 체크
-            if uc.started_at.date() <= yesterday:
+            if start_date and start_date <= yesterday:
                 success_conditions = uc.success_conditions or {}
                 condition_type = success_conditions.get("type", "")
 
@@ -148,14 +153,7 @@ class Command(BaseCommand):
                 self._send_future_message_notification(uc, today)
 
             # 4) 종료 시점 자동 판정
-            if uc.ends_at and now >= uc.ends_at and uc.status == "active":
-                progress = uc.progress or {}
-                success_conditions = uc.success_conditions or {}
-                is_success = _evaluate_success(uc, progress, success_conditions)
-                if not dry_run:
-                    final_spent = progress.get("current", 0)
-                    failure_reason = None if is_success else infer_failure_reason(uc, final_spent=final_spent)
-                    uc.complete_challenge(is_success, final_spent, failure_reason=failure_reason)
+            if finalize_expired_challenge(uc, reference=today, dry_run=dry_run):
                 finalized_count += 1
 
         self.stdout.write(
@@ -169,7 +167,9 @@ class Command(BaseCommand):
         미라클 두둑:
         - 전날 지출 입력(거래 발생) 또는 무지출 체크가 없으면 실패
         """
-        start_date = user_challenge.started_at.date()
+        start_date = get_challenge_start_date(user_challenge)
+        if not start_date:
+            return False
         if check_date < start_date:
             return False
 
@@ -189,45 +189,13 @@ class Command(BaseCommand):
 
         return False
 
-    def _ensure_daily_logs(self, user_challenge, today):
-        """
-        daily_check용 누락 로그 생성:
-        시작일부터 오늘까지 로그가 없으면 빈 로그 생성
-        """
-        start_date = user_challenge.started_at.date()
-        end_date = min(today, user_challenge.ends_at.date() if user_challenge.ends_at else today)
-        if end_date < start_date:
-            return
-
-        existing_dates = set(
-            user_challenge.daily_logs.filter(log_date__gte=start_date, log_date__lte=end_date)
-            .values_list("log_date", flat=True)
-        )
-
-        to_create = []
-        cursor = start_date
-        while cursor <= end_date:
-            if cursor not in existing_dates:
-                to_create.append(
-                    ChallengeDailyLog(
-                        user_challenge=user_challenge,
-                        log_date=cursor,
-                        spent_amount=0,
-                        transaction_count=0,
-                        spent_by_category={},
-                        is_checked=False,
-                    )
-                )
-            cursor += timedelta(days=1)
-
-        if to_create:
-            ChallengeDailyLog.objects.bulk_create(to_create)
-
     def _check_photo_missing_failure(self, user_challenge, check_date, dry_run=False):
         """
         현금 챌린지: 전날 사진 미인증 시 실패
         """
-        start_date = user_challenge.started_at.date()
+        start_date = get_challenge_start_date(user_challenge)
+        if not start_date:
+            return False
         if check_date < start_date:
             return False
 
@@ -247,7 +215,9 @@ class Command(BaseCommand):
         """
         원플원 러버: 전날 편의점 소비가 있었는데 사진 인증이 없으면 실패
         """
-        start_date = user_challenge.started_at.date()
+        start_date = get_challenge_start_date(user_challenge)
+        if not start_date:
+            return False
         if check_date < start_date:
             return False
 
@@ -279,8 +249,12 @@ class Command(BaseCommand):
         if not user_challenge.started_at:
             return
 
-        start_year = user_challenge.started_at.year
-        start_month = user_challenge.started_at.month
+        start_date = get_challenge_start_date(user_challenge)
+        if not start_date:
+            return
+
+        start_year = start_date.year
+        start_month = start_date.month
         if start_month == 12:
             target_year, target_month = start_year + 1, 1
         else:

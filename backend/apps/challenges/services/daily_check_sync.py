@@ -1,7 +1,10 @@
+from datetime import timedelta
+
 from django.utils import timezone
 
 from apps.challenges.constants import CONDITION_TYPE_DAILY_CHECK
 from apps.challenges.models import UserChallenge, ChallengeDailyLog
+from apps.challenges.services.lifecycle import get_challenge_start_date
 from apps.transactions.models import DailySpendingConfirmation
 
 
@@ -41,6 +44,42 @@ def sync_daily_check_log_with_confirmation(user, target_date, is_no_spending):
             log.is_checked = False
             log.checked_at = None
             log.save(update_fields=["is_checked", "checked_at", "updated_at"])
+
+
+def ensure_daily_check_logs(user_challenge, end_date):
+    """
+    시작일부터 end_date까지 누락된 daily_check 로그를 생성한다.
+    """
+    start_date = get_challenge_start_date(user_challenge)
+    if not start_date:
+        return
+
+    if end_date < start_date:
+        return
+
+    existing_dates = set(
+        user_challenge.daily_logs.filter(log_date__gte=start_date, log_date__lte=end_date)
+        .values_list("log_date", flat=True)
+    )
+
+    to_create = []
+    cursor = start_date
+    while cursor <= end_date:
+        if cursor not in existing_dates:
+            to_create.append(
+                ChallengeDailyLog(
+                    user_challenge=user_challenge,
+                    log_date=cursor,
+                    spent_amount=0,
+                    transaction_count=0,
+                    spent_by_category={},
+                    is_checked=False,
+                )
+            )
+        cursor += timedelta(days=1)
+
+    if to_create:
+        ChallengeDailyLog.objects.bulk_create(to_create)
 
 
 def sync_daily_check_logs_from_confirmations(user_challenge, start_date, end_date):

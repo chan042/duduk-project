@@ -6,6 +6,7 @@ from django.db.models.functions import Greatest
 from django.conf import settings
 from django.utils import timezone
 from apps.challenges.services.failure_reason import infer_failure_reason
+from apps.challenges.services.lifecycle import get_remaining_days
 from apps.challenges.services.safe_formula import FormulaEvaluationError, evaluate_formula
 
 
@@ -266,15 +267,7 @@ class UserChallenge(models.Model):
     @property
     def remaining_days(self):
         """남은 일수 계산"""
-        if self.ends_at is None:
-            return self.duration_days or 0
-        now = timezone.now()
-        if self.started_at and now < self.started_at:
-            return self.duration_days or 0
-        if now >= self.ends_at:
-            return 0
-        delta = self.ends_at - now
-        return max(0, delta.days + 1)
+        return get_remaining_days(self)
 
     def update_progress(self, progress_data):
         """진행 상황 업데이트"""

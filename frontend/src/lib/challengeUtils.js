@@ -5,6 +5,83 @@
  * - 진행률 계산
  */
 
+export const WEEK_DAYS = [
+    { key: 'sun', label: 'SUN', index: 0, shortLabel: '일' },
+    { key: 'mon', label: 'MON', index: 1, shortLabel: '월' },
+    { key: 'tue', label: 'TUE', index: 2, shortLabel: '화' },
+    { key: 'wed', label: 'WED', index: 3, shortLabel: '수' },
+    { key: 'thu', label: 'THU', index: 4, shortLabel: '목' },
+    { key: 'fri', label: 'FRI', index: 5, shortLabel: '금' },
+    { key: 'sat', label: 'SAT', index: 6, shortLabel: '토' },
+];
+
+export const normalizeWeekdayKey = (rawKey) => {
+    const key = String(rawKey || '').trim().toLowerCase();
+
+    if (key.includes('sun') || key === '일') return 'sun';
+    if (key.includes('mon') || key === '월') return 'mon';
+    if (key.includes('tue') || key === '화') return 'tue';
+    if (key.includes('wed') || key === '수') return 'wed';
+    if (key.includes('thu') || key === '목') return 'thu';
+    if (key.includes('fri') || key === '금') return 'fri';
+    if (key.includes('sat') || key === '토') return 'sat';
+
+    return null;
+};
+
+export const normalizeDailyRules = (dailyRules) => {
+    const normalized = {};
+
+    Object.entries(dailyRules || {}).forEach(([day, category]) => {
+        const dayKey = normalizeWeekdayKey(day);
+        if (dayKey) {
+            normalized[dayKey] = category;
+        }
+    });
+
+    return normalized;
+};
+
+export const getChallengeStartDayIndex = (challenge, fallbackDayIndex = 1) => {
+    const startedAt = challenge?.startedAt;
+    if (!startedAt) return fallbackDayIndex;
+
+    const parsed = new Date(startedAt);
+    if (Number.isNaN(parsed.getTime())) return fallbackDayIndex;
+    return parsed.getDay();
+};
+
+export const getOrderedWeekDays = (startDayIndex) => {
+    const startIndex = WEEK_DAYS.findIndex((day) => day.index === startDayIndex);
+    if (startIndex < 0) return WEEK_DAYS;
+    return [...WEEK_DAYS.slice(startIndex), ...WEEK_DAYS.slice(0, startIndex)];
+};
+
+export const isTodayByOffset = (startedAt, dayOffset, todayDateString) => {
+    if (!startedAt || !todayDateString) return false;
+    const start = new Date(startedAt);
+    if (Number.isNaN(start.getTime())) return false;
+    const shifted = new Date(start);
+    shifted.setDate(shifted.getDate() + dayOffset);
+    return shifted.toDateString() === todayDateString;
+};
+
+export const getChallengeDaysLeft = (challenge) => {
+    if (challenge?.daysLeft !== undefined) return challenge.daysLeft;
+    if (challenge?.remainingDays !== undefined) return challenge.remainingDays;
+    return challenge?.durationDays || challenge?.duration || 0;
+};
+
+export const getChallengeDdayLabel = (challenge) => {
+    const daysLeft = getChallengeDaysLeft(challenge);
+    if (daysLeft > 0) {
+        return `D-${daysLeft}`;
+    }
+    if (challenge?.status === 'active') {
+        return '결과 반영 중';
+    }
+    return null;
+};
 
 
 /**
@@ -155,10 +232,13 @@ export const getProgressPercent = (progress) => {
     if (!progress) return 0;
     if (typeof progress === 'number') return progress;
     if (typeof progress === 'object') {
+        if (progress.percentage !== undefined && progress.percentage !== null) {
+            return Number(progress.percentage) || 0;
+        }
         if (progress.current !== undefined && progress.target > 0) {
             return (progress.current / progress.target) * 100;
         }
-        return progress.percentage || 0;
+        return 0;
     }
     return 0;
 };
@@ -233,16 +313,21 @@ export const getProgressData = (progress) => {
             // amount, compare, random_budget
             current: progress.current,
             target: progress.target,
+            remaining: progress.remaining,
             // daily_check
             checkedDays: progress.checked_days || progress.checkedDays || 0,
             totalDays: progress.total_days || progress.totalDays || 0,
+            elapsedDays: progress.elapsed_days || progress.elapsedDays || 0,
             // daily_rule
             successDays: progress.passed_days || progress.success_days || progress.successDays || 0,
+            dailyStatus: progress.daily_status || progress.dailyStatus || [],
             // photo
             photoCount: progress.photo_count || progress.photoCount || 0,
             requiredCount: progress.required_count || progress.requiredCount || 0,
+            photos: progress.photos || [],
             // compare
             compareBase: progress.compare_base || progress.compareBase,
+            compareLabel: progress.compare_label || progress.compareLabel,
             difference: progress.difference,
             phase: progress.phase,
             thisMonthSpent: progress.this_month_spent,
@@ -254,6 +339,10 @@ export const getProgressData = (progress) => {
             upperLimit: progress.upper_limit ?? progress.upperLimit,
             // common
             isOnTrack: progress.is_on_track || progress.isOnTrack,
+            potentialPoints: progress.potential_points ?? progress.potentialPoints,
+            jackpotEligible: progress.jackpot_eligible ?? progress.jackpotEligible,
+            differencePercent: progress.difference_percent ?? progress.differencePercent,
+            maskTarget: progress.mask_target ?? progress.maskTarget,
         };
     }
     return { percentage: 0, type: null };

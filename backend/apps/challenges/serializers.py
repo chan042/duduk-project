@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from datetime import timedelta, datetime, time, date
+from datetime import timedelta, date
 from calendar import monthrange
 from django.db.models import Sum
 import random
@@ -20,6 +20,8 @@ from .constants import (
     COMPARE_TYPE_FIXED_EXPENSE,
     COMPARE_TYPE_NEXT_MONTH_CATEGORY,
 )
+from .services.lifecycle import resolve_challenge_start_at
+from .services.progress_factory import build_initial_progress_for_template
 
 
 def _get_last_month_bounds(reference_dt=None):
@@ -365,22 +367,7 @@ class UserChallengeCreateSerializer(serializers.Serializer):
         return user_challenge
 
     def _resolve_start_at(self, template, success_conditions, now=None):
-        """
-        특정 챌린지는 시작일을 강제
-        - 나와의 싸움(last_month_week): 항상 다음 월요일 시작
-        """
-        now = now or timezone.now()
-        compare_type = (success_conditions or {}).get('compare_type')
-        if compare_type != COMPARE_TYPE_LAST_MONTH_WEEK:
-            return now
-
-        weekday = now.weekday()
-        days_until_monday = (7 - weekday) % 7
-        if days_until_monday == 0:
-            return now
-        start_date = (now + timedelta(days=days_until_monday)).date()
-        start_naive = datetime.combine(start_date, time.min)
-        return timezone.make_aware(start_naive, timezone.get_current_timezone())
+        return resolve_challenge_start_at(success_conditions, now or timezone.now())
 
     def _generate_daily_rules(self, user_input_values, success_conditions):
         """무00의 날: 요일별 금지 카테고리 생성"""
@@ -415,115 +402,22 @@ class UserChallengeCreateSerializer(serializers.Serializer):
 
     def _create_initial_progress(self, template, user_input_values, success_conditions=None, reference_dt=None):
         """초기 progress 생성"""
-        display_config = template.display_config
-        progress_type = display_config.get('progress_type', 'amount')
         success_conditions = success_conditions or template.success_conditions
-        reference_dt = reference_dt or timezone.now()
+        compare_base = 0
 
-        if progress_type == 'amount':
-            target = user_input_values.get('target_amount') or \
-                     template.success_conditions.get('target_amount', 0)
-            progress = {
-                "type": "amount",
-                "current": 0,
-                "target": target,
-                "percentage": 0,
-                "is_on_track": True,
-                "remaining": target
-            }
-            if success_conditions.get('type') == CONDITION_TYPE_AMOUNT_RANGE and target:
-                tolerance_percent = success_conditions.get('tolerance_percent', 10)
-                progress['lower_limit'] = int(target * (1 - tolerance_percent / 100))
-                progress['upper_limit'] = int(target * (1 + tolerance_percent / 100))
-            return progress
-        elif progress_type == 'zero_spend':
-            return {
-                "type": "zero_spend",
-                "current": 0,
-                "target_categories": template.success_conditions.get('categories', []),
-                "is_violated": False,
-                "violation_amount": 0,
-                "is_on_track": True,
-                "elapsed_days": 0,
-                "total_days": template.duration_days,
-                "percentage": 0,
-            }
-        elif progress_type == 'daily_check':
-            return {
-                "type": "daily_check",
-                "checked_days": 0,
-                "total_days": template.duration_days,
-                "percentage": 0,
-                "daily_status": [],
-                "is_on_track": True
-            }
-        elif progress_type == 'photo':
-            mode = template.photo_frequency or 'once'
-            required_count = template.duration_days if template.photo_frequency == 'daily' else 1
-            if mode == 'on_purchase':
-                required_count = 0
-            return {
-                "type": "photo",
-                "photo_count": 0,
-                "required_count": required_count,
-                "percentage": 0,
-                "photos": [],
-                "is_on_track": True,
-                "mode": mode,
-            }
-        elif progress_type == 'compare':
-            # 비교형 챌린지
+        if (template.display_config or {}).get('progress_type', 'amount') == 'compare':
             compare_base = self._calculate_compare_base(
                 user_input_values=user_input_values,
                 success_conditions=success_conditions,
-                reference_dt=reference_dt,
+                reference_dt=reference_dt or timezone.now(),
             )
-            compare_label = success_conditions.get('compare_label', '비교 기준')
-            progress = {
-                "type": "compare",
-                "current": 0,
-                "compare_base": compare_base,
-                "target": compare_base,
-                "compare_label": compare_label,
-                "difference": 0,
-                "percentage": 0,
-                "is_on_track": True
-            }
-            if success_conditions.get('compare_type') == COMPARE_TYPE_NEXT_MONTH_CATEGORY:
-                progress.update({
-                    "phase": "this_month",
-                    "this_month_spent": compare_base,
-                    "next_month_spent": 0,
-                })
-            return progress
-        elif progress_type == 'daily_rule':
-            return {
-                "type": "daily_rule",
-                "daily_status": [],
-                "passed_days": 0,
-                "total_days": template.duration_days,
-                "is_on_track": True,
-                "has_violation": False,
-                "daily_rules": success_conditions.get('daily_rules', {}),
-                "percentage": 0,
-            }
-        elif progress_type == 'random_budget':
-            # 랜덤 예산 생성
-            random_budget = random.randint(30000, 100000)
-            return {
-                "type": "random_budget",
-                "current": 0,
-                "target": random_budget,
-                "percentage": 0,
-                "is_on_track": True,
-                "remaining": random_budget,
-                "potential_points": int(random_budget * 0.08),
-                "jackpot_eligible": False,
-                "difference_percent": 100,
-                "mask_target": True,
-            }
-        else:
-            return {"type": progress_type, "is_on_track": True}
+
+        return build_initial_progress_for_template(
+            template,
+            user_input_values=user_input_values,
+            success_conditions=success_conditions,
+            compare_base=compare_base,
+        )
 
     def _calculate_compare_base(self, user_input_values, success_conditions, reference_dt=None):
         """비교형 챌린지의 비교 기준 계산"""

@@ -51,16 +51,6 @@ const transformTemplate = (template) => ({
  * UserChallenge 응답을 프론트엔드 형식으로 변환
  */
 const transformUserChallenge = (uc) => {
-    // progress에서 percentage 추출
-    let progressPercent = 0;
-    if (uc.progress) {
-        if (typeof uc.progress === 'object') {
-            progressPercent = uc.progress.percentage || 0;
-        } else if (typeof uc.progress === 'number') {
-            progressPercent = uc.progress;
-        }
-    }
-
     return {
         id: uc.id,
         uniqueId: `uc_${uc.id}`,
@@ -71,8 +61,7 @@ const transformUserChallenge = (uc) => {
         maxPoints: uc.max_points,
         difficulty: uc.difficulty_display || uc.difficulty,
         difficultyRaw: uc.difficulty,
-        progress: progressPercent,
-        progressData: uc.progress,
+        progress: uc.progress,
         daysLeft: uc.remaining_days,
         duration: uc.remaining_days !== undefined ? `${uc.remaining_days}일` : `${uc.duration_days}일`,
         durationDays: uc.duration_days,

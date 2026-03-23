@@ -11,6 +11,7 @@ import {
     getDifficultyLabel,
     getDifficultyStyle,
     getCharacterFace,
+    getChallengeDdayLabel,
 } from '@/lib/challengeUtils';
 import { useChallenge } from './useChallenge';
 
@@ -77,6 +78,7 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClaimRewa
     };
 
     const buttonType = getButtonType();
+    const ddayLabel = getChallengeDdayLabel(challenge);
 
     return (
         <div className={isCompleted ? 'golden-glow-card' : ''} style={isCompleted ? styles.glowWrapper : {}}>
@@ -139,8 +141,8 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClaimRewa
                                         {getProgressDisplayText()}
                                     </span>
                                 )}
-                                {challenge.daysLeft !== undefined && (
-                                    <span style={styles.daysLeft}>D-{challenge.daysLeft}</span>
+                                {ddayLabel && (
+                                    <span style={styles.daysLeft}>{ddayLabel}</span>
                                 )}
                             </div>
                         )}
@@ -166,18 +168,6 @@ export default function ChallengeCard({ challenge, onStart, onRetry, onClaimRewa
                         </button>
                     </div>
                 </div>
-
-                {/* 하단 영역: 진행 바 (진행중인 챌린지만 표시) */}
-                {isActive && (
-                    <div style={styles.progressBarSection}>
-                        <div style={styles.progressBarContainer}>
-                            <div style={{
-                                ...styles.progressBarFill,
-                                width: `${Math.min(100, progressPercent)}%`
-                            }} />
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );
@@ -285,24 +275,6 @@ const styles = {
         alignItems: 'center',
         gap: '8px',
         marginTop: '4px',
-    },
-    progressBarSection: {
-        width: '100%',
-        paddingTop: '4px',
-        marginLeft: '60px',
-    },
-    progressBarContainer: {
-        width: '60%',
-        height: '6px',
-        backgroundColor: '#E5E7EB',
-        borderRadius: '3px',
-        overflow: 'hidden',
-    },
-    progressBarFill: {
-        height: '100%',
-        backgroundColor: 'var(--primary)',
-        borderRadius: '3px',
-        transition: 'width 0.3s ease',
     },
     progressText: {
         fontSize: '0.75rem',
