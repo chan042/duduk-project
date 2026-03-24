@@ -8,7 +8,7 @@
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getProfile } from '@/lib/api/auth';
+import { getProfile, loginWithGoogle as loginWithGoogleApi } from '@/lib/api/auth';
 
 // Context 생성
 const AuthContext = createContext(null);
@@ -93,20 +93,7 @@ export function AuthProvider({ children }) {
      */
     const loginWithGoogle = useCallback(async (accessToken) => {
         try {
-            const response = await fetch('http://localhost:8000/api/users/auth/google/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ access_token: accessToken }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Google 로그인 실패');
-            }
-
-            const data = await response.json();
+            const data = await loginWithGoogleApi(accessToken);
             const { access, refresh } = data;
 
             localStorage.setItem('accessToken', access);
@@ -122,6 +109,9 @@ export function AuthProvider({ children }) {
             }
         } catch (error) {
             console.error('Google 로그인 실패:', error);
+            if (error?.message === 'Network Error' || error?.name === 'TypeError') {
+                throw new Error('백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
+            }
             throw error;
         }
     }, [fetchUser, router]);

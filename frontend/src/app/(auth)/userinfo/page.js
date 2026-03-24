@@ -65,9 +65,15 @@ const questions = [
 ];
 
 export default function UserInfoPage() {
-    // 0 ~ (questions.length - 1): 질문 단계
-    // questions.length: 캐릭터 선택
-    // questions.length + 1: 캐릭터 이름 (마자막)
+    // 0: 안내 단계
+    // 1 ~ questions.length: 질문 단계
+    // questions.length + 1: 캐릭터 선택
+    // questions.length + 2: 캐릭터 이름 입력
+    const INTRO_STEP = 0;
+    const FIRST_QUESTION_STEP = 1;
+    const CHARACTER_SELECTION_STEP = questions.length + 1;
+    const CHARACTER_NAMING_STEP = questions.length + 2;
+
     const [currentStep, setCurrentStep] = useState(0);
     const [answers, setAnswers] = useState({});
     const [draftAnswers, setDraftAnswers] = useState({});
@@ -82,13 +88,15 @@ export default function UserInfoPage() {
     const router = useRouter();
     const { refreshUser } = useAuth();
 
-    const totalSteps = questions.length + 2;
+    const totalSteps = questions.length + 3;
 
     // 현재 단계가 질문 단계인지 확인
-    const isQuestionStep = currentStep < questions.length;
-    const currentQuestion = isQuestionStep ? questions[currentStep] : null;
+    const isIntroStep = currentStep === INTRO_STEP;
+    const isQuestionStep = currentStep >= FIRST_QUESTION_STEP && currentStep <= questions.length;
+    const currentQuestion = isQuestionStep ? questions[currentStep - FIRST_QUESTION_STEP] : null;
 
     const isBudgetQuestion = (question) => question?.id === 'monthly_budget';
+    const isMaritalStatusQuestion = (question) => question?.id === 'marital_status';
 
     const formatBudgetInput = (value) => {
         const digits = String(value ?? '').replace(/\D/g, '');
@@ -134,6 +142,9 @@ export default function UserInfoPage() {
     const currentInputValue = isQuestionStep && currentQuestion?.type !== 'select'
         ? getQuestionValue(currentQuestion)
         : '';
+    const currentSelectValue = isQuestionStep && currentQuestion?.type === 'select'
+        ? (answers[currentQuestion.id] ?? draftAnswers[currentQuestion.id] ?? '')
+        : '';
 
     useEffect(() => {
         stepTransitionLockRef.current = false;
@@ -145,7 +156,7 @@ export default function UserInfoPage() {
         }
 
         stepTransitionLockRef.current = true;
-        setCurrentStep(currentStep + 1);
+        setCurrentStep(prev => prev + 1);
     };
 
     const handleInputChange = (value) => {
@@ -235,22 +246,85 @@ export default function UserInfoPage() {
             [currentQuestion.id]: value
         }));
         setError('');
+    };
 
-        // 다음 질문 또는 캐릭터 선택 단계로 이동
-        goToNextStep();
+    const handleOptionClick = (value) => {
+        handleSelect(value);
+
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
     };
 
     const handleBack = () => {
         setError('');
 
-        if (currentStep === 0) {
+        if (currentStep === INTRO_STEP) {
             router.back();
             return;
         }
 
         stepTransitionLockRef.current = false;
-        setCurrentStep(currentStep - 1);
+        setCurrentStep(prev => prev - 1);
     };
+
+    const handlePrimaryAction = () => {
+        if (isIntroStep) {
+            goToNextStep();
+            return;
+        }
+
+        if (isQuestionStep) {
+            if (currentQuestion.type === 'select') {
+                if (!currentSelectValue) {
+                    return;
+                }
+
+                goToNextStep();
+                return;
+            }
+
+            handleQuestionSubmit();
+            return;
+        }
+
+        if (currentStep === CHARACTER_SELECTION_STEP) {
+            handleCharacterNext();
+            return;
+        }
+
+        if (currentStep === CHARACTER_NAMING_STEP) {
+            handleCharacterNameSubmit();
+        }
+    };
+
+    const primaryButtonDisabled = (() => {
+        if (loading) {
+            return true;
+        }
+
+        if (isIntroStep) {
+            return false;
+        }
+
+        if (isQuestionStep) {
+            return currentQuestion.type === 'select'
+                ? !currentSelectValue
+                : !currentInputValue.trim();
+        }
+
+        if (currentStep === CHARACTER_SELECTION_STEP) {
+            return !selectedCharacter;
+        }
+
+        if (currentStep === CHARACTER_NAMING_STEP) {
+            return !characterName.trim();
+        }
+
+        return false;
+    })();
+
+    const primaryButtonLabel = currentStep === CHARACTER_NAMING_STEP && loading ? '저장 중...' : currentStep === CHARACTER_NAMING_STEP ? '완료' : '다음';
 
     // Enter 키 처리
     const handleKeyDown = (e) => {
@@ -262,168 +336,184 @@ export default function UserInfoPage() {
         e.stopPropagation();
 
         if (isQuestionStep && currentQuestion.type !== 'select' && currentInputValue.trim()) {
-            handleQuestionSubmit();
-        } else if (currentStep === questions.length + 1 && characterName.trim()) {
-            handleCharacterNameSubmit();
+            handlePrimaryAction();
+        } else if (currentStep === CHARACTER_NAMING_STEP && characterName.trim()) {
+            handlePrimaryAction();
         }
     };
 
-    // 캐릭터 선택 단계 렌더링
-    const renderCharacterSelection = () => (
-        <>
-            <h2 style={styles.question}>나만의 두둑이를 선택하세요!</h2>
-
-            {error && <div style={styles.errorBox}>{error}</div>}
-
-            <div style={styles.characterGrid}>
-                {CHARACTERS.map((char) => (
-                    <div
-                        key={char.id}
-                        onClick={() => handleCharacterSelect(char.id)}
-                        style={{
-                            ...styles.characterCard,
-                            ...(selectedCharacter === char.id ? styles.characterCardSelected : {})
-                        }}
-                    >
-                        <div style={styles.characterImageWrapper}>
-                            <Image
-                                src={char.image}
-                                alt={char.name}
-                                width={160}
-                                height={160}
-                                style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'contain'
-                                }}
-                            />
-                        </div>
-                    </div>
-                ))}
-            </div>
+    const renderStepActions = () => (
+        <div style={styles.actionRow}>
+            <button
+                type="button"
+                onClick={handlePrimaryAction}
+                disabled={primaryButtonDisabled}
+                style={{
+                    ...styles.nextButton,
+                    ...(primaryButtonDisabled ? styles.nextButtonDisabled : {})
+                }}
+            >
+                {primaryButtonLabel}
+            </button>
 
             <button
                 type="button"
-                onClick={handleCharacterNext}
-                disabled={!selectedCharacter}
+                onClick={handleBack}
                 style={{
-                    ...styles.nextButton,
-                    opacity: !selectedCharacter ? 0.5 : 1,
-                    cursor: !selectedCharacter ? 'not-allowed' : 'pointer'
+                    ...styles.prevButton,
+                    ...(loading ? styles.prevButtonDisabled : {})
                 }}
+                disabled={loading}
             >
-                다음
+                이전
             </button>
-        </>
+        </div>
+    );
+
+    const renderIntro = () => (
+        <div style={styles.introStepLayout}>
+            <div style={styles.introContent}>
+                <h2 style={styles.question}>두둑 AI의 맞춤형 소비코칭을 위해<br />기본 정보가 필요해요!</h2>
+            </div>
+
+            {renderStepActions()}
+        </div>
+    );
+
+    // 캐릭터 선택 단계 렌더링
+    const renderCharacterSelection = () => (
+        <div style={styles.stepLayout}>
+            <div style={styles.stepBody}>
+                <h2 style={styles.question}>나만의 두둑이를 선택하세요!</h2>
+
+                {error && <div style={styles.errorBox}>{error}</div>}
+
+                <div style={styles.characterGrid}>
+                    {CHARACTERS.map((char) => (
+                        <div
+                            key={char.id}
+                            onClick={() => handleCharacterSelect(char.id)}
+                            style={{
+                                ...styles.characterCard,
+                                ...(selectedCharacter === char.id ? styles.characterCardSelected : {})
+                            }}
+                        >
+                            <div style={styles.characterImageWrapper}>
+                                <Image
+                                    src={char.image}
+                                    alt={char.name}
+                                    width={160}
+                                    height={160}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'contain'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {renderStepActions()}
+        </div>
     );
 
     // 캐릭터 이름 입력 단계 렌더링
     const renderCharacterNaming = () => (
-        <>
-            <h2 style={styles.question}>두둑이의 이름을 지어주세요!</h2>
+        <div style={styles.stepLayout}>
+            <div style={styles.stepBody}>
+                <h2 style={styles.question}>두둑이의 이름을 지어주세요!</h2>
 
-            {error && <div style={styles.errorBox}>{error}</div>}
+                {error && <div style={styles.errorBox}>{error}</div>}
 
-            <div style={styles.selectedCharacterPreview}>
-                <Image
-                    src={CHARACTERS.find(c => c.id === selectedCharacter)?.image || ''}
-                    alt="선택된 캐릭터"
-                    width={120}
-                    height={120}
-                    style={{ objectFit: 'contain' }}
-                />
+                <div style={styles.selectedCharacterPreview}>
+                    <Image
+                        src={CHARACTERS.find(c => c.id === selectedCharacter)?.image || ''}
+                        alt="선택된 캐릭터"
+                        width={120}
+                        height={120}
+                        style={{ objectFit: 'contain' }}
+                    />
+                </div>
+
+                <div style={styles.inputContainer}>
+                    <input
+                        type="text"
+                        value={characterName}
+                        onChange={(e) => setCharacterName(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="예: 두둑이"
+                        style={styles.input}
+                        maxLength={20}
+                        autoFocus
+                        disabled={loading}
+                    />
+                </div>
             </div>
 
-            <div style={styles.inputContainer}>
-                <input
-                    type="text"
-                    value={characterName}
-                    onChange={(e) => setCharacterName(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="예: 두둑이"
-                    style={styles.input}
-                    maxLength={20}
-                    autoFocus
-                    disabled={loading}
-                />
-            </div>
-
-            <button
-                type="button"
-                onClick={handleCharacterNameSubmit}
-                disabled={!characterName.trim() || loading}
-                style={{
-                    ...styles.nextButton,
-                    opacity: !characterName.trim() || loading ? 0.5 : 1,
-                    cursor: !characterName.trim() || loading ? 'not-allowed' : 'pointer'
-                }}
-            >
-                {loading ? '저장 중...' : '완료'}
-            </button>
-        </>
+            {renderStepActions()}
+        </div>
     );
 
     // 질문 단계 렌더링
     const renderQuestion = () => (
-        <>
-            <h2 style={styles.question}>{currentQuestion.question}</h2>
+        <div style={styles.stepLayout}>
+            <div style={styles.stepBody}>
+                <h2 style={styles.question}>{currentQuestion.question}</h2>
 
-            {error && <div style={styles.errorBox}>{error}</div>}
+                {error && <div style={styles.errorBox}>{error}</div>}
 
-            {currentQuestion.type === 'select' ? (
-                <div style={styles.optionsContainer}>
-                    {currentQuestion.options.map((option) => (
-                        <button
-                            type="button"
-                            key={option.value}
-                            onClick={() => handleSelect(option.value)}
-                            style={{
-                                ...styles.optionButton,
-                                ...(answers[currentQuestion.id] === option.value ? styles.optionButtonSelected : {})
-                            }}
-                            disabled={loading}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
-                </div>
-            ) : (
-                <div style={styles.inputContainer}>
-                    <input
-                        type={isBudgetQuestion(currentQuestion) ? 'text' : currentQuestion.type}
-                        value={currentInputValue}
-                        onChange={(e) => handleInputChange(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder={currentQuestion.placeholder}
-                        inputMode={isBudgetQuestion(currentQuestion) ? 'numeric' : undefined}
+                {currentQuestion.type === 'select' ? (
+                    <div
                         style={{
-                            ...styles.input,
-                            ...(currentQuestion.suffix ? styles.inputWithSuffix : {})
+                            ...styles.optionsContainer,
+                            ...(isMaritalStatusQuestion(currentQuestion) ? styles.optionsRowContainer : {})
                         }}
-                        autoFocus
-                        disabled={loading}
-                    />
-                    {currentQuestion.suffix && (
-                        <span style={styles.suffix}>{currentQuestion.suffix}</span>
-                    )}
-                </div>
-            )}
+                    >
+                        {currentQuestion.options.map((option) => (
+                            <button
+                                type="button"
+                                key={option.value}
+                                className="userinfo-option-button"
+                                onClick={() => handleOptionClick(option.value)}
+                                style={{
+                                    ...styles.optionButton,
+                                    ...(isMaritalStatusQuestion(currentQuestion) ? styles.optionButtonHalf : {}),
+                                    ...(answers[currentQuestion.id] === option.value ? styles.optionButtonSelected : styles.optionButtonDefault)
+                                }}
+                                disabled={loading}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                ) : (
+                    <div style={styles.inputContainer}>
+                        <input
+                            type={isBudgetQuestion(currentQuestion) ? 'text' : currentQuestion.type}
+                            value={currentInputValue}
+                            onChange={(e) => handleInputChange(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder={currentQuestion.placeholder}
+                            inputMode={isBudgetQuestion(currentQuestion) ? 'numeric' : undefined}
+                            style={{
+                                ...styles.input,
+                                ...(currentQuestion.suffix ? styles.inputWithSuffix : {})
+                            }}
+                            autoFocus
+                            disabled={loading}
+                        />
+                        {currentQuestion.suffix && (
+                            <span style={styles.suffix}>{currentQuestion.suffix}</span>
+                        )}
+                    </div>
+                )}
+            </div>
 
-            {currentQuestion.type !== 'select' && (
-                <button
-                    type="button"
-                    onClick={handleQuestionSubmit}
-                    disabled={!currentInputValue.trim() || loading}
-                    style={{
-                        ...styles.nextButton,
-                        opacity: !currentInputValue.trim() || loading ? 0.5 : 1,
-                        cursor: !currentInputValue.trim() || loading ? 'not-allowed' : 'pointer'
-                    }}
-                >
-                    다음
-                </button>
-            )}
-        </>
+            {renderStepActions()}
+        </div>
     );
 
     return (
@@ -448,24 +538,10 @@ export default function UserInfoPage() {
 
             {/* 단계별 컨텐츠 */}
             <div style={styles.questionContainer}>
+                {isIntroStep && renderIntro()}
                 {isQuestionStep && renderQuestion()}
-                {currentStep === questions.length && renderCharacterSelection()}
-                {currentStep === questions.length + 1 && renderCharacterNaming()}
-            </div>
-
-            <div style={styles.bottomNav}>
-                <button
-                    type="button"
-                    onClick={handleBack}
-                    style={{
-                        ...styles.backButton,
-                        ...(loading ? styles.backButtonDisabled : {})
-                    }}
-                    disabled={loading}
-                    aria-label="이전 단계로 이동"
-                >
-                    &lt;
-                </button>
+                {currentStep === CHARACTER_SELECTION_STEP && renderCharacterSelection()}
+                {currentStep === CHARACTER_NAMING_STEP && renderCharacterNaming()}
             </div>
         </div>
     );
@@ -489,22 +565,20 @@ const styles = {
         textAlign: 'left',
         width: '100%',
     },
-    backButton: {
-        width: '2.5rem',
-        height: '2.5rem',
-        borderRadius: '999px',
-        border: '1px solid rgba(148, 163, 184, 0.24)',
-        backgroundColor: '#FFFFFF',
-        color: 'var(--text-main)',
-        fontSize: '1.05rem',
-        fontWeight: '700',
+    prevButton: {
+        padding: 0,
+        border: 'none',
+        backgroundColor: 'transparent',
+        color: 'var(--text-sub)',
+        fontSize: '0.95rem',
+        fontWeight: '500',
         cursor: 'pointer',
-        display: 'inline-flex',
+        display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+        lineHeight: 1.2,
     },
-    backButtonDisabled: {
+    prevButtonDisabled: {
         opacity: 0.5,
         cursor: 'not-allowed',
     },
@@ -534,12 +608,42 @@ const styles = {
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
+        alignItems: 'stretch',
     },
-    bottomNav: {
+    stepLayout: {
+        width: '100%',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
+        paddingTop: '3rem',
+    },
+    introStepLayout: {
+        width: '100%',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+    },
+    stepBody: {
         width: '100%',
         display: 'flex',
-        justifyContent: 'flex-start',
+        flexDirection: 'column',
+        alignItems: 'center',
+    },
+    introContent: {
+        width: '100%',
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    actionRow: {
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '0.875rem',
+        marginTop: '2rem',
         paddingTop: '1rem',
         paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
     },
@@ -641,6 +745,9 @@ const styles = {
         flexDirection: 'column',
         gap: '1rem',
     },
+    optionsRowContainer: {
+        flexDirection: 'row',
+    },
     optionButton: {
         width: '100%',
         padding: '1.25rem',
@@ -648,10 +755,25 @@ const styles = {
         fontWeight: '500',
         color: 'var(--text-main)',
         backgroundColor: '#FFFFFF',
-        border: '1px solid #E2E8F0',
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: '#E2E8F0',
         borderRadius: 'var(--radius-md)',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
+        outline: 'none',
+        outlineColor: 'transparent',
+        appearance: 'none',
+        WebkitAppearance: 'none',
+        WebkitTapHighlightColor: 'transparent',
+    },
+    optionButtonHalf: {
+        flex: 1,
+    },
+    optionButtonDefault: {
+        borderColor: '#E2E8F0',
+        backgroundColor: '#FFFFFF',
+        boxShadow: 'none',
     },
     optionButtonSelected: {
         borderColor: 'var(--primary)',
@@ -660,14 +782,18 @@ const styles = {
     },
     nextButton: {
         width: '100%',
-        padding: '1rem',
+        minHeight: '3.5rem',
+        padding: '1rem 1.25rem',
         fontSize: '1rem',
         fontWeight: '600',
         color: '#FFFFFF',
         background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
         border: 'none',
         borderRadius: 'var(--radius-md)',
-        marginTop: '2rem',
-        boxShadow: '0 4px 12px rgba(47, 133, 90, 0.25)',
+        cursor: 'pointer',
+    },
+    nextButtonDisabled: {
+        opacity: 0.5,
+        cursor: 'not-allowed',
     },
 };

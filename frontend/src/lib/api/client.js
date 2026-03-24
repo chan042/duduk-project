@@ -1,11 +1,28 @@
 import axios from 'axios';
 
 // 환경변수 기반으로 API URL 선택 (.env.local에서 관리)
-function getBaseURL() {
-    if (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1') {
-        return process.env.NEXT_PUBLIC_API_URL_127;
+export function getBaseURL() {
+    if (typeof window === 'undefined') {
+        return process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL_127 || 'http://localhost:8000';
     }
-    return process.env.NEXT_PUBLIC_API_URL;
+
+    const { protocol, hostname } = window.location;
+    const fallbackBaseURL = `${protocol}//${hostname}:8000`;
+
+    if (hostname === '127.0.0.1') {
+        return process.env.NEXT_PUBLIC_API_URL_127 || fallbackBaseURL;
+    }
+
+    if (hostname === 'localhost') {
+        return process.env.NEXT_PUBLIC_API_URL || fallbackBaseURL;
+    }
+
+    const configuredBaseURL = process.env.NEXT_PUBLIC_API_URL;
+    if (configuredBaseURL && !configuredBaseURL.includes('localhost') && !configuredBaseURL.includes('127.0.0.1')) {
+        return configuredBaseURL;
+    }
+
+    return fallbackBaseURL;
 }
 
 const baseURL = getBaseURL();

@@ -3,7 +3,9 @@
  * - 인증 관련 API 호출 함수를 제공합니다.
  * - 로그인, 회원가입, 프로필 조회 기능을 포함합니다.
  */
+import axios from 'axios';
 import client from './client';
+import { getBaseURL } from './client';
 
 /**
  * 로그인 API
@@ -46,6 +48,23 @@ export const register = async (email, username, password, passwordConfirm, chara
     }
 
     const response = await client.post('/api/users/register/', data);
+    return response.data;
+};
+
+/**
+ * Google 로그인 API
+ * @param {string} accessToken - Google OAuth access token
+ * @returns {Promise<{access: string, refresh: string, user: object}>}
+ */
+export const loginWithGoogle = async (accessToken) => {
+    const response = await axios.post(`${getBaseURL()}/api/users/auth/google/`, {
+        access_token: accessToken
+    }, {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+
     return response.data;
 };
 

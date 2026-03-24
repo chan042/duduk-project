@@ -46,6 +46,18 @@ button {
   transition: all 0.2s ease;
 }
 
+.userinfo-option-button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.userinfo-option-button:focus,
+.userinfo-option-button:focus-visible,
+.userinfo-option-button:active {
+  outline: none;
+  outline-color: transparent;
+  box-shadow: none;
+}
+
 
 /* Animations */
 @keyframes typing {
