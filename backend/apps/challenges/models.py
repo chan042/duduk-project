@@ -21,6 +21,7 @@ class ChallengeTemplate(models.Model):
     """
     SOURCE_TYPE_CHOICES = [
         ('duduk', '두둑 챌린지'),
+        ('event', '이벤트 챌린지'),
     ]
     
     DIFFICULTY_CHOICES = [
@@ -79,6 +80,11 @@ class ChallengeTemplate(models.Model):
 
     # 프론트 표시 설정 - JSONB
     display_config = models.JSONField(verbose_name='프론트 표시 설정', default=dict, blank=True)
+
+    # 이벤트 전용
+    event_start_at = models.DateTimeField(blank=True, null=True, verbose_name='이벤트 시작일')
+    event_end_at = models.DateTimeField(blank=True, null=True, verbose_name='이벤트 종료일')
+    event_banner_url = models.CharField(max_length=500, blank=True, null=True, verbose_name='이벤트 배너 URL')
     
     is_active = models.BooleanField(default=True, verbose_name='활성화 여부')
     display_order = models.IntegerField(default=0, verbose_name='표시 순서')
@@ -93,6 +99,27 @@ class ChallengeTemplate(models.Model):
 
     def __str__(self):
         return f"[{self.get_source_type_display()}] {self.name}"
+
+    @property
+    def is_event_active(self):
+        if self.source_type != 'event':
+            return False
+
+        now = timezone.now()
+        if self.event_start_at and self.event_start_at > now:
+            return False
+        if self.event_end_at and self.event_end_at < now:
+            return False
+
+        return True
+
+    @property
+    def remaining_event_time(self):
+        if not self.is_event_active or not self.event_end_at:
+            return None
+
+        remaining = self.event_end_at - timezone.now()
+        return remaining if remaining.total_seconds() > 0 else None
 
 
 class UserChallenge(models.Model):

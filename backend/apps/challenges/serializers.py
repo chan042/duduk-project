@@ -5,6 +5,7 @@
 """
 from rest_framework import serializers
 from django.utils import timezone
+from django.db import transaction
 from datetime import timedelta, date
 from calendar import monthrange
 from django.db.models import Sum
@@ -105,6 +106,12 @@ class ChallengeTemplateSerializer(serializers.ModelSerializer):
             return None
         _, reason = _get_template_availability(obj, request.user)
         return reason
+
+    def get_remaining_event_time(self, obj):
+        remaining = obj.remaining_event_time
+        if not remaining:
+            return None
+        return int(remaining.total_seconds())
 
 
 class ChallengeTemplateListSerializer(serializers.ModelSerializer):
