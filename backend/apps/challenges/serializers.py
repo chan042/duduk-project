@@ -10,8 +10,6 @@ from calendar import monthrange
 from django.db.models import Sum
 import random
 import uuid
-
-from django.db import transaction
 from .models import ChallengeTemplate, UserChallenge, ChallengeDailyLog
 from .constants import (
     CONDITION_TYPE_AMOUNT_LIMIT,
@@ -77,8 +75,6 @@ class ChallengeTemplateSerializer(serializers.ModelSerializer):
     """챌린지 템플릿 상세 직렬화"""
     source_type_display = serializers.CharField(source='get_source_type_display', read_only=True)
     difficulty_display = serializers.CharField(source='get_difficulty_display', read_only=True)
-    is_event_active = serializers.BooleanField(read_only=True)
-    remaining_event_time = serializers.SerializerMethodField()
     is_available = serializers.SerializerMethodField()
     unavailable_reason = serializers.SerializerMethodField()
     
@@ -92,8 +88,6 @@ class ChallengeTemplateSerializer(serializers.ModelSerializer):
             'success_conditions', 'user_inputs', 'success_description',
             'display_config',
             'requires_daily_check', 'requires_photo', 'photo_frequency', 'photo_description',
-            'event_start_at', 'event_end_at', 'event_banner_url',
-            'is_event_active', 'remaining_event_time',
             'is_available', 'unavailable_reason',
             'is_active', 'display_order', 'created_at'
         ]
@@ -117,7 +111,6 @@ class ChallengeTemplateListSerializer(serializers.ModelSerializer):
     """챌린지 템플릿 목록용 간략 직렬화"""
     source_type_display = serializers.CharField(source='get_source_type_display', read_only=True)
     difficulty_display = serializers.CharField(source='get_difficulty_display', read_only=True)
-    is_event_active = serializers.BooleanField(read_only=True)
     is_available = serializers.SerializerMethodField()
     unavailable_reason = serializers.SerializerMethodField()
     
@@ -133,7 +126,7 @@ class ChallengeTemplateListSerializer(serializers.ModelSerializer):
             'base_points', 'duration_days',
             'requires_photo', 'requires_daily_check', 'photo_description',
             'user_inputs', 'success_description',
-            'display_config', 'is_event_active', 'display_order',
+            'display_config', 'display_order',
             'is_available', 'unavailable_reason',
             'my_challenge_status', 'my_challenge_id'
         ]
@@ -177,12 +170,12 @@ class UserChallengeSerializer(serializers.ModelSerializer):
             'base_points', 'max_points', 'has_penalty', 'bonus_points',
             'status', 'status_display',
             'final_spent', 'earned_points', 'penalty_points', 'bonus_earned',
-            'completed_at', 'attempt_number',
+            'completed_at', 'reward_claimed_at', 'attempt_number',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'progress', 'status', 'final_spent', 'earned_points',
-            'penalty_points', 'bonus_earned', 'completed_at', 'attempt_number',
+            'penalty_points', 'bonus_earned', 'completed_at', 'reward_claimed_at', 'attempt_number',
             'created_at', 'updated_at'
         ]
 
@@ -211,7 +204,7 @@ class UserChallengeListSerializer(serializers.ModelSerializer):
             'success_description',
             'status', 'status_display',
             'base_points', 'earned_points', 'attempt_number',
-            'completed_at'
+            'completed_at', 'reward_claimed_at'
         ]
 
     def get_user_inputs(self, obj):
@@ -226,9 +219,6 @@ class UserChallengeCreateSerializer(serializers.Serializer):
     def validate_template_id(self, value):
         try:
             template = ChallengeTemplate.objects.get(id=value, is_active=True)
-            # 이벤트 챌린지는 활성 기간 확인
-            if template.source_type == 'event' and not template.is_event_active:
-                raise serializers.ValidationError("이벤트 기간이 아닙니다.")
             return value
         except ChallengeTemplate.DoesNotExist:
             raise serializers.ValidationError("유효하지 않은 챌린지 템플릿입니다.")

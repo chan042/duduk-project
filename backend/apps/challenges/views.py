@@ -40,17 +40,12 @@ from external.ai.client import AIClient
 
 
 def _get_template_queryset_for_user(user, tab=None):
-    queryset = ChallengeTemplate.objects.filter(is_active=True)
+    queryset = ChallengeTemplate.objects.filter(is_active=True, source_type='duduk')
 
     if tab == 'duduk':
-        queryset = queryset.filter(source_type='duduk')
-    elif tab == 'event':
-        now = timezone.now()
-        queryset = queryset.filter(
-            source_type='event',
-            event_start_at__lte=now,
-            event_end_at__gte=now,
-        )
+        pass
+    elif tab:
+        queryset = queryset.none()
 
     latest_challenge = UserChallenge.objects.filter(
         user=user,
@@ -439,12 +434,20 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        earned_points = user_challenge.earned_points
-        user_challenge.claim_reward()
+        if user_challenge.reward_claimed_at:
+            return Response(
+                {'error': '이미 보상을 받은 챌린지입니다.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # 보상받기 후 UserChallenge 삭제 → 챌린지가 다시 '도전하기' 상태로 표시됨
-        user_challenge.daily_logs.all().delete()
-        user_challenge.delete()
+        earned_points = user_challenge.earned_points
+        if not user_challenge.claim_reward():
+            return Response(
+                {'error': '보상 수령 처리에 실패했습니다. 잠시 후 다시 시도해주세요.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        request.user.refresh_from_db(fields=['points', 'total_points_earned'])
 
         return Response({
             'message': f'{earned_points}P가 지급되었습니다!',
@@ -560,7 +563,6 @@ class ChallengeDashboardView(APIView):
         refresh_user_challenge_states(user)
 
         templates_duduk = _get_template_queryset_for_user(user, tab='duduk')
-        templates_event = _get_template_queryset_for_user(user, tab='event')
 
         user_challenges = UserChallenge.objects.filter(
             user=user,
@@ -584,7 +586,6 @@ class ChallengeDashboardView(APIView):
             }).data,
             'templates': {
                 'duduk': ChallengeTemplateListSerializer(templates_duduk, **template_serializer_kwargs).data,
-                'event': ChallengeTemplateListSerializer(templates_event, **template_serializer_kwargs).data,
             },
             'challenges': {
                 'active': UserChallengeListSerializer(active, **challenge_serializer_kwargs).data,
@@ -652,7 +653,6 @@ class ChallengeStatsView(APIView):
             'success_rate': 0,
             'by_source_type': {
                 'duduk': challenges.filter(source_type='duduk').count(),
-                'event': challenges.filter(source_type='event').count(),
                 'custom': challenges.filter(source_type='custom').count(),
                 'ai': challenges.filter(source_type='ai').count(),
             }

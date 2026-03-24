@@ -16,10 +16,12 @@ logger = logging.getLogger(__name__)
 
 class ChallengeTemplate(models.Model):
     """
-    챌린지 템플릿 (두둑/이벤트)
+    챌린지 템플릿
     - 두둑 챌린지: 플랫폼에서 제공하는 기본 챌린지
     """
-    SOURCE_TYPE_CHOICES = ('duduk', '두둑 챌린지')
+    SOURCE_TYPE_CHOICES = [
+        ('duduk', '두둑 챌린지'),
+    ]
     
     DIFFICULTY_CHOICES = [
         ('easy', '쉬움'),
@@ -217,6 +219,7 @@ class UserChallenge(models.Model):
     penalty_points = models.IntegerField(default=0, verbose_name='패널티 포인트')
     bonus_earned = models.BooleanField(default=False, verbose_name='보너스 획득')
     completed_at = models.DateTimeField(blank=True, null=True, verbose_name='완료일시')
+    reward_claimed_at = models.DateTimeField(blank=True, null=True, verbose_name='보상 수령일시')
     
     # 재도전
     attempt_number = models.IntegerField(default=1, verbose_name='시도 횟수')
@@ -273,8 +276,6 @@ class UserChallenge(models.Model):
             if final_spent is not None:
                 locked.final_spent = int(final_spent)
 
-            user_model = locked.user.__class__
-
             if is_success:
                 locked.penalty_points = 0
                 locked.earned_points = locked._calculate_points()
@@ -283,13 +284,8 @@ class UserChallenge(models.Model):
                     locked.earned_points += locked.bonus_points or 0
                 else:
                     locked.bonus_earned = False
-
-                if locked.earned_points:
-                    user_model.objects.filter(pk=locked.user_id).update(
-                        points=F('points') + locked.earned_points,
-                        total_points_earned=F('total_points_earned') + locked.earned_points,
-                    )
             else:
+                user_model = locked.user.__class__
                 locked.earned_points = 0
                 locked.bonus_earned = False
                 if locked.has_penalty:
@@ -348,14 +344,35 @@ class UserChallenge(models.Model):
             )
 
     def claim_reward(self):
-        """보상 수령 처리 - 포인트 지급"""
-        if self.status != 'completed':
-            return False
+        """보상 수령 처리 - 포인트 지급 및 완료 챌린지 아카이브"""
+        with transaction.atomic():
+            locked = UserChallenge.objects.select_for_update().select_related('user').get(pk=self.pk)
 
-        # 포인트 지급
-        self.user.points += self.earned_points
-        self.user.total_points_earned += self.earned_points
-        self.user.save(update_fields=['points', 'total_points_earned'])
+            if locked.status != 'completed' or locked.reward_claimed_at:
+                self.refresh_from_db()
+                return False
+
+            earned_points = int(locked.earned_points or 0)
+            user_model = locked.user.__class__
+
+            if earned_points:
+                user_model.objects.filter(pk=locked.user_id).update(
+                    points=F('points') + earned_points,
+                    total_points_earned=F('total_points_earned') + earned_points,
+                )
+
+            locked.reward_claimed_at = timezone.now()
+            locked.is_current_attempt = False
+            locked.progress = {}
+            locked.daily_logs.all().delete()
+            locked.save(update_fields=[
+                'reward_claimed_at',
+                'is_current_attempt',
+                'progress',
+                'updated_at',
+            ])
+
+        self.refresh_from_db()
         return True
 
     def _handle_completion_side_effects(self, is_success: bool):

@@ -118,7 +118,7 @@ export default function ChallengeDetailModal({
     };
 
     const isTemplateChallenge =
-        !!challenge?.templateId || challenge?.sourceType === 'duduk' || challenge?.sourceType === 'event';
+        !!challenge?.templateId || challenge?.sourceType === 'duduk';
     const templateReferenceId = challenge?.templateId || (isTemplateChallenge ? challenge?.id : null);
     const isTemplateRestart = isFailed && isTemplateChallenge && !!templateReferenceId;
     const canConfigureInputs = !isActive && !isCompleted && !isReady && (!isFailed || isTemplateRestart);
@@ -213,6 +213,11 @@ export default function ChallengeDetailModal({
             isAI: true,
         })),
     ];
+
+    const displayDurationDays = challenge?.durationDays
+        ?? (typeof challenge?.duration === 'string'
+            ? Number(String(challenge.duration).replace('일', ''))
+            : challenge?.duration);
 
     const buildStartInputValues = () => {
         const normalized = {};
@@ -313,7 +318,7 @@ export default function ChallengeDetailModal({
                                     <span style={{ ...styles.statValue, color: 'var(--primary)' }}>
                                         {isActive
                                             ? getChallengeDdayLabel(challenge)
-                                            : `${String(challenge.duration || 7).replace('일', '')}일`}
+                                            : `${displayDurationDays || 7}일`}
                                     </span>
                                 </div>
                             </div>

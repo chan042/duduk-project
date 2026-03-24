@@ -339,7 +339,7 @@ class CoachingAdviceResponse(AIBaseModel):
 
 
 class NumericConstraints(AIBaseModel):
-    duration_days: int = 7
+    duration_days: Optional[int] = None
     target_amount: Optional[int] = None
 
 
@@ -1022,6 +1022,7 @@ JSON 외의 설명, 코드블록, URL 본문 삽입은 금지합니다.
 
 [규칙]
 - 성공 조건은 구체적이고 측정 가능하게 작성
+- numeric_constraints.duration_days를 반드시 포함
 - target_keywords는 지출 항목 매칭용 키워드 배열
 - target_categories는 위 카테고리만 사용
 - 설명은 친근하고 동기부여가 되는 말투
@@ -1065,6 +1066,7 @@ AI 소비 코칭 분석 결과를 바탕으로 사용자가 실천할 수 있는
 
 [규칙]
 - 성공 조건은 구체적이고 측정 가능하게 작성
+- numeric_constraints.duration_days를 반드시 포함
 - target_keywords는 지출 항목 매칭용 키워드 배열
 - target_categories는 위 카테고리만 사용
 - 설명은 친근하고 동기부여가 되는 말투
@@ -1090,7 +1092,20 @@ AI 소비 코칭 분석 결과를 바탕으로 사용자가 실천할 수 있는
         result["base_points"] = calculate_points(difficulty)
 
         constraints = result.get("numeric_constraints", {})
-        result["duration_days"] = int(constraints.get("duration_days") or 7)
+        raw_duration_days = constraints.get("duration_days")
+        if raw_duration_days is None:
+            logger.warning("Gemini challenge response missing duration_days; applying 7-day fallback")
+            duration_days = 7
+        else:
+            try:
+                duration_days = int(raw_duration_days)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "Gemini challenge response returned invalid duration_days=%r; applying 7-day fallback",
+                    raw_duration_days,
+                )
+                duration_days = 7
+        result["duration_days"] = max(1, min(duration_days, 365))
         target_amount = constraints.get("target_amount")
         result["target_amount"] = int(target_amount) if target_amount is not None else None
 

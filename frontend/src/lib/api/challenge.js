@@ -35,11 +35,6 @@ const transformTemplate = (template) => ({
     requiresPhoto: template.requires_photo || false,
     photoFrequency: template.photo_frequency,
     photoDescription: template.photo_description,
-    // 이벤트 전용
-    isEventActive: template.is_event_active,
-    eventStartAt: template.event_start_at,
-    eventEndAt: template.event_end_at,
-    eventBannerUrl: template.event_banner_url,
     // 사용자 상태 정보
     status: template.my_challenge_status,
     userChallengeId: template.my_challenge_id,
@@ -79,6 +74,7 @@ const transformUserChallenge = (uc) => {
         startedAt: uc.started_at,
         endsAt: uc.ends_at,
         completedAt: uc.completed_at,
+        rewardClaimedAt: uc.reward_claimed_at,
         earnedPoints: uc.earned_points || 0,
         penaltyPoints: uc.penalty_points || 0,
         bonusEarned: uc.bonus_earned || false,
@@ -104,8 +100,8 @@ const sortByDifficulty = (challenges) => {
 };
 
 /**
- * 챌린지 템플릿 목록 조회 (두덕/이벤트)
- * @param {string} tab - 'duduk' | 'event'
+ * 챌린지 템플릿 목록 조회
+ * @param {string} tab - 'duduk'
  */
 export const getChallengeTemplates = async (tab = 'duduk') => {
     try {
@@ -150,8 +146,8 @@ export const previewTemplateInput = async (templateId, userInputValues = {}) => 
 };
 
 /**
- * 두둑/이벤트 챌린지 목록 조회
- * @param {string} tab - 'duduk' | 'event'
+ * 두둑 챌린지 목록 조회
+ * @param {string} tab - 'duduk'
  */
 export const getChallenges = async (tab = 'duduk') => {
     return getChallengeTemplates(tab);
@@ -173,7 +169,6 @@ export const getChallengeDashboard = async () => {
             pointsDetail: payload.points || { points: 0, total_points_earned: 0, total_points_used: 0 },
             templates: {
                 duduk: sortByDifficulty((templates.duduk || []).map(transformTemplate)),
-                event: sortByDifficulty((templates.event || []).map(transformTemplate)),
             },
             challenges: {
                 active: (challengeBuckets.active || []).map(transformUserChallenge),

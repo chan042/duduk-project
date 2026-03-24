@@ -137,8 +137,7 @@ export default function ChallengePage() {
             let data = [];
             let ongoing = [];
             const dudukTemplates = dashboard.templates?.duduk || [];
-            const eventTemplates = dashboard.templates?.event || [];
-            const allTemplates = [...dudukTemplates, ...eventTemplates];
+            const allTemplates = [...dudukTemplates];
 
             const ongoingChallengesFromApi = dashboard.challenges?.ongoing || [];
             const completedChallenges = dashboard.challenges?.completed || [];

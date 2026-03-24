@@ -18,7 +18,8 @@ export const useChallenge = (challenge, isOngoing = false) => {
 
     const isActive = challenge?.status === 'active';
     const isFailed = challenge?.status === 'failed' || !!challenge?.failedDate;
-    const isCompleted = challenge?.status === 'completed';
+    const isRewardClaimed = Boolean(challenge?.rewardClaimedAt || challenge?.reward_claimed_at);
+    const isCompleted = challenge?.status === 'completed' && !isRewardClaimed;
     const isReady = challenge?.status === 'ready';
     const isUnavailable = challenge?.isAvailable === false;
     const isSaved = challenge?.status === 'saved';

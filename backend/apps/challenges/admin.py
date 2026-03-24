@@ -12,7 +12,7 @@ Challenges 관리자(Admin) 설정 파일
 @admin.register(ChallengeTemplate)
 class ChallengeTemplateAdmin(admin.ModelAdmin):
     """
-    챌린지 템플릿 관리 (두둑, 이벤트)
+    챌린지 템플릿 관리
     """
     list_display = ['name', 'source_type', 'difficulty', 'base_points', 'duration_days', 'is_active', 'display_order', 'created_at']
     list_filter = ['source_type', 'difficulty', 'is_active', 'requires_daily_check', 'requires_photo']
@@ -36,10 +36,6 @@ class ChallengeTemplateAdmin(admin.ModelAdmin):
         ('프론트 표시', {
             'fields': ('display_config',)
         }),
-        ('이벤트 전용', {
-            'fields': ('event_start_at', 'event_end_at', 'event_banner_url'),
-            'classes': ('collapse',)
-        }),
         ('상태', {
             'fields': ('is_active', 'display_order')
         }),
@@ -56,7 +52,7 @@ class UserChallengeAdmin(admin.ModelAdmin):
     search_fields = ['user__username', 'user__email', 'name']
     ordering = ['-started_at']
     raw_id_fields = ['user', 'template', 'source_coaching', 'previous_attempt']
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['created_at', 'updated_at', 'reward_claimed_at']
     
     fieldsets = (
         ('사용자 정보', {
@@ -81,7 +77,7 @@ class UserChallengeAdmin(admin.ModelAdmin):
             'fields': ('display_config', 'progress')
         }),
         ('상태 및 결과', {
-            'fields': ('status', 'final_spent', 'earned_points', 'penalty_points', 'bonus_earned', 'completed_at')
+            'fields': ('status', 'final_spent', 'earned_points', 'penalty_points', 'bonus_earned', 'completed_at', 'reward_claimed_at')
         }),
         ('재도전', {
             'fields': ('attempt_number', 'previous_attempt')

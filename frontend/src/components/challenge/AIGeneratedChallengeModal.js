@@ -36,6 +36,7 @@ export default function AIGeneratedChallengeModal({
         successDescription: editedData.success_conditions || [],
         points: editedData.base_points,
         durationDays: editedData.duration_days,
+        duration: editedData.duration_days ? `${editedData.duration_days}일` : undefined,
         sourceType: 'ai',
         // 이미지 등은 기본값 사용됨
         ...editedData
