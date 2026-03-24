@@ -126,13 +126,13 @@ class UserChallenge(models.Model):
     """
     사용자 챌린지 (모든 유형 통합)
     - 두둑 챌린지: 템플릿 기반
-    - 사용자 커스텀 챌린지: 직접 설정
-    - AI 맞춤 챌린지: 코칭 기반 자동 생성
+    - custom 챌린지: 챌린지 페이지에서 AI 생성
+    - coaching 챌린지: 코칭 카드 기반 AI 생성
     """
     SOURCE_TYPE_CHOICES = [
         ('duduk', '두둑 챌린지'),
-        ('custom', '사용자 커스텀'),
-        ('ai', 'AI 맞춤'),
+        ('custom', '사용자 챌린지'),
+        ('coaching', '코칭 챌린지'),
     ]
     
     DIFFICULTY_CHOICES = [

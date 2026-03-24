@@ -236,15 +236,15 @@ export const getMyChallengeDetail = async (id) => {
  */
 export const getUserChallenges = async () => {
     try {
-        const [customRes, aiRes] = await Promise.all([
+        const [customRes, coachingRes] = await Promise.all([
             client.get('/api/challenges/my/?source_type=custom'),
-            client.get('/api/challenges/my/?source_type=ai')
+            client.get('/api/challenges/my/?source_type=coaching')
         ]);
 
         const customData = Array.isArray(customRes.data) ? customRes.data : [];
-        const aiData = Array.isArray(aiRes.data) ? aiRes.data : [];
+        const coachingData = Array.isArray(coachingRes.data) ? coachingRes.data : [];
 
-        const combined = [...customData, ...aiData];
+        const combined = [...customData, ...coachingData];
         const sorted = sortByDifficulty(combined.map(transformUserChallenge));
         return sorted;
     } catch (error) {
@@ -358,28 +358,6 @@ export const getChallengeStats = async () => {
         return response.data;
     } catch (error) {
         console.error('Get Challenge Stats Error:', error);
-        throw error;
-    }
-};
-
-/**
- * 사용자 커스텀 챌린지 생성
- * @param {Object} challengeData
- */
-export const createUserChallenge = async (challengeData) => {
-    try {
-        const response = await client.post('/api/challenges/my/create_custom/', {
-            name: challengeData.name,
-            description: challengeData.description || '',
-
-            difficulty: challengeData.difficulty || 'normal',
-            duration_days: challengeData.duration_days || 7,
-            target_amount: challengeData.target_amount || null,
-            target_categories: challengeData.target_categories || [],
-        });
-        return transformUserChallenge(response.data);
-    } catch (error) {
-        console.error('Create User Challenge Error:', error);
         throw error;
     }
 };

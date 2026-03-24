@@ -181,19 +181,19 @@ class YuntaekScoreCalculator:
         start_date, end_date = self._get_month_date_range()
         
         # 생성 건수와 성공 건수 조회
-        ai_challenges = UserChallenge.objects.filter(
+        coaching_challenges = UserChallenge.objects.filter(
             user=self.user,
-            source_type='ai',
+            source_type='coaching',
             created_at__gte=start_date,
             created_at__lt=end_date
         )
         
-        challenges_created = ai_challenges.count()
+        challenges_created = coaching_challenges.count()
         
         if challenges_created < self.MIN_CHALLENGE_COUNT_FOR_SCORE:
             return 0
 
-        successful_challenges = ai_challenges.filter(
+        successful_challenges = coaching_challenges.filter(
             status='completed',
             completed_at__gte=start_date,
             completed_at__lt=end_date,

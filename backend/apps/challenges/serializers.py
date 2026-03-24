@@ -1,6 +1,6 @@
 """
 - 템플릿/사용자 챌린지 직렬화
-- 템플릿 시작, 커스텀 생성, AI 저장 로직
+- 템플릿 시작, AI 저장 로직
 - 비교형 챌린지 기준 금액 계산
 """
 from rest_framework import serializers
@@ -522,102 +522,6 @@ ALL_CATEGORIES = [
 ]
 
 
-class CustomChallengeCreateSerializer(serializers.Serializer):
-    """사용자 커스텀 챌린지 생성용 직렬화"""
-    name = serializers.CharField(max_length=100)
-    description = serializers.CharField(required=False, allow_blank=True)
-    difficulty = serializers.ChoiceField(choices=['easy', 'normal', 'hard'], default='normal')
-    duration_days = serializers.IntegerField(min_value=1, max_value=365)
-    
-    # 검증 조건
-    target_amount = serializers.IntegerField(required=False, allow_null=True)
-    target_categories = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        default=list
-    )
-
-    def validate_target_categories(self, value):
-        for category in value:
-            if category != 'all' and category not in ALL_CATEGORIES:
-                raise serializers.ValidationError(f"유효하지 않은 카테고리입니다: {category}")
-        return value
-    
-    def create(self, validated_data):
-        user = self.context['request'].user
-        now = timezone.now()
-        
-        target_amount = validated_data.pop('target_amount', None)
-        target_categories = validated_data.pop('target_categories', [])
-        
-        # success_conditions 생성
-        success_conditions = {
-            "type": CONDITION_TYPE_AMOUNT_LIMIT if target_amount else CONDITION_TYPE_ZERO_SPEND,
-            "target_amount": target_amount or 0,
-            "categories": target_categories or ["all"],
-            "comparison": "lte"
-        }
-        
-        # display_config 생성
-        progress_type = "amount" if target_amount else "zero_spend"
-        display_config = {
-            "progress_type": progress_type,
-            "primary_metric": {
-                "label": "사용 금액",
-                "unit": "원",
-                "format": "currency",
-                "show_target": bool(target_amount),
-                "target_label": "목표"
-            },
-            "show_progress_bar": True
-        }
-        
-        # 초기 progress
-        if progress_type == "amount":
-            progress = {
-                "type": "amount",
-                "current": 0,
-                "target": target_amount,
-                "percentage": 0,
-                "is_on_track": True,
-                "remaining": target_amount
-            }
-        else:
-            progress = {
-                "type": "zero_spend",
-                "current": 0,
-                "target_categories": target_categories,
-                "is_violated": False,
-                "violation_amount": 0,
-                "is_on_track": True
-            }
-        
-        user_challenge = UserChallenge.objects.create(
-            user=user,
-            source_type='custom',
-            name=validated_data['name'],
-            description=validated_data.get('description', ''),
-            difficulty=validated_data.get('difficulty', 'normal'),
-            duration_days=validated_data['duration_days'],
-            started_at=None,
-            ends_at=None,
-            success_conditions=success_conditions,
-            user_input_values={
-                'target_amount': target_amount,
-                'target_categories': target_categories
-            },
-            display_config=display_config,
-            progress=progress,
-            base_points=100,
-            success_description=[f"{validated_data['duration_days']}일간 목표 금액 이하 지출"],
-            attempt_group_id=uuid.uuid4(),
-            is_current_attempt=True,
-            status='saved',
-        )
-
-        return user_challenge
-
-
 class ChallengeDailyLogSerializer(serializers.ModelSerializer):
     """일별 챌린지 로그 직렬화"""
     
@@ -773,7 +677,14 @@ class BaseChallengeStartSerializer(serializers.Serializer):
                 "checked_conditions": []
             }
 
-    def _create_user_challenge(self, validated_data, source_coaching=None, generated_by='gpt'):
+    def _create_user_challenge(
+        self,
+        validated_data,
+        *,
+        source_type,
+        source_coaching=None,
+        generated_by='gpt',
+    ):
         """UserChallenge 생성 공통 로직"""
         user = self.context['request'].user
 
@@ -792,7 +703,7 @@ class BaseChallengeStartSerializer(serializers.Serializer):
 
         user_challenge = UserChallenge.objects.create(
             user=user,
-            source_type='ai',
+            source_type=source_type,
             source_coaching=source_coaching,
             name=validated_data['name'],
             description=validated_data.get('description', ''),
@@ -831,7 +742,11 @@ class AIChallengeStartSerializer(BaseChallengeStartSerializer):
     """AI 챌린지 시작 직렬화"""
 
     def create(self, validated_data):
-        return self._create_user_challenge(validated_data, generated_by='gpt')
+        return self._create_user_challenge(
+            validated_data,
+            source_type='custom',
+            generated_by='gpt',
+        )
 
 
 class CoachingChallengeStartSerializer(BaseChallengeStartSerializer):
@@ -858,6 +773,7 @@ class CoachingChallengeStartSerializer(BaseChallengeStartSerializer):
 
             user_challenge = self._create_user_challenge(
                 validated_data,
+                source_type='coaching',
                 source_coaching=source_coaching,
                 generated_by='gpt_coaching'
             )

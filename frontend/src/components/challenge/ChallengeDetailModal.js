@@ -745,7 +745,7 @@ export default function ChallengeDetailModal({
                             {/* Not Started */}
                             {!isActive && !isFailed && !isCompleted && !isReady && (
                                 <div style={styles.buttonRow}>
-                                    {(challenge.sourceType === 'custom' || challenge.sourceType === 'ai') && (
+                                    {(challenge.sourceType === 'custom' || challenge.sourceType === 'coaching') && (
                                         <button
                                             style={styles.secondaryButton}
                                             onClick={() => {

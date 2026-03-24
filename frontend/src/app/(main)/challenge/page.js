@@ -219,7 +219,7 @@ export default function ChallengePage() {
                 case 'user':
                     // 사용자 탭: 사용자가 만든 챌린지 + AI 생성 챌린지
                     const userTemplates = userChallengesAll;
-                    const userOngoing = ongoing.filter(c => c.sourceType === 'custom' || c.sourceType === 'ai');
+                    const userOngoing = ongoing.filter(c => c.sourceType === 'custom' || c.sourceType === 'coaching');
                     // 진행중인 사용자/AI 챌린지 ID 목록
                     const userOngoingIds = new Set(userOngoing.map((c) => c.id));
                     // 진행중이 아닌 챌린지만 필터링
