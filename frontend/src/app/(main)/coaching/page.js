@@ -123,6 +123,26 @@ export default function CoachingPage() {
         }
     };
 
+    const handleRegenerateChallenge = async () => {
+        if (!currentCoachingId || isGeneratingChallenge) {
+            return;
+        }
+
+        try {
+            setIsGeneratingChallenge(true);
+            const generated = await generateChallengeFromCoaching(
+                currentCoachingId,
+                aiGeneratedChallenge?.difficulty || 'normal'
+            );
+            setAiGeneratedChallenge(generated);
+        } catch (err) {
+            console.error('코칭 기반 챌린지 재생성 실패:', err);
+            alert(err.response?.data?.error || '챌린지 재생성에 실패했습니다.');
+        } finally {
+            setIsGeneratingChallenge(false);
+        }
+    };
+
     // 최신 4개와 나머지 카드 분리 (최대 5개)
     const recentCards = cards.slice(0, 4);
     const olderCards = cards.slice(4, 9); // 5번째부터 9번째까지 (최대 5개)
@@ -167,6 +187,7 @@ export default function CoachingPage() {
                 challengeData={aiGeneratedChallenge}
                 onSave={handleSaveAIChallenge}
                 isSaving={isSavingAI}
+                onRegenerate={handleRegenerateChallenge}
                 source="coaching"
             />
         </div >

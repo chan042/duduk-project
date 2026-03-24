@@ -37,7 +37,7 @@ export default function AIGeneratedChallengeModal({
         points: editedData.base_points,
         durationDays: editedData.duration_days,
         duration: editedData.duration_days ? `${editedData.duration_days}일` : undefined,
-        sourceType: 'ai',
+        sourceType: source === 'coaching' ? 'coaching' : 'custom',
         // 이미지 등은 기본값 사용됨
         ...editedData
     };
@@ -46,7 +46,7 @@ export default function AIGeneratedChallengeModal({
         onSave(editedData); // 저장 호출
     };
 
-    const shouldShowRegenerate = source === 'custom';
+    const shouldShowRegenerate = (source === 'custom' || source === 'coaching') && typeof onRegenerate === 'function';
 
     // 커스텀 푸터 버튼 (재생성/저장 또는 저장만)
     const customFooter = (

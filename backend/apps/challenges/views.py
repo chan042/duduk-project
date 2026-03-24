@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from django.db.models import Sum, OuterRef, Subquery
+from django.db import transaction
 from datetime import timedelta
 
 from .models import ChallengeTemplate, UserChallenge, ChallengeDailyLog
@@ -28,7 +29,7 @@ from .signals import _evaluate_success, _update_photo_progress
 from .serializers import (
     ChallengeTemplateSerializer, ChallengeTemplateListSerializer,
     UserChallengeSerializer, UserChallengeListSerializer,
-    UserChallengeCreateSerializer, CustomChallengeCreateSerializer,
+    UserChallengeCreateSerializer,
     ChallengeDailyLogSerializer,
     UserPointsSerializer,
     RestartChallengeSerializer,
@@ -132,8 +133,6 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
             return UserChallengeListSerializer
         elif self.action == 'create':
             return UserChallengeCreateSerializer
-        elif self.action == 'create_custom':
-            return CustomChallengeCreateSerializer
         elif self.action == 'restart':
             return RestartChallengeSerializer
         return UserChallengeSerializer
@@ -149,19 +148,30 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
         
         if status_filter == 'active':
             queryset = queryset.filter(status='active')
+            ordering = '-started_at'
         elif status_filter == 'ready':
             queryset = queryset.filter(status='ready')
+            ordering = '-started_at'
+        elif status_filter == 'saved':
+            queryset = queryset.filter(status='saved')
+            ordering = '-created_at'
         elif status_filter == 'completed':
             queryset = queryset.filter(status='completed')
+            ordering = '-started_at'
         elif status_filter == 'failed':
             queryset = queryset.filter(status='failed')
+            ordering = '-started_at'
         elif status_filter == 'finished':
             queryset = queryset.filter(status__in=['completed', 'failed'])
+            ordering = '-started_at'
+        else:
+            ordering = '-started_at'
         
         if source_type:
             queryset = queryset.filter(source_type=source_type)
         
-        return queryset.order_by('-started_at')
+        return queryset.order_by(ordering, '-created_at')
+
     def create(self, request, *args, **kwargs):
         """템플릿 기반 챌린지 시작"""
         serializer = UserChallengeCreateSerializer(
@@ -171,21 +181,6 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         user_challenge = serializer.save()
         
-        return Response(
-            UserChallengeSerializer(user_challenge).data,
-            status=status.HTTP_201_CREATED
-        )
-
-    @action(detail=False, methods=['post'])
-    def create_custom(self, request):
-        """사용자 커스텀 챌린지 생성"""
-        serializer = CustomChallengeCreateSerializer(
-            data=request.data,
-            context={'request': request}
-        )
-        serializer.is_valid(raise_exception=True)
-        user_challenge = serializer.save()
-
         return Response(
             UserChallengeSerializer(user_challenge).data,
             status=status.HTTP_201_CREATED
@@ -247,6 +242,54 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
             UserChallengeSerializer(user_challenge).data,
             status=status.HTTP_201_CREATED
         )
+
+    def update(self, request, *args, **kwargs):
+        user_challenge = self.get_object()
+        if user_challenge.source_type in {'custom', 'coaching'}:
+            return Response(
+                {'error': 'custom/coaching 챌린지는 수정할 수 없습니다. 재생성 또는 삭제 후 다시 만들어주세요.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return Response(
+            {'error': '이 챌린지는 수정할 수 없습니다.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        challenge = self.get_object()
+
+        with transaction.atomic():
+            user_challenge = UserChallenge.objects.select_for_update().get(
+                pk=challenge.pk,
+                user=request.user,
+            )
+
+            if user_challenge.source_type not in {'custom', 'coaching'}:
+                return Response(
+                    {'error': 'custom/coaching 챌린지만 삭제할 수 있습니다.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if user_challenge.status != 'saved':
+                return Response(
+                    {'error': '저장된 custom/coaching 챌린지만 삭제할 수 있습니다.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            source_coaching_id = user_challenge.source_coaching_id
+            user_challenge.delete()
+
+            if source_coaching_id:
+                from apps.coaching.models import Coaching
+
+                has_remaining = UserChallenge.objects.filter(source_coaching_id=source_coaching_id).exists()
+                if not has_remaining:
+                    Coaching.objects.filter(pk=source_coaching_id).update(has_generated_challenge=False)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def _get_user_spending_summary(self, user):
         """사용자 최근 지출 요약 생성"""
@@ -573,7 +616,7 @@ class ChallengeDashboardView(APIView):
         ongoing = user_challenges.filter(status__in=['active', 'ready'])
         completed = user_challenges.filter(status='completed')
         failed = user_challenges.filter(status='failed')
-        custom_ai = user_challenges.filter(source_type__in=['custom', 'ai'])
+        custom_and_coaching = user_challenges.filter(source_type__in=['custom', 'coaching'])
 
         challenge_serializer_kwargs = {'many': True}
         template_serializer_kwargs = {'many': True, 'context': {'request': request}}
@@ -593,7 +636,7 @@ class ChallengeDashboardView(APIView):
                 'ongoing': UserChallengeListSerializer(ongoing, **challenge_serializer_kwargs).data,
                 'completed': UserChallengeListSerializer(completed, **challenge_serializer_kwargs).data,
                 'failed': UserChallengeListSerializer(failed, **challenge_serializer_kwargs).data,
-                'user': UserChallengeListSerializer(custom_ai, **challenge_serializer_kwargs).data,
+                'user': UserChallengeListSerializer(custom_and_coaching, **challenge_serializer_kwargs).data,
             }
         })
 
@@ -654,7 +697,7 @@ class ChallengeStatsView(APIView):
             'by_source_type': {
                 'duduk': challenges.filter(source_type='duduk').count(),
                 'custom': challenges.filter(source_type='custom').count(),
-                'ai': challenges.filter(source_type='ai').count(),
+                'coaching': challenges.filter(source_type='coaching').count(),
             }
         }
         
