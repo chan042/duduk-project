@@ -11,6 +11,8 @@ export default function ChallengeList() {
     const { isAuthenticated } = useAuth();
     const [challenges, setChallenges] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const challengeGap = '0.75rem';
+    const challengeCardWidth = 'clamp(280px, 88%, 340px)';
 
     useEffect(() => {
         const fetchChallenges = async () => {
@@ -47,7 +49,7 @@ export default function ChallengeList() {
     if (!isLoading && (!isAuthenticated || challenges.length === 0)) {
         return (
             <div style={{ marginBottom: '0.75rem' }}>
-                <div style={{ marginBottom: '0.75rem', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}>
+                <div style={{ marginBottom: '0.75rem' }}>
                     <h2 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-main)' }}>진행 중인 챌린지</h2>
                 </div>
                 <div style={{
@@ -57,7 +59,6 @@ export default function ChallengeList() {
                     fontSize: '0.9rem',
                     backgroundColor: 'var(--background-light)',
                     borderRadius: 'var(--radius-md)',
-                    margin: '0 0.5rem',
                     border: '1px dashed rgba(0,0,0,0.1)'
                 }}>
                     {!isAuthenticated ? (
@@ -78,47 +79,30 @@ export default function ChallengeList() {
 
     return (
         <div style={{ marginBottom: '0.75rem' }}>
-            <div style={{ marginBottom: '0.75rem', paddingLeft: '0.5rem', paddingRight: '0.5rem' }}>
+            <div style={{ marginBottom: '0.75rem' }}>
                 <h2 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--text-main)' }}>진행 중인 챌린지</h2>
             </div>
 
-            <div style={{ position: 'relative', margin: '0 -0.5rem' }}>
-                {/* Left Blur */}
-                <div style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: '20px',
-                    background: 'linear-gradient(to right, var(--background-light) 20%, transparent)',
-                    zIndex: 10,
-                    pointerEvents: 'none'
-                }}></div>
-
-                {/* Right Blur */}
-                <div style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: '20px',
-                    background: 'linear-gradient(to left, var(--background-light) 20%, transparent)',
-                    zIndex: 10,
-                    pointerEvents: 'none'
-                }}></div>
-
+            <div>
                 <div style={{
                     display: 'flex',
-                    gap: '0.75rem',
+                    gap: challengeGap,
                     overflowX: 'auto',
-                    padding: '0.25rem 1rem',
+                    padding: '0.25rem 0 calc(0.25rem + 2px) 0',
                     scrollbarWidth: 'none',
-                    paddingBottom: '0.25rem',
-                    maskImage: 'linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)',
-                    WebkitMaskImage: 'linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)'
+                    scrollSnapType: 'x proximity',
+                    overscrollBehaviorX: 'contain',
+                    WebkitOverflowScrolling: 'touch'
                 }}>
                     {challenges.map(challenge => (
-                        <div key={challenge.uniqueId || challenge.id} style={{ minWidth: '310px' }}>
+                        <div
+                            key={challenge.uniqueId || challenge.id}
+                            style={{
+                                flex: '0 0 auto',
+                                width: challengeCardWidth,
+                                scrollSnapAlign: 'start'
+                            }}
+                        >
                             <ChallengeCard
                                 challenge={challenge}
                                 onClick={handleCardClick}
@@ -130,8 +114,8 @@ export default function ChallengeList() {
                     {/* Loading Skeletons if loading */}
                     {isLoading && (
                         <>
-                            <div style={{ minWidth: '310px', height: '140px', backgroundColor: 'white', borderRadius: '16px', opacity: 0.5 }}></div>
-                            <div style={{ minWidth: '310px', height: '140px', backgroundColor: 'white', borderRadius: '16px', opacity: 0.5 }}></div>
+                            <div style={{ flex: '0 0 auto', width: challengeCardWidth, height: '140px', backgroundColor: 'white', borderRadius: '16px', opacity: 0.5, scrollSnapAlign: 'start' }}></div>
+                            <div style={{ flex: '0 0 auto', width: challengeCardWidth, height: '140px', backgroundColor: 'white', borderRadius: '16px', opacity: 0.5, scrollSnapAlign: 'start' }}></div>
                         </>
                     )}
                 </div>
