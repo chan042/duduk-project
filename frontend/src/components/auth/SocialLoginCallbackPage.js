@@ -37,7 +37,7 @@ function verifyOAuthState(provider, returnedState) {
 export default function SocialLoginCallbackPage({ provider }) {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { loginWithKakao } = useAuth();
+    const { loginWithKakao, loginWithNaver } = useAuth();
 
     const providerConfig = getSocialCallbackProviderConfig(provider);
     const providerLabel = providerConfig?.label ?? provider;
@@ -52,6 +52,7 @@ export default function SocialLoginCallbackPage({ provider }) {
 
         const loginHandlers = {
             kakao: loginWithKakao,
+            naver: loginWithNaver,
         };
 
         const finishWithError = (message) => {
@@ -123,6 +124,7 @@ export default function SocialLoginCallbackPage({ provider }) {
         };
     }, [
         loginWithKakao,
+        loginWithNaver,
         provider,
         providerConfig,
         providerError,

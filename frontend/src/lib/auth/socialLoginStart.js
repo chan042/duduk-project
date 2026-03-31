@@ -12,6 +12,17 @@ const SOCIAL_LOGIN_START_CONFIGS = {
             };
         },
     },
+    naver: {
+        authorizeUrl: 'https://nid.naver.com/oauth2.0/authorize',
+        buildAuthorizeParams({ clientId, redirectUri, state }) {
+            return {
+                client_id: clientId,
+                redirect_uri: redirectUri,
+                response_type: 'code',
+                state,
+            };
+        },
+    },
 };
 
 function createOAuthState() {

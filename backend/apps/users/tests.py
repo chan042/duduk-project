@@ -411,3 +411,264 @@ class KakaoLoginViewTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['error_code'], 'SOCIAL_EMAIL_NOT_VERIFIED')
+
+
+class NaverLoginViewTests(APITestCase):
+    @override_settings(
+        NAVER_CLIENT_ID='naver-client-id',
+        NAVER_CLIENT_SECRET='naver-client-secret',
+    )
+    @patch('apps.users.oauth_views.requests.get')
+    @patch('apps.users.oauth_views.requests.post')
+    def test_naver_login_creates_user(self, mock_post, mock_get):
+        token_response = Mock()
+        token_response.ok = True
+        token_response.json.return_value = {
+            'access_token': 'naver-access-token',
+        }
+        mock_post.return_value = token_response
+
+        profile_response = Mock()
+        profile_response.ok = True
+        profile_response.json.return_value = {
+            'resultcode': '00',
+            'message': 'success',
+            'response': {
+                'id': 'naver-user-123',
+                'email': 'naver-user@example.com',
+                'name': 'Naver User',
+                'nickname': 'Naver Nickname',
+                'profile_image': 'https://example.com/naver-profile.jpg',
+            },
+        }
+        mock_get.return_value = profile_response
+
+        response = self.client.post(
+            '/api/users/auth/naver/',
+            {
+                'code': 'naver-auth-code',
+                'state': 'naver-state-token',
+                'redirect_uri': 'http://localhost:3000/login/callback/naver',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['user']['email'], 'naver-user@example.com')
+        self.assertTrue(User.objects.filter(email='naver-user@example.com').exists())
+        self.assertTrue(
+            SocialAccount.objects.filter(
+                provider=SocialAccount.Provider.NAVER,
+                provider_user_id='naver-user-123',
+            ).exists()
+        )
+
+        request_params = mock_post.call_args.kwargs['params']
+        self.assertEqual(request_params['client_id'], 'naver-client-id')
+        self.assertEqual(request_params['client_secret'], 'naver-client-secret')
+        self.assertEqual(request_params['code'], 'naver-auth-code')
+        self.assertEqual(request_params['state'], 'naver-state-token')
+
+    @patch('apps.users.oauth_views.requests.get')
+    @patch('apps.users.oauth_views.requests.post')
+    def test_naver_login_accepts_access_token_without_code_exchange(self, mock_post, mock_get):
+        profile_response = Mock()
+        profile_response.ok = True
+        profile_response.json.return_value = {
+            'resultcode': '00',
+            'message': 'success',
+            'response': {
+                'id': 'naver-user-123',
+                'email': 'naver-user@example.com',
+                'name': 'Naver User',
+            },
+        }
+        mock_get.return_value = profile_response
+
+        response = self.client.post(
+            '/api/users/auth/naver/',
+            {
+                'access_token': 'naver-access-token',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['user']['email'], 'naver-user@example.com')
+        self.assertTrue(
+            SocialAccount.objects.filter(
+                provider=SocialAccount.Provider.NAVER,
+                provider_user_id='naver-user-123',
+            ).exists()
+        )
+        mock_post.assert_not_called()
+        self.assertEqual(
+            mock_get.call_args.kwargs['headers']['Authorization'],
+            'Bearer naver-access-token',
+        )
+
+    def test_naver_login_requires_code_or_access_token(self):
+        response = self.client.post(
+            '/api/users/auth/naver/',
+            {},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error_code'], 'SOCIAL_AUTH_INPUT_REQUIRED')
+
+    @override_settings(
+        NAVER_CLIENT_ID='naver-client-id',
+        NAVER_CLIENT_SECRET='naver-client-secret',
+    )
+    @patch('apps.users.oauth_views.requests.get')
+    @patch('apps.users.oauth_views.requests.post')
+    def test_naver_login_links_to_existing_google_user_with_same_email(self, mock_post, mock_get):
+        existing_user = User.objects.create(
+            email='shared@example.com',
+            username='Existing User',
+            auth_provider='google',
+            social_id='google-user-123',
+        )
+        SocialAccount.objects.create(
+            user=existing_user,
+            provider=SocialAccount.Provider.GOOGLE,
+            provider_user_id='google-user-123',
+            email='shared@example.com',
+            email_verified=True,
+            display_name='Existing User',
+        )
+
+        token_response = Mock()
+        token_response.ok = True
+        token_response.json.return_value = {
+            'access_token': 'naver-access-token',
+        }
+        mock_post.return_value = token_response
+
+        profile_response = Mock()
+        profile_response.ok = True
+        profile_response.json.return_value = {
+            'resultcode': '00',
+            'message': 'success',
+            'response': {
+                'id': 'naver-user-123',
+                'email': 'shared@example.com',
+                'name': 'Naver User',
+            },
+        }
+        mock_get.return_value = profile_response
+
+        response = self.client.post(
+            '/api/users/auth/naver/',
+            {
+                'code': 'naver-auth-code',
+                'state': 'naver-state-token',
+                'redirect_uri': 'http://localhost:3000/login/callback/naver',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['user']['id'], existing_user.id)
+        self.assertTrue(
+            SocialAccount.objects.filter(
+                user=existing_user,
+                provider=SocialAccount.Provider.NAVER,
+                provider_user_id='naver-user-123',
+            ).exists()
+        )
+
+    @override_settings(
+        NAVER_CLIENT_ID='naver-client-id',
+        NAVER_CLIENT_SECRET='naver-client-secret',
+    )
+    @patch('apps.users.oauth_views.requests.get')
+    @patch('apps.users.oauth_views.requests.post')
+    def test_naver_login_rejects_second_naver_account_for_same_user(self, mock_post, mock_get):
+        existing_user = User.objects.create(
+            email='shared@example.com',
+            username='Existing User',
+            auth_provider='google',
+            social_id='google-user-123',
+        )
+        SocialAccount.objects.create(
+            user=existing_user,
+            provider=SocialAccount.Provider.NAVER,
+            provider_user_id='existing-naver-user',
+            email='shared@example.com',
+            email_verified=True,
+            display_name='Existing User',
+        )
+
+        token_response = Mock()
+        token_response.ok = True
+        token_response.json.return_value = {
+            'access_token': 'naver-access-token',
+        }
+        mock_post.return_value = token_response
+
+        profile_response = Mock()
+        profile_response.ok = True
+        profile_response.json.return_value = {
+            'resultcode': '00',
+            'message': 'success',
+            'response': {
+                'id': 'naver-user-123',
+                'email': 'shared@example.com',
+                'name': 'Naver User',
+            },
+        }
+        mock_get.return_value = profile_response
+
+        response = self.client.post(
+            '/api/users/auth/naver/',
+            {
+                'code': 'naver-auth-code',
+                'state': 'naver-state-token',
+                'redirect_uri': 'http://localhost:3000/login/callback/naver',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data['error_code'], 'SOCIAL_ACCOUNT_ALREADY_LINKED')
+
+    @override_settings(
+        NAVER_CLIENT_ID='naver-client-id',
+        NAVER_CLIENT_SECRET='naver-client-secret',
+    )
+    @patch('apps.users.oauth_views.requests.get')
+    @patch('apps.users.oauth_views.requests.post')
+    def test_naver_login_requires_email(self, mock_post, mock_get):
+        token_response = Mock()
+        token_response.ok = True
+        token_response.json.return_value = {
+            'access_token': 'naver-access-token',
+        }
+        mock_post.return_value = token_response
+
+        profile_response = Mock()
+        profile_response.ok = True
+        profile_response.json.return_value = {
+            'resultcode': '00',
+            'message': 'success',
+            'response': {
+                'id': 'naver-user-123',
+                'name': 'Naver User',
+            },
+        }
+        mock_get.return_value = profile_response
+
+        response = self.client.post(
+            '/api/users/auth/naver/',
+            {
+                'code': 'naver-auth-code',
+                'state': 'naver-state-token',
+                'redirect_uri': 'http://localhost:3000/login/callback/naver',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error_code'], 'SOCIAL_EMAIL_REQUIRED')

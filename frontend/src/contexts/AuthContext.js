@@ -6,6 +6,7 @@ import {
     getProfile,
     loginWithGoogle as loginWithGoogleApi,
     loginWithKakao as loginWithKakaoApi,
+    loginWithNaver as loginWithNaverApi,
 } from '@/lib/api/auth';
 
 const AuthContext = createContext(null);
@@ -75,7 +76,7 @@ export function AuthProvider({ children }) {
             const profile = await getProfile();
             setUser(profile);
         } catch (error) {
-            console.error('프로필 조회 실패:', error);
+            console.error('Failed to fetch profile:', error);
             setUser(null);
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
@@ -96,7 +97,7 @@ export function AuthProvider({ children }) {
                 return;
             }
         } catch (error) {
-            console.error('로그인 후 프로필 확인 실패:', error);
+            console.error('Failed to verify profile after login:', error);
         }
 
         router.push('/');
@@ -126,10 +127,10 @@ export function AuthProvider({ children }) {
             await handleLogin(data.access, data.refresh);
             return data;
         } catch (error) {
-            console.error(`${providerLabel} 로그인 실패:`, error);
+            console.error(`${providerLabel} login failed:`, error);
 
             if (error?.message === 'Network Error' || error?.name === 'TypeError') {
-                throw new Error('백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.');
+                throw new Error('백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요.');
             }
 
             throw error;
@@ -143,7 +144,7 @@ export function AuthProvider({ children }) {
         }
 
         if (!isCapacitorPluginAvailable('Browser')) {
-            throw new Error('Capacitor Browser 플러그인을 찾을 수 없습니다. `npm install` 후 `npx cap sync`를 실행해주세요.');
+            throw new Error('Capacitor Browser 플러그인을 찾을 수 없습니다. `npm install` 후 `npx cap sync`를 실행해 주세요.');
         }
 
         const browserPlugin = getCapacitorPlugin('Browser');
@@ -165,7 +166,7 @@ export function AuthProvider({ children }) {
         }
 
         if (!isCapacitorPluginAvailable('App')) {
-            console.warn('Capacitor App 플러그인을 찾을 수 없어 appUrlOpen 리스너를 등록하지 않습니다.');
+            console.warn('Capacitor App plugin is unavailable. appUrlOpen listener was not registered.');
             return undefined;
         }
 
@@ -177,7 +178,7 @@ export function AuthProvider({ children }) {
             const browserPlugin = getCapacitorPlugin('Browser');
 
             if (!appPlugin?.addListener) {
-                console.warn('Capacitor App 플러그인을 사용할 수 없어 appUrlOpen 리스너를 등록하지 않습니다.');
+                console.warn('Capacitor App plugin is unavailable. appUrlOpen listener was not registered.');
                 return;
             }
 
@@ -202,7 +203,7 @@ export function AuthProvider({ children }) {
 
                         await handleLogin(access, refresh);
                     } catch (error) {
-                        console.error('앱 딥링크 로그인 처리 실패:', error);
+                        console.error('Failed to complete native Google login:', error);
                     }
                 });
 
@@ -210,7 +211,7 @@ export function AuthProvider({ children }) {
                     listenerHandle?.remove?.();
                 }
             } catch (error) {
-                console.error('앱 딥링크 리스너 등록 실패:', error);
+                console.error('Failed to register native auth listener:', error);
             }
         };
 
@@ -227,7 +228,11 @@ export function AuthProvider({ children }) {
     }, [completeSocialLogin]);
 
     const loginWithKakao = useCallback((payload) => {
-        return completeSocialLogin(loginWithKakaoApi, payload, '카카오');
+        return completeSocialLogin(loginWithKakaoApi, payload, 'Kakao');
+    }, [completeSocialLogin]);
+
+    const loginWithNaver = useCallback((payload) => {
+        return completeSocialLogin(loginWithNaverApi, payload, 'Naver');
     }, [completeSocialLogin]);
 
     const value = {
@@ -238,6 +243,7 @@ export function AuthProvider({ children }) {
         login: handleLogin,
         loginWithGoogle,
         loginWithKakao,
+        loginWithNaver,
         startNativeGoogleLogin,
         logout: handleLogout,
         refreshUser: fetchUser,

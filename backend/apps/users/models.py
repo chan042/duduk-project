@@ -87,6 +87,7 @@ class User(AbstractUser):
             ('email', 'Email'),
             ('google', 'Google'),
             ('kakao', 'Kakao'),
+            ('naver', 'Naver'),
         ],
         verbose_name='인증 제공자',
     )
@@ -105,6 +106,7 @@ class SocialAccount(models.Model):
     class Provider(models.TextChoices):
         GOOGLE = 'google', 'Google'
         KAKAO = 'kakao', 'Kakao'
+        NAVER = 'naver', 'Naver'
 
     user = models.ForeignKey(
         User,

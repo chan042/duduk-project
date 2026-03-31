@@ -57,6 +57,11 @@ export const loginWithKakao = async (payload) => {
     return response.data;
 };
 
+export const loginWithNaver = async (payload) => {
+    const response = await postSocialAuth('/api/users/auth/naver/', payload);
+    return response.data;
+};
+
 export const getProfile = async () => {
     const response = await client.get('/api/users/profile/');
     return response.data;

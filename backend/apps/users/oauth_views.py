@@ -1,5 +1,5 @@
 """
-OAuth login views for Google and Kakao.
+OAuth login views for Google, Kakao, and Naver.
 """
 import logging
 
@@ -62,6 +62,7 @@ def _provider_label(provider):
     return {
         'google': 'Google',
         'kakao': 'Kakao',
+        'naver': 'Naver',
     }.get(provider, provider)
 
 
@@ -212,6 +213,26 @@ def _build_kakao_profile(user_info):
     }
 
 
+def _build_naver_profile(user_info):
+    profile = user_info.get('response') or {}
+    email = profile.get('email')
+    display_name = (
+        profile.get('name')
+        or profile.get('nickname')
+        or (email.split('@')[0] if email else 'naver-user')
+    )
+
+    return {
+        'provider': SocialAccount.Provider.NAVER,
+        'provider_user_id': profile.get('id'),
+        'email': email,
+        'email_verified': bool(email),
+        'display_name': display_name,
+        'profile_image_url': profile.get('profile_image', ''),
+        'raw_profile': user_info,
+    }
+
+
 def _exchange_kakao_code_for_access_token(code, redirect_uri):
     if not code:
         raise SocialAuthError(
@@ -331,6 +352,136 @@ def _authenticate_kakao(payload):
     return _resolve_social_user(profile)
 
 
+def _exchange_naver_code_for_access_token(code, state_token):
+    if not code:
+        raise SocialAuthError(
+            '인가 코드(code)가 필요합니다.',
+            error_code='SOCIAL_CODE_MISSING',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not state_token:
+        raise SocialAuthError(
+            'state가 필요합니다.',
+            error_code='SOCIAL_STATE_MISSING',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    client_id = getattr(settings, 'NAVER_CLIENT_ID', None)
+    client_secret = getattr(settings, 'NAVER_CLIENT_SECRET', None)
+    if not client_id or not client_secret:
+        raise SocialAuthError(
+            '서버에 NAVER_CLIENT_ID 또는 NAVER_CLIENT_SECRET이 설정되지 않았습니다.',
+            error_code='SOCIAL_PROVIDER_NOT_CONFIGURED',
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    token_response = requests.post(
+        'https://nid.naver.com/oauth2.0/token',
+        params={
+            'grant_type': 'authorization_code',
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'code': code,
+            'state': state_token,
+        },
+        timeout=10,
+    )
+
+    if not token_response.ok:
+        logger.warning(
+            'Naver token exchange failed: status=%s body=%s',
+            token_response.status_code,
+            token_response.text,
+        )
+        raise SocialAuthError(
+            '네이버 토큰 교환에 실패했습니다.',
+            error_code='SOCIAL_TOKEN_EXCHANGE_FAILED',
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    access_token = token_response.json().get('access_token')
+    if not access_token:
+        logger.warning('Naver token exchange returned no access token: body=%s', token_response.text)
+        raise SocialAuthError(
+            '네이버 액세스 토큰을 받지 못했습니다.',
+            error_code='SOCIAL_TOKEN_EXCHANGE_FAILED',
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    return access_token
+
+
+def _fetch_naver_profile(access_token):
+    if not access_token:
+        raise SocialAuthError(
+            '네이버 액세스 토큰을 받지 못했습니다.',
+            error_code='SOCIAL_TOKEN_EXCHANGE_FAILED',
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    profile_response = requests.get(
+        'https://openapi.naver.com/v1/nid/me',
+        headers={'Authorization': f'Bearer {access_token}'},
+        timeout=10,
+    )
+
+    if not profile_response.ok:
+        logger.warning(
+            'Naver profile fetch failed: status=%s body=%s',
+            profile_response.status_code,
+            profile_response.text,
+        )
+        raise SocialAuthError(
+            '네이버 사용자 정보 조회에 실패했습니다.',
+            error_code='SOCIAL_PROFILE_FETCH_FAILED',
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    profile_payload = profile_response.json()
+    if profile_payload.get('resultcode') not in (None, '00'):
+        logger.warning(
+            'Naver profile fetch returned unexpected result: body=%s',
+            profile_response.text,
+        )
+        raise SocialAuthError(
+            '네이버 사용자 정보 조회에 실패했습니다.',
+            error_code='SOCIAL_PROFILE_FETCH_FAILED',
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    return _build_naver_profile(profile_payload)
+
+
+def _validate_naver_profile(profile):
+    if not profile['email']:
+        raise SocialAuthError(
+            '네이버 계정에서 이메일 정보를 가져올 수 없습니다. 동의 항목에서 이메일 제공을 활성화해 주세요.',
+            error_code='SOCIAL_EMAIL_REQUIRED',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+def _authenticate_naver(payload):
+    access_token = payload.get('access_token')
+    code = payload.get('code')
+    state_token = payload.get('state')
+
+    if not access_token and not code:
+        raise SocialAuthError(
+            'access_token 또는 code가 필요합니다.',
+            error_code='SOCIAL_AUTH_INPUT_REQUIRED',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not access_token:
+        access_token = _exchange_naver_code_for_access_token(code, state_token)
+
+    profile = _fetch_naver_profile(access_token)
+    _validate_naver_profile(profile)
+    return _resolve_social_user(profile)
+
+
 class GoogleLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -439,6 +590,32 @@ class KakaoLoginView(APIView):
             )
         except Exception as exc:
             logger.exception('Kakao login failed')
+            return Response(
+                {'error': f'로그인 처리 중 오류가 발생했습니다: {exc}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class NaverLoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        try:
+            user = _authenticate_naver(request.data)
+            return Response(_build_auth_response(user), status=status.HTTP_200_OK)
+        except SocialAuthError as error:
+            return _build_error_response(error)
+        except requests.RequestException:
+            logger.exception('Naver provider request failed')
+            return Response(
+                {
+                    'error': '네이버 로그인 서버와 통신 중 오류가 발생했습니다.',
+                    'error_code': 'SOCIAL_PROVIDER_REQUEST_FAILED',
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except Exception as exc:
+            logger.exception('Naver login failed')
             return Response(
                 {'error': f'로그인 처리 중 오류가 발생했습니다: {exc}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

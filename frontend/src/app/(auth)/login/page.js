@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import GoogleLoginButton from '@/components/auth/GoogleLoginButton';
 import KakaoLoginButton from '@/components/auth/KakaoLoginButton';
+import NaverLoginButton from '@/components/auth/NaverLoginButton';
 
 export default function LoginPage() {
     const [text, setText] = useState('');
@@ -52,6 +53,7 @@ export default function LoginPage() {
             <div style={styles.bottomSection}>
                 <div style={styles.buttonContainer}>
                     <KakaoLoginButton />
+                    <NaverLoginButton />
                     <GoogleLoginButton />
                 </div>
 
