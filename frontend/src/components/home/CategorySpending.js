@@ -13,7 +13,7 @@ const FALLBACK_COLORS = [
 ];
 
 export default function CategorySpending() {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, isNativeApp, startNativeGoogleLogin } = useAuth();
     const [data, setData] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -60,6 +60,19 @@ export default function CategorySpending() {
             setError('데이터를 불러오는데 실패했습니다.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleLoginClick = async () => {
+        if (!isNativeApp) {
+            return;
+        }
+
+        try {
+            await startNativeGoogleLogin();
+        } catch (error) {
+            console.error('네이티브 Google 로그인 시작 실패:', error);
+            alert('Google 로그인에 실패했습니다. 다시 시도해주세요.');
         }
     };
 
@@ -119,21 +132,41 @@ export default function CategorySpending() {
                 {!isAuthenticated ? (
                     <>
                         <p style={{ color: 'var(--text-sub)', padding: '2rem 0 1rem 0' }}>로그인하고 카테고리별 지출을 확인하세요</p>
-                        <a
-                            href="/login"
-                            style={{
-                                display: 'inline-block',
-                                padding: '0.75rem 1.5rem',
-                                backgroundColor: 'var(--primary)',
-                                color: 'white',
-                                borderRadius: 'var(--radius-md)',
-                                textDecoration: 'none',
-                                fontWeight: '600',
-                                marginBottom: '1rem'
-                            }}
-                        >
-                            로그인하기
-                        </a>
+                        {isNativeApp ? (
+                            <button
+                                type="button"
+                                onClick={handleLoginClick}
+                                style={{
+                                    display: 'inline-block',
+                                    padding: '0.75rem 1.5rem',
+                                    backgroundColor: 'var(--primary)',
+                                    color: 'white',
+                                    borderRadius: 'var(--radius-md)',
+                                    textDecoration: 'none',
+                                    fontWeight: '600',
+                                    marginBottom: '1rem',
+                                    border: 'none'
+                                }}
+                            >
+                                로그인하기
+                            </button>
+                        ) : (
+                            <a
+                                href="/login"
+                                style={{
+                                    display: 'inline-block',
+                                    padding: '0.75rem 1.5rem',
+                                    backgroundColor: 'var(--primary)',
+                                    color: 'white',
+                                    borderRadius: 'var(--radius-md)',
+                                    textDecoration: 'none',
+                                    fontWeight: '600',
+                                    marginBottom: '1rem'
+                                }}
+                            >
+                                로그인하기
+                            </a>
+                        )}
                     </>
                 ) : (
                     <p style={{ color: 'var(--text-sub)', padding: '3rem 0' }}>아직 지출 내역이 없습니다.</p>

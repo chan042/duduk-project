@@ -5,7 +5,7 @@ import { getCategoryStats } from '@/lib/api/transaction';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function TotalSpending() {
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, isNativeApp, startNativeGoogleLogin } = useAuth();
     const [totalSpending, setTotalSpending] = useState(0);
     const [loading, setLoading] = useState(true);
     const [isAngry, setIsAngry] = useState(false);
@@ -39,6 +39,19 @@ export default function TotalSpending() {
         setTimeout(() => {
             setIsAngry(false);
         }, 700);
+    };
+
+    const handleLoginClick = async () => {
+        if (!isNativeApp) {
+            return;
+        }
+
+        try {
+            await startNativeGoogleLogin();
+        } catch (error) {
+            console.error('네이티브 Google 로그인 시작 실패:', error);
+            alert('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+        }
     };
 
     // 사용자 예산 가져오기 (없으면 0)
@@ -88,20 +101,39 @@ export default function TotalSpending() {
                 <p style={{ color: 'var(--text-sub)', marginBottom: '1rem' }}>
                     로그인하고 지출 현황을 확인하세요
                 </p>
-                <a
-                    href="/login"
-                    style={{
-                        display: 'inline-block',
-                        padding: '0.75rem 1.5rem',
-                        backgroundColor: 'var(--primary)',
-                        color: 'white',
-                        borderRadius: 'var(--radius-md)',
-                        textDecoration: 'none',
-                        fontWeight: '600'
-                    }}
-                >
-                    로그인하기
-                </a>
+                {isNativeApp ? (
+                    <button
+                        type="button"
+                        onClick={handleLoginClick}
+                        style={{
+                            display: 'inline-block',
+                            padding: '0.75rem 1.5rem',
+                            backgroundColor: 'var(--primary)',
+                            color: 'white',
+                            borderRadius: 'var(--radius-md)',
+                            textDecoration: 'none',
+                            fontWeight: '600',
+                            border: 'none'
+                        }}
+                    >
+                        로그인하기
+                    </button>
+                ) : (
+                    <a
+                        href="/login"
+                        style={{
+                            display: 'inline-block',
+                            padding: '0.75rem 1.5rem',
+                            backgroundColor: 'var(--primary)',
+                            color: 'white',
+                            borderRadius: 'var(--radius-md)',
+                            textDecoration: 'none',
+                            fontWeight: '600'
+                        }}
+                    >
+                        로그인하기
+                    </a>
+                )}
             </div>
         );
     }

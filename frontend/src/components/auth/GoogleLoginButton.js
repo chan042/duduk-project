@@ -9,7 +9,28 @@ import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '@/contexts/AuthContext';
 
 function GoogleLoginButtonContent() {
-    const { loginWithGoogle } = useAuth();
+    const { loginWithGoogle, startNativeGoogleLogin, isNativeApp } = useAuth();
+
+    if (isNativeApp) {
+        return (
+            <div style={styles.buttonWrapper}>
+                <button
+                    type="button"
+                    style={styles.nativeButton}
+                    onClick={async () => {
+                        try {
+                            await startNativeGoogleLogin();
+                        } catch (error) {
+                            console.error('네이티브 Google 로그인 시작 실패:', error);
+                            alert('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+                        }
+                    }}
+                >
+                    Google로 계속하기
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div style={styles.buttonWrapper}>
@@ -72,6 +93,18 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    nativeButton: {
+        width: '100%',
+        maxWidth: '360px',
+        height: '44px',
+        borderRadius: '999px',
+        border: '1px solid #D1D5DB',
+        backgroundColor: '#FFFFFF',
+        color: '#111827',
+        fontSize: '0.95rem',
+        fontWeight: '600',
+        cursor: 'pointer',
     },
     errorContainer: {
         padding: '1.5rem',
