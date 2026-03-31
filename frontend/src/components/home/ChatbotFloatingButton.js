@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Headset } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function ChatbotFloatingButton() {
@@ -55,7 +55,7 @@ export default function ChatbotFloatingButton() {
                     }}
             aria-label="Duduk AI 열기"
         >
-            <Headset size={22} strokeWidth={2.5} />
+            <MessageCircle size={22} strokeWidth={2.5} />
             <div style={{
                 display: 'flex',
                 flexDirection: 'column',
