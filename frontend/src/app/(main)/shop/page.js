@@ -542,7 +542,7 @@ const styles = {
     },
     navIcons: {
         position: 'absolute',
-        top: '16px',
+        top: 'calc(var(--safe-area-top) + 16px)',
         left: '16px',
         zIndex: 50,
         display: 'flex',
@@ -560,7 +560,7 @@ const styles = {
     },
     pointsBadge: {
         position: 'absolute',
-        top: '16px',
+        top: 'calc(var(--safe-area-top) + 16px)',
         right: '16px',
         backgroundColor: 'white',
         padding: '6px 12px',

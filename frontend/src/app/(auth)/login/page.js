@@ -76,6 +76,7 @@ const styles = {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        padding: 'var(--safe-area-top) 2rem 0',
         width: '100%',
         maxWidth: '430px',
         margin: '0 auto',

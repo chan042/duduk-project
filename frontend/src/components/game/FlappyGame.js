@@ -529,7 +529,7 @@ const styles = {
         transform: 'translateX(-50%)',
         width: '100%',
         maxWidth: '430px',
-        height: '100vh',
+        height: '100dvh',
         backgroundColor: '#fff',
         zIndex: 1000,
     },
@@ -548,7 +548,7 @@ const styles = {
     },
     roomIconButton: {
         position: 'absolute',
-        top: '16px',
+        top: 'calc(var(--safe-area-top) + 16px)',
         left: '16px',
         zIndex: 50,
         background: 'transparent',
@@ -622,7 +622,7 @@ const styles = {
     },
     livesContainer: {
         position: 'absolute',
-        top: '16px',
+        top: 'calc(var(--safe-area-top) + 16px)',
         left: '16px',
         zIndex: 100,
     },
@@ -640,7 +640,7 @@ const styles = {
     },
     timerContainer: {
         position: 'absolute',
-        top: '16px',
+        top: 'calc(var(--safe-area-top) + 16px)',
         right: '16px',
         zIndex: 100,
         backgroundColor: 'rgba(0, 0, 0, 0.45)',

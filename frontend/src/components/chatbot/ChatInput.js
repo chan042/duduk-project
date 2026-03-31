@@ -27,10 +27,9 @@ export default function ChatInput({ onSendMessage, disabled, characterName }) {
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
             borderTop: '1px solid #f0f0f0',
             backdropFilter: 'blur(10px)',
-            position: 'sticky',
-            bottom: 0,
             zIndex: 10,
-            paddingBottom: 'calc(16px + env(safe-area-inset-bottom))'
+            flexShrink: 0,
+            paddingBottom: 'calc(16px + var(--safe-area-bottom))'
         }}>
             <form
                 onSubmit={handleSubmit}
@@ -38,6 +37,7 @@ export default function ChatInput({ onSendMessage, disabled, characterName }) {
                     display: 'flex',
                     alignItems: 'flex-end',
                     gap: '12px',
+                    minWidth: 0,
                     backgroundColor: '#f8fafc',
                     borderRadius: '24px',
                     padding: '8px 16px',
@@ -57,15 +57,17 @@ export default function ChatInput({ onSendMessage, disabled, characterName }) {
                     rows={1}
                     style={{
                         flex: 1,
+                        minWidth: 0,
                         background: 'transparent',
                         border: 'none',
                         outline: 'none',
                         resize: 'none',
-                        fontSize: '0.95rem',
+                        fontSize: '16px',
                         lineHeight: '1.5',
                         maxHeight: '100px',
                         padding: '8px 0',
                         color: 'var(--text-main)',
+                        WebkitTextSizeAdjust: '100%',
                     }}
                 />
                 <button

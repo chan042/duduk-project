@@ -561,6 +561,7 @@ const styles = {
         alignItems: 'center',
         width: '100%',
         maxWidth: '430px',
+        padding: 'calc(2rem + var(--safe-area-top)) 2rem 2rem',
         margin: '0 auto',
         paddingTop: 'max(1rem, env(safe-area-inset-top))',
         paddingRight: 'clamp(1rem, 4vw, 1.5rem)',
