@@ -1,5 +1,7 @@
 "use client";
 
+import { startSocialLogin } from '@/lib/auth/socialLoginStart';
+
 const SOCIAL_BUTTON_MAX_WIDTH = 360;
 const KAKAO_LABEL = '\uce74\uce74\uc624\ub85c \uacc4\uc18d\ud558\uae30';
 const KAKAO_LOGIN_ALT = '\uce74\uce74\uc624 \ub85c\uadf8\uc778';
@@ -26,14 +28,6 @@ function KakaoSymbol() {
     );
 }
 
-function createOAuthState() {
-    if (typeof window !== 'undefined' && window.crypto?.randomUUID) {
-        return window.crypto.randomUUID();
-    }
-
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 export default function KakaoLoginButton() {
     const restApiKey = process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY;
 
@@ -47,21 +41,9 @@ export default function KakaoLoginButton() {
     }
 
     const handleLogin = () => {
-        if (typeof window === 'undefined') {
-            return;
-        }
-
-        const state = createOAuthState();
-        const redirectUri = `${window.location.origin}/login/callback/kakao`;
-        const params = new URLSearchParams({
-            client_id: restApiKey,
-            redirect_uri: redirectUri,
-            response_type: 'code',
-            state,
+        startSocialLogin('kakao', {
+            clientId: restApiKey,
         });
-
-        sessionStorage.setItem('oauth_state_kakao', state);
-        window.location.assign(`https://kauth.kakao.com/oauth/authorize?${params.toString()}`);
     };
 
     return (

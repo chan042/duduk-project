@@ -1,12 +1,11 @@
 import { Suspense } from 'react';
 import SocialLoginCallbackPage from '@/components/auth/SocialLoginCallbackPage';
+import { SOCIAL_CALLBACK_PROVIDER_NAMES } from '@/lib/auth/socialCallbackProviders';
 
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-    return [
-        { provider: 'kakao' },
-    ];
+    return SOCIAL_CALLBACK_PROVIDER_NAMES.map((provider) => ({ provider }));
 }
 
 function CallbackFallback() {

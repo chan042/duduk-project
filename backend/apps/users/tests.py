@@ -210,6 +210,57 @@ class KakaoLoginViewTests(APITestCase):
             'http://localhost:3000/login/callback/kakao',
         )
 
+    @patch('apps.users.oauth_views.requests.get')
+    @patch('apps.users.oauth_views.requests.post')
+    def test_kakao_login_accepts_access_token_without_code_exchange(self, mock_post, mock_get):
+        profile_response = Mock()
+        profile_response.ok = True
+        profile_response.json.return_value = {
+            'id': 987654321,
+            'kakao_account': {
+                'email': 'kakao-user@example.com',
+                'is_email_valid': True,
+                'is_email_verified': True,
+                'profile': {
+                    'nickname': 'Kakao User',
+                },
+            },
+        }
+        mock_get.return_value = profile_response
+
+        response = self.client.post(
+            '/api/users/auth/kakao/',
+            {
+                'access_token': 'kakao-access-token',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['user']['email'], 'kakao-user@example.com')
+        self.assertTrue(User.objects.filter(email='kakao-user@example.com').exists())
+        self.assertTrue(
+            SocialAccount.objects.filter(
+                provider=SocialAccount.Provider.KAKAO,
+                provider_user_id='987654321',
+            ).exists()
+        )
+        mock_post.assert_not_called()
+        self.assertEqual(
+            mock_get.call_args.kwargs['headers']['Authorization'],
+            'Bearer kakao-access-token',
+        )
+
+    def test_kakao_login_requires_code_or_access_token(self):
+        response = self.client.post(
+            '/api/users/auth/kakao/',
+            {},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error_code'], 'SOCIAL_AUTH_INPUT_REQUIRED')
+
     @override_settings(KAKAO_REST_API_KEY='kakao-rest-key')
     @patch('apps.users.oauth_views.requests.get')
     @patch('apps.users.oauth_views.requests.post')

@@ -61,7 +61,7 @@ def _build_error_response(error):
 def _provider_label(provider):
     return {
         'google': 'Google',
-        'kakao': '카카오',
+        'kakao': 'Kakao',
     }.get(provider, provider)
 
 
@@ -106,7 +106,11 @@ def _upsert_social_account(user, profile):
             )
 
         if not social_account:
-            social_account = SocialAccount(user=user, provider=provider, provider_user_id=provider_user_id)
+            social_account = SocialAccount(
+                user=user,
+                provider=provider,
+                provider_user_id=provider_user_id,
+            )
 
     social_account.email = profile.get('email')
     social_account.email_verified = profile.get('email_verified', False)
@@ -128,7 +132,7 @@ def _resolve_social_user(profile):
 
     if not provider_user_id:
         raise SocialAuthError(
-            '소셜 로그인 식별자 정보가 없습니다.',
+            '소셜 로그인 계정 정보가 없습니다.',
             error_code='SOCIAL_ID_REQUIRED',
             status_code=status.HTTP_400_BAD_REQUEST,
         )
@@ -208,6 +212,125 @@ def _build_kakao_profile(user_info):
     }
 
 
+def _exchange_kakao_code_for_access_token(code, redirect_uri):
+    if not code:
+        raise SocialAuthError(
+            '인가 코드(code)가 필요합니다.',
+            error_code='SOCIAL_CODE_MISSING',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not redirect_uri:
+        raise SocialAuthError(
+            'redirect_uri가 필요합니다.',
+            error_code='SOCIAL_REDIRECT_URI_MISSING',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    kakao_rest_api_key = getattr(settings, 'KAKAO_REST_API_KEY', None)
+    kakao_client_secret = getattr(settings, 'KAKAO_CLIENT_SECRET', None)
+    if not kakao_rest_api_key:
+        raise SocialAuthError(
+            '서버에 KAKAO_REST_API_KEY가 설정되지 않았습니다.',
+            error_code='SOCIAL_PROVIDER_NOT_CONFIGURED',
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    token_response = requests.post(
+        'https://kauth.kakao.com/oauth/token',
+        data={
+            'grant_type': 'authorization_code',
+            'client_id': kakao_rest_api_key,
+            'redirect_uri': redirect_uri,
+            'code': code,
+            **({'client_secret': kakao_client_secret} if kakao_client_secret else {}),
+        },
+        headers={
+            'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+        },
+        timeout=10,
+    )
+
+    if not token_response.ok:
+        logger.warning(
+            'Kakao token exchange failed: status=%s body=%s',
+            token_response.status_code,
+            token_response.text,
+        )
+        raise SocialAuthError(
+            '카카오 토큰 교환에 실패했습니다.',
+            error_code='SOCIAL_TOKEN_EXCHANGE_FAILED',
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    return token_response.json().get('access_token')
+
+
+def _fetch_kakao_profile(access_token):
+    if not access_token:
+        raise SocialAuthError(
+            '카카오 액세스 토큰을 받지 못했습니다.',
+            error_code='SOCIAL_TOKEN_EXCHANGE_FAILED',
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    profile_response = requests.get(
+        'https://kapi.kakao.com/v2/user/me',
+        headers={'Authorization': f'Bearer {access_token}'},
+        timeout=10,
+    )
+
+    if not profile_response.ok:
+        logger.warning(
+            'Kakao profile fetch failed: status=%s body=%s',
+            profile_response.status_code,
+            profile_response.text,
+        )
+        raise SocialAuthError(
+            '카카오 사용자 정보 조회에 실패했습니다.',
+            error_code='SOCIAL_PROFILE_FETCH_FAILED',
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    return _build_kakao_profile(profile_response.json())
+
+
+def _validate_kakao_profile(profile):
+    if not profile['email']:
+        raise SocialAuthError(
+            '카카오 계정에서 이메일 정보를 가져올 수 없습니다. 동의 항목에서 이메일 제공을 활성화해 주세요.',
+            error_code='SOCIAL_EMAIL_REQUIRED',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not profile['email_verified']:
+        raise SocialAuthError(
+            '카카오 이메일이 유효하지 않거나 인증되지 않았습니다.',
+            error_code='SOCIAL_EMAIL_NOT_VERIFIED',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+def _authenticate_kakao(payload):
+    access_token = payload.get('access_token')
+    code = payload.get('code')
+    redirect_uri = payload.get('redirect_uri')
+
+    if not access_token and not code:
+        raise SocialAuthError(
+            'access_token 또는 code가 필요합니다.',
+            error_code='SOCIAL_AUTH_INPUT_REQUIRED',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not access_token:
+        access_token = _exchange_kakao_code_for_access_token(code, redirect_uri)
+
+    profile = _fetch_kakao_profile(access_token)
+    _validate_kakao_profile(profile)
+    return _resolve_social_user(profile)
+
+
 class GoogleLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -255,9 +378,9 @@ class GoogleLoginView(APIView):
                         {
                             'error': (
                                 'Google credential의 클라이언트 ID가 서버 설정과 일치하지 않습니다. '
-                                '프론트엔드의 NEXT_PUBLIC_GOOGLE_CLIENT_ID와 '
-                                '백엔드의 GOOGLE_OAUTH_CLIENT_ID 또는 GOOGLE_OAUTH_CLIENT_IDS를 '
-                                '같은 Google OAuth 프로젝트 값으로 맞춰주세요.'
+                                '프론트엔드의 NEXT_PUBLIC_GOOGLE_CLIENT_ID와 백엔드의 '
+                                'GOOGLE_OAUTH_CLIENT_ID 또는 GOOGLE_OAUTH_ALLOWED_CLIENT_IDS를 '
+                                '같은 Google OAuth 프로젝트 값으로 맞춰 주세요.'
                             )
                         },
                         status=status.HTTP_401_UNAUTHORIZED,
@@ -300,102 +423,8 @@ class KakaoLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        code = request.data.get('code')
-        redirect_uri = request.data.get('redirect_uri')
-
-        if not code:
-            return Response(
-                {'error': '인가 코드(code)가 필요합니다.', 'error_code': 'SOCIAL_CODE_MISSING'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not redirect_uri:
-            return Response(
-                {'error': 'redirect_uri가 필요합니다.', 'error_code': 'SOCIAL_REDIRECT_URI_MISSING'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        kakao_rest_api_key = getattr(settings, 'KAKAO_REST_API_KEY', None)
-        kakao_client_secret = getattr(settings, 'KAKAO_CLIENT_SECRET', None)
-        if not kakao_rest_api_key:
-            return Response(
-                {
-                    'error': '서버에 KAKAO_REST_API_KEY가 설정되지 않았습니다.',
-                    'error_code': 'SOCIAL_PROVIDER_NOT_CONFIGURED',
-                },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
         try:
-            token_response = requests.post(
-                'https://kauth.kakao.com/oauth/token',
-                data={
-                    'grant_type': 'authorization_code',
-                    'client_id': kakao_rest_api_key,
-                    'redirect_uri': redirect_uri,
-                    'code': code,
-                    **({'client_secret': kakao_client_secret} if kakao_client_secret else {}),
-                },
-                headers={
-                    'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
-                },
-                timeout=10,
-            )
-
-            if not token_response.ok:
-                logger.warning(
-                    'Kakao token exchange failed: status=%s body=%s',
-                    token_response.status_code,
-                    token_response.text,
-                )
-                raise SocialAuthError(
-                    '카카오 토큰 교환에 실패했습니다.',
-                    error_code='SOCIAL_TOKEN_EXCHANGE_FAILED',
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                )
-
-            access_token = token_response.json().get('access_token')
-            if not access_token:
-                raise SocialAuthError(
-                    '카카오 액세스 토큰을 받지 못했습니다.',
-                    error_code='SOCIAL_TOKEN_EXCHANGE_FAILED',
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                )
-
-            profile_response = requests.get(
-                'https://kapi.kakao.com/v2/user/me',
-                headers={'Authorization': f'Bearer {access_token}'},
-                timeout=10,
-            )
-
-            if not profile_response.ok:
-                logger.warning(
-                    'Kakao profile fetch failed: status=%s body=%s',
-                    profile_response.status_code,
-                    profile_response.text,
-                )
-                raise SocialAuthError(
-                    '카카오 사용자 정보 조회에 실패했습니다.',
-                    error_code='SOCIAL_PROFILE_FETCH_FAILED',
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                )
-
-            profile = _build_kakao_profile(profile_response.json())
-            if not profile['email']:
-                raise SocialAuthError(
-                    '카카오 계정에서 이메일 정보를 가져올 수 없습니다. 동의 항목에서 이메일 제공을 활성화해주세요.',
-                    error_code='SOCIAL_EMAIL_REQUIRED',
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
-
-            if not profile['email_verified']:
-                raise SocialAuthError(
-                    '카카오 이메일이 유효하지 않거나 인증되지 않았습니다.',
-                    error_code='SOCIAL_EMAIL_NOT_VERIFIED',
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
-
-            user = _resolve_social_user(profile)
+            user = _authenticate_kakao(request.data)
             return Response(_build_auth_response(user), status=status.HTTP_200_OK)
         except SocialAuthError as error:
             return _build_error_response(error)
