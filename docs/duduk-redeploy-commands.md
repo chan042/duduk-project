@@ -4,8 +4,8 @@
 
 현재 스테이징 환경:
 
-- 프론트 웹: [https://duduk-web-staging-htj7x3xmnq-du.a.run.app](https://duduk-web-staging-htj7x3xmnq-du.a.run.app)
-- 백엔드 API: [https://duduk-api-staging-htj7x3xmnq-du.a.run.app](https://duduk-api-staging-htj7x3xmnq-du.a.run.app)
+- 프론트 웹: [https://duduk-web-staging-128789205583.asia-northeast3.run.app](https://duduk-web-staging-128789205583.asia-northeast3.run.app)
+- 백엔드 API: [https://duduk-api-staging-128789205583.asia-northeast3.run.app](https://duduk-api-staging-128789205583.asia-northeast3.run.app)
 - GCP 프로젝트: `duduk-300c`
 - 리전: `asia-northeast3`
 
@@ -46,8 +46,8 @@ sh /Users/chan/Project/duduk-project/frontend/cloudrun/deploy.sh
 
 ### 1-2. 배포 후 확인
 
-- 메인 페이지: [https://duduk-web-staging-htj7x3xmnq-du.a.run.app](https://duduk-web-staging-htj7x3xmnq-du.a.run.app)
-- 로그인 페이지: [https://duduk-web-staging-htj7x3xmnq-du.a.run.app/login](https://duduk-web-staging-htj7x3xmnq-du.a.run.app/login)
+- 메인 페이지: [https://duduk-web-staging-128789205583.asia-northeast3.run.app](https://duduk-web-staging-128789205583.asia-northeast3.run.app)
+- 로그인 페이지: [https://duduk-web-staging-128789205583.asia-northeast3.run.app/login](https://duduk-web-staging-128789205583.asia-northeast3.run.app/login)
 
 ## 2. 백엔드 API 스테이징 재배포
 
@@ -80,7 +80,7 @@ python manage.py seed_reference_data --force-update
 
 ### 2-2. 배포 후 확인
 
-- 헬스체크: [https://duduk-api-staging-htj7x3xmnq-du.a.run.app/healthz/](https://duduk-api-staging-htj7x3xmnq-du.a.run.app/healthz/)
+- 헬스체크: [https://duduk-api-staging-128789205583.asia-northeast3.run.app/healthz/](https://duduk-api-staging-128789205583.asia-northeast3.run.app/healthz/)
 
 ### 2-3. 참조 데이터 시드 실행
 

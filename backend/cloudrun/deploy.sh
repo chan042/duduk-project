@@ -42,12 +42,19 @@ gcloud run deploy "$CLOUD_RUN_SERVICE" \
   --add-cloudsql-instances "$CLOUD_SQL_INSTANCE" \
   --env-vars-file "$ENV_VARS_FILE"
 
-SERVICE_URL=$(
+PROJECT_NUMBER=$(
+  gcloud projects describe "$GCP_PROJECT_ID" \
+    --format='value(projectNumber)'
+)
+
+LEGACY_SERVICE_URL=$(
   gcloud run services describe "$CLOUD_RUN_SERVICE" \
     --project "$GCP_PROJECT_ID" \
     --region "$GCP_REGION" \
     --format='value(status.url)'
 )
+
+SERVICE_URL="https://${CLOUD_RUN_SERVICE}-${PROJECT_NUMBER}.${GCP_REGION}.run.app"
 
 SERVICE_IMAGE=$(
   gcloud run services describe "$CLOUD_RUN_SERVICE" \
@@ -83,6 +90,7 @@ echo ""
 echo "Cloud Run service deployed."
 echo "Service URL: $SERVICE_URL"
 echo "Health check: ${SERVICE_URL}/healthz/"
+echo "Legacy URL: $LEGACY_SERVICE_URL"
 if [ "$RUN_REFERENCE_SEED" = "1" ]; then
   echo "Reference data seed job: ${CLOUD_RUN_SEED_JOB}"
 fi

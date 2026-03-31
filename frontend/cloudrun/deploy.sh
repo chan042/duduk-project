@@ -39,14 +39,22 @@ gcloud run deploy "$CLOUD_RUN_SERVICE" \
   --min-instances "$CLOUD_RUN_MIN_INSTANCES" \
   --max-instances "$CLOUD_RUN_MAX_INSTANCES"
 
-SERVICE_URL=$(
+PROJECT_NUMBER=$(
+  gcloud projects describe "$GCP_PROJECT_ID" \
+    --format='value(projectNumber)'
+)
+
+LEGACY_SERVICE_URL=$(
   gcloud run services describe "$CLOUD_RUN_SERVICE" \
     --project "$GCP_PROJECT_ID" \
     --region "$GCP_REGION" \
     --format='value(status.url)'
 )
 
+SERVICE_URL="https://${CLOUD_RUN_SERVICE}-${PROJECT_NUMBER}.${GCP_REGION}.run.app"
+
 echo ""
 echo "Frontend Cloud Run service deployed."
 echo "Service URL: $SERVICE_URL"
 echo "Health check: ${SERVICE_URL}/healthz/"
+echo "Legacy URL: $LEGACY_SERVICE_URL"
