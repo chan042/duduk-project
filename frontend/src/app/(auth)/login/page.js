@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import GoogleLoginButton from '@/components/auth/GoogleLoginButton';
+import KakaoLoginButton from '@/components/auth/KakaoLoginButton';
+import NaverLoginButton from '@/components/auth/NaverLoginButton';
 
 export default function LoginPage() {
     const [text, setText] = useState('');
@@ -12,32 +15,32 @@ export default function LoginPage() {
         const intervalId = setInterval(() => {
             if (index < fullText.length) {
                 setText(fullText.slice(0, index + 1));
-                index++;
-            } else {
-                clearInterval(intervalId);
+                index += 1;
+                return;
             }
-        }, 150); // 150ms per character
+
+            clearInterval(intervalId);
+        }, 150);
 
         return () => clearInterval(intervalId);
     }, []);
 
-    // Split text to style "Duduk" differently
     const renderText = () => {
-        const dudukPart = 'Duduk';
-        if (text.length <= dudukPart.length) {
+        const brand = 'Duduk';
+        if (text.length <= brand.length) {
             return <span style={styles.titleMint}>{text}</span>;
         }
+
         return (
             <>
-                <span style={styles.titleMint}>{dudukPart}</span>
-                <span style={{ whiteSpace: 'pre' }}>{text.slice(dudukPart.length)}</span>
+                <span style={styles.titleMint}>{brand}</span>
+                <span style={{ whiteSpace: 'pre' }}>{text.slice(brand.length)}</span>
             </>
         );
     };
 
     return (
         <div style={styles.container}>
-            {/* 상단 타이틀 */}
             <div style={styles.header}>
                 <h1 style={styles.titleWrapper}>
                     <span style={styles.title}>
@@ -47,17 +50,20 @@ export default function LoginPage() {
                 </h1>
             </div>
 
-            {/* Google 로그인 버튼 및 안내 문구 */}
-            <div style={{ ...styles.bottomSection, ...styles.fadeInUp }} className="animate-fade-in-up delay-200">
+            <div style={styles.bottomSection}>
                 <div style={styles.buttonContainer}>
+                    <KakaoLoginButton />
+                    <NaverLoginButton />
                     <GoogleLoginButton />
                 </div>
 
-                {/* 안내 문구 */}
                 <div style={styles.footer}>
                     <p style={styles.notice}>
-                        로그인하면 Duduk의 <a href="/terms" style={styles.link}>이용약관</a> 및 <a href="/privacy" style={styles.link}>개인정보처리방침</a>에<br />
-                        동의하게 됩니다.
+                        로그인하면 Duduk의{' '}
+                        <Link href="/terms" style={styles.link}>이용약관</Link>
+                        {' '}및{' '}
+                        <Link href="/privacy" style={styles.link}>개인정보처리방침</Link>
+                        {' '}동의 후 로그인할 수 있습니다.
                     </p>
                 </div>
             </div>
@@ -67,28 +73,36 @@ export default function LoginPage() {
 
 const styles = {
     container: {
-        minHeight: '100vh',
+        minHeight: '100dvh',
         backgroundColor: '#FFFFFF',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        padding: '0 2rem',
+        padding: 'var(--safe-area-top) 2rem 0',
         width: '100%',
+        maxWidth: '430px',
+        margin: '0 auto',
+        paddingTop: 'max(1rem, env(safe-area-inset-top))',
+        paddingRight: 'clamp(1rem, 5vw, 2rem)',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        paddingLeft: 'clamp(1rem, 5vw, 2rem)',
         fontFamily: 'var(--font-pretendard)',
     },
     header: {
+        width: '100%',
         flex: 1,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingTop: '15vh',
+        paddingTop: 'clamp(3rem, 14vh, 7rem)',
+        paddingBottom: 'clamp(2rem, 8vh, 4rem)',
     },
     titleWrapper: {
         display: 'inline-block',
-        minHeight: '3rem', // Prevent layout shift
+        minHeight: '3rem',
     },
     title: {
-        fontSize: '2.5rem',
+        fontSize: 'clamp(2rem, 9vw, 2.5rem)',
         fontWeight: '800',
         color: '#1E293B',
         lineHeight: '1.2',
@@ -98,30 +112,27 @@ const styles = {
         justifyContent: 'center',
     },
     titleMint: {
-        color: '#14b8a6',
+        color: '#14B8A6',
     },
     cursor: {
         display: 'inline-block',
         width: '4px',
-        height: '2.4rem',
-        backgroundColor: '#14b8a6',
+        height: 'clamp(1.95rem, 8vw, 2.4rem)',
+        backgroundColor: '#14B8A6',
         animation: 'blink-caret .75s step-end infinite',
         marginLeft: '4px',
     },
     bottomSection: {
         width: '100%',
-        maxWidth: '400px',
+        maxWidth: '360px',
         marginTop: 'auto',
-        paddingBottom: '3rem',
-    },
-    fadeInUp: {
     },
     buttonContainer: {
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1rem',
-        marginBottom: '1.5rem',
+        gap: '0.875rem',
+        marginBottom: '1.25rem',
     },
     footer: {
         width: '100%',
@@ -132,6 +143,7 @@ const styles = {
         textAlign: 'center',
         lineHeight: '1.6',
         letterSpacing: '-0.02em',
+        wordBreak: 'keep-all',
     },
     link: {
         color: '#64748B',

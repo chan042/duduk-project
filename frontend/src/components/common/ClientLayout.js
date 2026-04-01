@@ -13,6 +13,7 @@ export default function ClientLayout({ children }) {
     const [isPopupOpen, setIsPopupOpen] = useState(false);
     const pathname = usePathname();
     const hideBottomNav = HIDE_BOTTOM_NAV_ROUTES.includes(pathname);
+    const isChatbotPage = pathname === '/chatbot';
 
     const handleTransactionAdded = () => {
         console.log("Transaction added via global quick add");
@@ -23,23 +24,32 @@ export default function ClientLayout({ children }) {
         <NotificationProvider>
             <div style={{
                 backgroundColor: '#e0e0e0',
-                minHeight: '100vh',
+                minHeight: isChatbotPage ? '100dvh' : '100vh',
+                height: isChatbotPage ? '100dvh' : 'auto',
                 display: 'flex',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                overflow: isChatbotPage ? 'hidden' : 'visible',
             }}>
                 <div style={{
                     width: '100%',
                     maxWidth: '430px',
                     backgroundColor: 'var(--background-light)',
-                    minHeight: '100vh',
+                    minHeight: isChatbotPage ? '100dvh' : '100vh',
+                    height: isChatbotPage ? '100dvh' : 'auto',
                     boxShadow: '0 0 20px rgba(0,0,0,0.1)',
                     position: 'relative',
                     display: 'flex',
-                    flexDirection: 'column'
+                    flexDirection: 'column',
+                    overflow: isChatbotPage ? 'hidden' : 'visible',
                 }}>
                     <GlobalHeader />
 
-                    <div style={{ flex: 1, paddingBottom: hideBottomNav ? '0px' : '80px' }}>
+                    <div style={{
+                        flex: 1,
+                        minHeight: 0,
+                        paddingBottom: hideBottomNav ? '0px' : '80px',
+                        overflow: isChatbotPage ? 'hidden' : 'visible',
+                    }}>
                         {children}
                     </div>
 

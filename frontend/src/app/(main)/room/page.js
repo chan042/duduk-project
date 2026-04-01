@@ -373,7 +373,7 @@ const styles = {
         transform: 'translateX(-50%)',
         width: '100%',
         maxWidth: '430px',
-        height: '100vh',
+        height: '100dvh',
         overflow: 'hidden',
         zIndex: 50,
     },
@@ -388,7 +388,7 @@ const styles = {
     },
     header: {
         position: 'absolute',
-        top: '16px',
+        top: 'calc(var(--safe-area-top) + 16px)',
         left: '16px',
         zIndex: 10,
         display: 'flex',
@@ -397,7 +397,7 @@ const styles = {
     sideMenu: {
         position: 'absolute',
         right: '16px',
-        top: '16px',
+        top: 'calc(var(--safe-area-top) + 16px)',
         zIndex: 10,
         display: 'flex',
         flexDirection: 'column',

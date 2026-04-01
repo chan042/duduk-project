@@ -53,7 +53,7 @@ export default function BottomNavigation({ onQuickAddClick }) {
                     alignItems: "center",
                     height: "100%",
                     position: "relative",
-                    padding: "0 0.5rem 20px",
+                    padding: "10px 0.5rem 18px",
                 }}
             >
                 <Link

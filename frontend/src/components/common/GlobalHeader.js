@@ -11,6 +11,7 @@ export default function GlobalHeader() {
     const router = useRouter();
     const { unreadCount } = useNotification();
     const isHome = pathname === '/';
+    const managesOwnSafeArea = pathname === '/chatbot';
 
     const getHeaderContent = () => {
         if (isHome) {
@@ -100,7 +101,12 @@ export default function GlobalHeader() {
     };
 
     const content = getHeaderContent();
-    if (!content) return null;
+    if (!content) {
+        if (managesOwnSafeArea) {
+            return null;
+        }
+        return <div style={styles.safeAreaSpacer} aria-hidden="true" />;
+    }
 
     return (
         <header style={styles.header}>
@@ -140,11 +146,16 @@ const styles = {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '1rem',
+        padding: 'calc(1rem + var(--safe-area-top)) 1rem 1rem',
         backgroundColor: 'var(--background-light)',
         position: 'sticky',
         top: 0,
         zIndex: 50
+    },
+    safeAreaSpacer: {
+        height: 'var(--safe-area-top)',
+        backgroundColor: 'var(--background-light)',
+        flexShrink: 0,
     },
     sideArea: {
         width: '40px',

@@ -733,7 +733,7 @@ const styles = {
     },
     headerIcons: {
         position: 'absolute',
-        top: '12px',
+        top: 'calc(var(--safe-area-top) + 12px)',
         right: '12px',
         display: 'flex',
         gap: '8px',

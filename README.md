@@ -104,6 +104,8 @@ GEMINI_MODEL_COACHING=gemini-2.5-flash
 GEMINI_MODEL_ANALYSIS=gemini-2.5-flash
 GOOGLE_OAUTH_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
 GOOGLE_OAUTH_CLIENT_IDS=your-google-web-client-id.apps.googleusercontent.com
+KAKAO_REST_API_KEY=your-kakao-rest-api-key
+KAKAO_CLIENT_SECRET=your-kakao-client-secret
 ```
 
 `GEMINI_API_KEY` 대신 `GOOGLE_API_KEY`도 사용할 수 있습니다. 코칭/분석 키를 분리하려면 `GEMINI_API_KEY_COACHING`, `GEMINI_API_KEY_ANALYSIS`를 설정하면 됩니다.
@@ -112,10 +114,12 @@ GOOGLE_OAUTH_CLIENT_IDS=your-google-web-client-id.apps.googleusercontent.com
 
 ```env
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com
+NEXT_PUBLIC_KAKAO_REST_API_KEY=your-kakao-rest-api-key
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 `NEXT_PUBLIC_GOOGLE_CLIENT_ID`와 백엔드의 `GOOGLE_OAUTH_CLIENT_ID` 또는 `GOOGLE_OAUTH_CLIENT_IDS`는 같은 Google OAuth 프로젝트의 웹 클라이언트 ID여야 합니다.
+`NEXT_PUBLIC_KAKAO_REST_API_KEY`는 카카오 Developers의 REST API 키여야 하고, 백엔드의 `KAKAO_REST_API_KEY`와 같은 앱 값을 사용해야 합니다.
 
 
 ### 3. 프로젝트 실행

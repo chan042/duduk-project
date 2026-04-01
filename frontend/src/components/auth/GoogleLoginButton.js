@@ -1,15 +1,44 @@
 "use client";
 
-/**
- * [파일 역할]
- * - Google 로그인 버튼 컴포넌트를 제공합니다.
- * - Google credential(ID token)을 백엔드로 전송하여 JWT 토큰을 받습니다.
- */
+import { useEffect, useRef, useState } from 'react';
 import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '@/contexts/AuthContext';
 
+const SOCIAL_BUTTON_MAX_WIDTH = 360;
+
 function GoogleLoginButtonContent() {
     const { loginWithGoogle, startNativeGoogleLogin, isNativeApp } = useAuth();
+    const wrapperRef = useRef(null);
+    const [buttonWidth, setButtonWidth] = useState(SOCIAL_BUTTON_MAX_WIDTH);
+
+    useEffect(() => {
+        if (isNativeApp) {
+            return undefined;
+        }
+
+        const updateButtonWidth = () => {
+            if (!wrapperRef.current) {
+                return;
+            }
+
+            const nextWidth = Math.min(
+                Math.max(Math.floor(wrapperRef.current.clientWidth), 280),
+                SOCIAL_BUTTON_MAX_WIDTH,
+            );
+            setButtonWidth(nextWidth);
+        };
+
+        updateButtonWidth();
+
+        if (typeof ResizeObserver === 'undefined' || !wrapperRef.current) {
+            return undefined;
+        }
+
+        const observer = new ResizeObserver(updateButtonWidth);
+        observer.observe(wrapperRef.current);
+
+        return () => observer.disconnect();
+    }, [isNativeApp]);
 
     if (isNativeApp) {
         return (
@@ -33,13 +62,13 @@ function GoogleLoginButtonContent() {
     }
 
     return (
-        <div style={styles.buttonWrapper}>
+        <div ref={wrapperRef} style={styles.buttonWrapper}>
             <GoogleLogin
                 theme="outline"
                 size="large"
                 text="continue_with"
                 shape="pill"
-                width="360"
+                width={String(buttonWidth)}
                 onSuccess={async (credentialResponse) => {
                     try {
                         if (!credentialResponse.credential) {
@@ -71,7 +100,7 @@ export default function GoogleLoginButton() {
         return (
             <div style={styles.errorContainer}>
                 <p style={styles.errorText}>
-                    ⚠️ Google OAuth 설정이 필요합니다.
+                    Google OAuth 설정이 필요합니다.
                 </p>
                 <p style={styles.errorSubtext}>
                     .env 파일에 NEXT_PUBLIC_GOOGLE_CLIENT_ID를 설정해주세요.
@@ -93,6 +122,9 @@ const styles = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        maxWidth: `${SOCIAL_BUTTON_MAX_WIDTH}px`,
+        margin: '0 auto',
+        minHeight: '44px',
     },
     nativeButton: {
         width: '100%',

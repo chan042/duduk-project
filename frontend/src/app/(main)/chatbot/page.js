@@ -70,6 +70,25 @@ export default function ChatbotPage() {
         initSession();
     }, [loading]);
 
+    useEffect(() => {
+        const previousBodyOverflow = document.body.style.overflow;
+        const previousHtmlOverflow = document.documentElement.style.overflow;
+        const previousBodyOverscroll = document.body.style.overscrollBehavior;
+        const previousHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overscrollBehavior = 'none';
+        document.documentElement.style.overscrollBehavior = 'none';
+
+        return () => {
+            document.body.style.overflow = previousBodyOverflow;
+            document.documentElement.style.overflow = previousHtmlOverflow;
+            document.body.style.overscrollBehavior = previousBodyOverscroll;
+            document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
+        };
+    }, []);
+
     // 사용자가 메시지 전송
     const handleSendMessage = async (text) => {
         const newUserMsg = { id: Date.now(), role: 'user', content: text };
@@ -113,23 +132,24 @@ export default function ChatbotPage() {
 
     return (
         <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100dvh', // Use dvh for mobile browser compatibility
+            display: 'grid',
+            gridTemplateRows: 'auto minmax(0, 1fr) auto',
+            height: '100%',
+            minHeight: 0,
+            maxHeight: '100%',
             backgroundColor: '#ffffff',
             position: 'relative',
-            overflow: 'hidden' // Prevent body scroll
+            overflow: 'hidden'
         }}>
             {/* 상단 헤더 (뒤로가기 포함) - 채팅방 느낌 */}
             <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                padding: '16px',
+                flexShrink: 0,
+                padding: 'calc(16px + var(--safe-area-top)) 16px 16px',
                 borderBottom: '1px solid #f0f0f0',
                 backgroundColor: 'rgba(255, 255, 255, 0.9)',
                 backdropFilter: 'blur(10px)',
-                position: 'sticky',
-                top: 0,
                 zIndex: 10
             }}>
                 <button
@@ -154,13 +174,13 @@ export default function ChatbotPage() {
 
             {/* 대화 내용 영역 */}
             <div style={{
-                flex: 1,
+                minHeight: 0,
                 overflowY: 'auto',
-                padding: '20px 16px',
+                WebkitOverflowScrolling: 'touch',
+                padding: '20px 16px 24px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '16px',
-                paddingBottom: '-20px' // 여백
+                gap: '16px'
             }}>
                 {messages.map((msg) => (
                     <ChatMessage key={msg.id} message={msg} characterType={user?.character_type || 'char_cat'} />

@@ -21,6 +21,7 @@ backend/celerybeat-schedule
 # Node/Next.js
 node_modules/
 .next/
+frontend/.env.local
 frontend/.env.production
 frontend/out/
 npm-debug.log*

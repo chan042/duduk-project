@@ -13,6 +13,12 @@ export const metadata = {
   description: '당신의 소비를 스마트하게 관리하세요',
 }
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+}
+
 export default function RootLayout({ children }) {
   return (
     <html lang="ko" suppressHydrationWarning>

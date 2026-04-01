@@ -188,7 +188,7 @@ export default function ClosetPage() {
                     onClick={handleSaveLook}
                     style={{
                         position: 'absolute',
-                        top: '16px',
+                        top: 'calc(var(--safe-area-top) + 16px)',
                         right: '16px',
                         zIndex: 50,
                         backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -340,7 +340,7 @@ const styles = {
     },
     navIcons: {
         position: 'absolute',
-        top: '16px',
+        top: 'calc(var(--safe-area-top) + 16px)',
         left: '16px',
         zIndex: 50,
         display: 'flex',
@@ -358,7 +358,7 @@ const styles = {
     },
     characterContainer: {
         position: 'absolute',
-        top: '60px', // Below nav
+        top: 'calc(var(--safe-area-top) + 60px)',
         left: 0,
         right: 0,
         bottom: 0,
