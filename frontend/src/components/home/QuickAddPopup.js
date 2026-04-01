@@ -32,6 +32,7 @@ export default function QuickAddPopup({ onClose, onTransactionAdded, selectedDat
         handleConfirmAnalyzedStore,
         handleSubmitManualStore,
         handleSave,
+        handleClose,
         handleBack,
         setImageMatchMenuName,
         setManualStoreName,
@@ -48,22 +49,31 @@ export default function QuickAddPopup({ onClose, onTransactionAdded, selectedDat
     const header = step === QUICK_ADD_STEPS.INPUT ? (
         <div style={styles.inputHeader}>
             <h2 style={styles.inputHeaderTitle}>Quick Add</h2>
-            <button type="button" onClick={onClose} style={styles.iconButton}>
+            <button type="button" onClick={handleClose} style={styles.iconButton}>
                 <X size={24} color="var(--text-main)" />
             </button>
         </div>
     ) : showImageMatchBackButton ? (
         <div style={styles.flowHeader}>
-            <button type="button" onClick={handleBack} style={styles.backButton}>
+            <button
+                type="button"
+                onClick={handleBack}
+                disabled={isLoading}
+                style={{
+                    ...styles.backButton,
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    opacity: isLoading ? 0.4 : 1,
+                }}
+            >
                 <ChevronLeft size={22} color="var(--text-main)" />
             </button>
-            <button type="button" onClick={onClose} style={styles.iconButton}>
+            <button type="button" onClick={handleClose} style={styles.iconButton}>
                 <X size={24} color="var(--text-main)" />
             </button>
         </div>
     ) : (
         <div style={styles.closeHeader}>
-            <button type="button" onClick={onClose} style={styles.iconButton}>
+            <button type="button" onClick={handleClose} style={styles.iconButton}>
                 <X size={24} color="var(--text-main)" />
             </button>
         </div>
@@ -72,7 +82,7 @@ export default function QuickAddPopup({ onClose, onTransactionAdded, selectedDat
     return (
         <BottomSheet
             isOpen
-            onClose={onClose}
+            onClose={handleClose}
             closeOnBackdrop={false}
             header={header}
             backgroundColor="var(--background-light)"
@@ -146,6 +156,7 @@ export default function QuickAddPopup({ onClose, onTransactionAdded, selectedDat
                 <TransactionConfirm
                     initialData={parsedData}
                     onSave={handleSave}
+                    isSaving={loadingType === QUICK_ADD_LOADING.SAVE}
                     selectedDate={selectedDate}
                     originalInput={confirmOriginalInput}
                 />

@@ -11,6 +11,8 @@ from calendar import monthrange
 from django.db.models import Sum
 import random
 import uuid
+from apps.common.categories import TRANSACTION_CATEGORIES
+from apps.common.months import get_month_date_bounds, get_previous_month
 from .models import ChallengeTemplate, UserChallenge, ChallengeDailyLog
 from .constants import (
     CONDITION_TYPE_AMOUNT_LIMIT,
@@ -33,15 +35,8 @@ from .services.progress import build_initial_progress, build_initial_progress_fo
 
 def _get_last_month_bounds(reference_dt=None):
     now = reference_dt or timezone.now()
-    if now.month == 1:
-        last_month_year = now.year - 1
-        last_month = 12
-    else:
-        last_month_year = now.year
-        last_month = now.month - 1
-    start = date(last_month_year, last_month, 1)
-    end = date(last_month_year, last_month, monthrange(last_month_year, last_month)[1])
-    return start, end
+    last_month_year, last_month = get_previous_month(now.year, now.month)
+    return get_month_date_bounds(last_month_year, last_month)
 
 
 def _get_template_availability(template, user, reference_dt=None):
@@ -475,15 +470,8 @@ class UserChallengeCreateSerializer(serializers.Serializer):
 
         elif compare_type == COMPARE_TYPE_FIXED_EXPENSE:
             # 고정비 다이어트: 지난달 고정비
-            if now.month == 1:
-                last_month_year = now.year - 1
-                last_month = 12
-            else:
-                last_month_year = now.year
-                last_month = now.month - 1
-
-            last_month_start = date(last_month_year, last_month, 1)
-            last_month_end = date(last_month_year, last_month, monthrange(last_month_year, last_month)[1])
+            last_month_year, last_month = get_previous_month(now.year, now.month)
+            last_month_start, last_month_end = get_month_date_bounds(last_month_year, last_month)
 
             total = Transaction.objects.filter(
                 user=user,
@@ -510,13 +498,7 @@ class UserChallengeCreateSerializer(serializers.Serializer):
 
         return 0
 
-
-
-ALL_CATEGORIES = [
-    '식비', '생활', '카페/간식', '온라인 쇼핑', '패션/쇼핑', '뷰티/미용', 
-    '교통', '자동차', '주거/통신', '의료/건강', '문화/여가', '여행/숙박', 
-    '교육/학습', '자녀/육아', '반려동물', '경조/선물', '술/유흥', '기타'
-]
+ALL_CATEGORIES = list(TRANSACTION_CATEGORIES)
 
 
 class ChallengeDailyLogSerializer(serializers.ModelSerializer):

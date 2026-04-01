@@ -16,6 +16,7 @@ from apps.battles.services.profile_service import (
     get_or_create_battle_profile,
     reconcile_locked_battle_profile,
 )
+from apps.common.months import get_next_month
 
 
 CATEGORY_SCORE_KEYS = {
@@ -64,9 +65,16 @@ def _request_deadline_at(now):
 
 
 def _score_expected_at(now):
-    if now.month == 12:
-        return now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    return now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    next_year, next_month = get_next_month(now.year, now.month)
+    return now.replace(
+        year=next_year,
+        month=next_month,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
 
 
 def _category_display_name(category):

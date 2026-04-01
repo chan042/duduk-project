@@ -157,6 +157,7 @@ const styles = {
     buttonRow: {
         display: 'flex',
         gap: '0.75rem',
+        marginTop: '0.5rem',
     },
     primaryButton: {
         flex: 1,
@@ -200,6 +201,7 @@ const styles = {
         display: 'flex',
         flexDirection: 'column',
         gap: '0.75rem',
+        marginTop: '0.5rem',
     },
     manualInput: {
         width: '100%',

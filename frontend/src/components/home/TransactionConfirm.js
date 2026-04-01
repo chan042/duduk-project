@@ -3,13 +3,14 @@
 
 
 // 외부 라이브러리 및 아이콘 임포트
-import { Edit2, MapPin, Calendar, Check, X } from 'lucide-react';
+import { Edit2, MapPin, Calendar, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 import CalculatorInput from '../common/CalculatorInput';       // 금액 계산기 모달
+import CategoryPickerSheet from '../common/CategoryPickerSheet';
 import DateWheelPicker from '../common/DateWheelPicker';       // 날짜 휠 선택 모달
 import KakaoLocationPicker from '../common/KakaoLocationPicker'; // 카카오맵 장소 검색 모달
-import { getCategoryIcon, CATEGORIES, CATEGORY_COLORS, normalizeCategory } from '../common/CategoryIcons'; // 카테고리 아이콘/색상
+import { getCategoryIcon, CATEGORY_COLORS, normalizeCategory } from '../common/CategoryIcons'; // 카테고리 아이콘/색상
 
 // ============================================================
 // 헬퍼 함수: 초기 위치 데이터 보정
@@ -54,7 +55,13 @@ const getSmartLocation = (data, input) => {
 
 
 
-export default function TransactionConfirm({ initialData, onSave, selectedDate, originalInput = '' }) {
+export default function TransactionConfirm({
+    initialData,
+    onSave,
+    isSaving = false,
+    selectedDate,
+    originalInput = '',
+}) {
     // --------------------------------------------------------------------------------
     // 1. State Declarations (Must be at the top to avoid TDZ)
     // --------------------------------------------------------------------------------
@@ -116,8 +123,12 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate, 
     };
 
     const hasValidAmount = typeof amount === 'number' && amount > 0;
-
+    const showImageMatchPriceFailureMessage = initialData?.imageMatchStatus === 'not_found' && amount === 0;
     const handleSaveClick = () => {
+        if (isSaving) {
+            return;
+        }
+
         if (!hasValidAmount) {
             alert('금액을 입력해주세요.');
             setShowCalculator(true);
@@ -139,7 +150,7 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate, 
 
     // 렌더링
     return (
-        <div style={{ paddingBottom: '1rem' }}>
+        <div style={styles.container}>
 
             {/* ----------------------------------------
                 섹션 1: 금액 표시 (헤더)
@@ -147,18 +158,11 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate, 
             ---------------------------------------- */}
             <div
                 onClick={() => setShowCalculator(true)}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    marginBottom: '1.5rem',
-                    cursor: 'pointer'
-                }}
+                style={styles.amountRow}
             >
                 <span style={{
-                    fontSize: '1.75rem',
-                    fontWeight: '800',
-                    color: hasValidAmount ? 'var(--text-main)' : 'var(--primary)'
+                    ...styles.amountText,
+                    color: hasValidAmount ? 'var(--text-main)' : 'var(--primary)',
                 }}>
                     {hasValidAmount ? `₩${amount.toLocaleString()}` : '금액을 입력해주세요'}
                 </span>
@@ -166,188 +170,86 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate, 
             </div>
 
             {!hasValidAmount && (
-                <p style={{
-                    marginTop: '-1rem',
-                    marginBottom: '1.25rem',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-sub)',
-                    lineHeight: 1.5
-                }}>
-                    이미지에서 가격을 찾지 못했어요. 탭해서 금액을 직접 입력해주세요.
+                <p style={styles.amountHint}>
+                    {showImageMatchPriceFailureMessage
+                        ? '가격 분석에 실패했습니다. 금액을 직접 입력해주세요.'
+                        : '금액을 직접 입력해주세요.'}
                 </p>
             )}
 
             {/* ----------------------------------------
                 섹션 2: 카테고리 & 날짜 선택 버튼 (가로 배치)
             ---------------------------------------- */}
-            <div style={{
-                display: 'flex',
-                gap: '0.75rem',
-                marginBottom: '1.5rem'
-            }}>
+            <div style={styles.pickerRow}>
                 {/* 카테고리 선택 버튼 */}
                 <div
                     onClick={() => setShowCategoryPicker(true)}
-                    style={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        backgroundColor: 'white',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '0.875rem 1rem',
-                        cursor: 'pointer'
-                    }}
+                    style={styles.pickerCard}
                 >
-                    {/* 카테고리 아이콘 */}
                     <div style={{
+                        ...styles.pickerIcon,
                         backgroundColor: `${getCategoryColor(category)}20`,
-                        padding: '0.5rem',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
                     }}>
                         {getCategoryIcon(category, 20)}
                     </div>
-                    {/* 카테고리 라벨 및 값 */}
                     <div>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)', marginBottom: '0.125rem' }}>카테고리</p>
-                        <p style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-main)' }}>{category}</p>
+                        <p style={styles.pickerLabel}>카테고리</p>
+                        <p style={styles.pickerValue}>{category}</p>
                     </div>
                 </div>
 
                 {/* 날짜 선택 버튼 */}
                 <div
                     onClick={() => setShowDatePicker(true)}
-                    style={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        backgroundColor: 'white',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '0.875rem 1rem',
-                        cursor: 'pointer'
-                    }}
+                    style={styles.pickerCard}
                 >
-                    {/* 날짜 아이콘 */}
-                    <div style={{
-                        backgroundColor: '#f0f9ff',
-                        padding: '0.5rem',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                    }}>
+                    <div style={{ ...styles.pickerIcon, backgroundColor: '#f0f9ff' }}>
                         <Calendar size={20} color="#3b82f6" />
                     </div>
-                    {/* 날짜 라벨 및 값 */}
                     <div>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-sub)', marginBottom: '0.125rem' }}>날짜</p>
-                        <p style={{ fontSize: '0.9rem', fontWeight: '600', color: 'var(--text-main)' }}>{formatDateDisplay()}</p>
+                        <p style={styles.pickerLabel}>날짜</p>
+                        <p style={styles.pickerValue}>{formatDateDisplay()}</p>
                     </div>
                 </div>
             </div>
 
             {/* ----------------------------------------
                 섹션 3: 상품명 입력
-                - 언더라인 스타일 입력 필드
             ---------------------------------------- */}
-            <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: 'var(--text-main)',
-                    marginBottom: '0.5rem'
-                }}>상품명</label>
+            <div style={styles.fieldBlock}>
+                <label style={styles.fieldLabel}>상품명</label>
                 <input
                     type="text"
                     value={item}
                     onChange={(e) => setItem(e.target.value)}
                     placeholder="상품명을 입력하세요"
-                    style={{
-                        width: '100%',
-                        padding: '0.5rem 0',        // 좌우 패딩 없음 (라벨과 정렬)
-                        fontSize: '1rem',
-                        fontWeight: '500',
-                        color: 'var(--text-main)',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        borderBottom: '1px solid #e2e8f0',
-                        outline: 'none',
-                        boxSizing: 'border-box'
-                    }}
+                    style={styles.fieldInput}
                 />
             </div>
 
             {/* ----------------------------------------
                 섹션 4: 소비처 입력
-                - 언더라인 스타일 입력 필드
             ---------------------------------------- */}
-            <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: 'var(--text-main)',
-                    marginBottom: '0.5rem'
-                }}>소비처</label>
+            <div style={styles.fieldBlock}>
+                <label style={styles.fieldLabel}>소비처</label>
                 <input
                     type="text"
                     value={store}
                     onChange={(e) => setStore(e.target.value)}
                     placeholder="소비처를 입력하세요"
-                    style={{
-                        width: '100%',
-                        padding: '0.5rem 0',        // 좌우 패딩 없음 (라벨과 정렬)
-                        fontSize: '1rem',
-                        fontWeight: '500',
-                        color: 'var(--text-main)',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        borderBottom: '1px solid #e2e8f0',
-                        outline: 'none',
-                        boxSizing: 'border-box'
-                    }}
+                    style={styles.fieldInput}
                 />
             </div>
 
             {/* ----------------------------------------
                 섹션 5: 장소 검색
-                - 지도 썸네일을 클릭해야만 카카오맵 장소 검색 모달이 열림
-                - 오른쪽에 실제 미니맵 표시 (작은 썸네일 유지 + 실제 지도)
             ---------------------------------------- */}
-            <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: 'var(--text-main)',
-                    marginBottom: '0.5rem'
-                }}>장소 검색</label>
+            <div style={styles.fieldBlock}>
+                <label style={styles.fieldLabel}>장소 검색</label>
 
-                {/* 장소명 + 미니맵 영역 - flex로 하단 정렬 */}
-                <div
-                    style={{
-                        display: 'flex',
-                        alignItems: 'flex-end',  /* 하단 정렬 */
-                        justifyContent: 'space-between',
-                        gap: '12px'
-                    }}
-                >
-                    {/* 장소명 입력 필드 - 직접 수정 가능 */}
-                    <div style={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        borderBottom: '1px solid #e2e8f0',
-                        paddingBottom: '0.5rem'
-                    }}>
+                <div style={styles.locationRow}>
+                    {/* 장소명 입력 필드 */}
+                    <div style={styles.locationInputWrapper}>
                         <input
                             type="text"
                             value={location.placeName || location.address || ''}
@@ -357,18 +259,8 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate, 
                                 address: location.address || e.target.value
                             })}
                             placeholder="장소를 검색하세요"
-                            style={{
-                                flex: 1,
-                                fontSize: '1rem',
-                                fontWeight: '500',
-                                color: 'var(--text-main)',
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                outline: 'none',
-                                padding: 0
-                            }}
+                            style={styles.locationInput}
                         />
-                        {/* 장소명 삭제 버튼 */}
                         {(location.placeName || location.address) && (
                             <button
                                 onClick={() => setLocation({
@@ -377,148 +269,80 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate, 
                                     lat: null,
                                     lng: null
                                 })}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    padding: '2px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'var(--text-sub)'
-                                }}
+                                style={styles.locationClearButton}
                             >
                                 <X size={16} />
                             </button>
                         )}
                     </div>
 
-                    {/* 미니맵 영역 - 클릭 시에만 모달 열림 */}
+                    {/* 미니맵 영역 */}
                     <div
                         onClick={() => setShowLocationPicker(true)}
-                        style={{
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '8px',
-                            overflow: 'hidden',
-                            flexShrink: 0,
-                            cursor: 'pointer',
-                            position: 'relative',
-                            border: '1px solid #e2e8f0',
-                            backgroundColor: '#f1f5f9'
-                        }}
+                        style={styles.minimapShell}
                     >
-                        {/* 실제 미니맵 또는 기본 아이콘 */}
                         {location.lat && location.lng ? (
                             <img
                                 src={`https://dapi.kakao.com/v2/local/map/staticmap.png?appkey=${process.env.NEXT_PUBLIC_KAKAO_JS_KEY}&center=${location.lng},${location.lat}&level=3&w=96&h=96&marker=color:red|pos:${location.lng},${location.lat}`}
                                 alt="위치 미리보기"
-                                style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'cover'
-                                }}
+                                style={styles.minimapImage}
                                 onError={(e) => {
-                                    // 이미지 로드 실패 시 기본 아이콘 표시
                                     e.target.style.display = 'none';
                                     e.target.nextSibling.style.display = 'flex';
                                 }}
                             />
                         ) : null}
-                        {/* 기본 아이콘 (좌표 없을 때 또는 이미지 로드 실패 시) */}
                         <div style={{
-                            width: '100%',
-                            height: '100%',
-                            backgroundColor: '#e0f2f1',
+                            ...styles.minimapFallback,
                             display: location.lat && location.lng ? 'none' : 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0
                         }}>
                             <MapPin size={24} color="var(--primary)" />
                         </div>
                     </div>
                 </div>
 
-                {/* 안내 텍스트 */}
-                <p style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--text-sub)',
-                    marginTop: '0.5rem'
-                }}>썸네일을 누르면 지도를 크게 볼 수 있습니다.</p>
+                <p style={styles.locationHint}>썸네일을 누르면 지도를 크게 볼 수 있습니다.</p>
             </div>
 
             {/* ----------------------------------------
                 섹션 6: 고정 지출 토글
-                - 매월 반복되는 고정 지출로 등록할지 여부
             ---------------------------------------- */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '0.5rem 0',
-                marginBottom: '1rem'
-            }}>
-                <span style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-main)' }}>고정 지출에 추가</span>
-                {/* 토글 스위치 */}
+            <div style={styles.toggleRow}>
+                <span style={styles.toggleLabel}>고정 지출에 추가</span>
                 <div
                     onClick={() => setIsRecurring(!isRecurring)}
                     style={{
-                        width: '50px',
-                        height: '28px',
+                        ...styles.toggleTrack,
                         backgroundColor: isRecurring ? 'var(--primary)' : '#cbd5e0',
-                        borderRadius: '14px',
-                        position: 'relative',
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s ease'
                     }}
                 >
-                    {/* 토글 원형 버튼 */}
                     <div style={{
-                        width: '24px',
-                        height: '24px',
-                        backgroundColor: 'white',
-                        borderRadius: '50%',
-                        position: 'absolute',
-                        top: '2px',
+                        ...styles.toggleThumb,
                         left: isRecurring ? '24px' : '2px',
-                        transition: 'left 0.2s ease',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                    }}></div>
+                    }} />
                 </div>
             </div>
 
             {/* ----------------------------------------
                 섹션 7: 저장 버튼
-                - 클릭 시 onSave 콜백 호출하여 데이터 저장
             ---------------------------------------- */}
             <button
+                type="button"
                 onClick={handleSaveClick}
+                disabled={isSaving}
                 style={{
-                    width: '100%',
-                    padding: '1rem',
-                    backgroundColor: 'var(--primary)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '1.1rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 6px rgba(47, 133, 90, 0.2)',
-                    opacity: hasValidAmount ? 1 : 0.7
+                    ...styles.saveButton,
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    opacity: hasValidAmount ? 1 : 0.7,
                 }}
             >
-                저장
+                {isSaving ? '저장 중...' : '저장'}
             </button>
 
             {/* ========================================
                 모달 컴포넌트들
-                - 각 모달은 해당 상태가 true일 때 표시됨
             ======================================== */}
 
-            {/* 금액 계산기 모달 */}
             <CalculatorInput
                 isOpen={showCalculator}
                 onClose={() => setShowCalculator(false)}
@@ -526,7 +350,6 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate, 
                 onConfirm={(newAmount) => setAmount(newAmount)}
             />
 
-            {/* 날짜 휠 선택 모달 */}
             <DateWheelPicker
                 isOpen={showDatePicker}
                 onClose={() => setShowDatePicker(false)}
@@ -534,7 +357,6 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate, 
                 onConfirm={(newDate) => setRawDate(newDate)}
             />
 
-            {/* 카카오맵 장소 검색 모달 */}
             <KakaoLocationPicker
                 isOpen={showLocationPicker}
                 onClose={() => setShowLocationPicker(false)}
@@ -543,97 +365,199 @@ export default function TransactionConfirm({ initialData, onSave, selectedDate, 
                 initialPlaceName={location.address && store ? `${location.address} ${store}` : (store || location.address)}
             />
 
-            {/* 카테고리 선택 모달 (바텀시트 형태) */}
-            {showCategoryPicker && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                        display: 'flex',
-                        alignItems: 'flex-end',
-                        justifyContent: 'center',
-                        zIndex: 2000,
-                    }}
-                    onClick={() => setShowCategoryPicker(false)}
-                >
-                    {/* 카테고리 선택 패널 */}
-                    <div
-                        style={{
-                            backgroundColor: 'white',
-                            borderTopLeftRadius: '24px',
-                            borderTopRightRadius: '24px',
-                            padding: '20px',
-                            width: '100%',
-                            maxWidth: '430px',
-                            maxHeight: '60vh',
-                            overflowY: 'auto',
-                            animation: 'slideUp 0.3s ease-out'
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {/* 모달 헤더 */}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '16px'
-                        }}>
-                            <span style={{ fontSize: '1.125rem', fontWeight: '600' }}>카테고리 선택</span>
-                            <button
-                                onClick={() => setShowCategoryPicker(false)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        {/* 카테고리 목록 */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {CATEGORIES.map((cat) => (
-                                <div
-                                    key={cat}
-                                    onClick={() => {
-                                        setCategory(cat);
-                                        setShowCategoryPicker(false);
-                                    }}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '12px',
-                                        padding: '12px 16px',
-                                        borderRadius: '12px',
-                                        backgroundColor: category === cat ? '#e6fffa' : '#f8f9fa',
-                                        cursor: 'pointer',
-                                        border: category === cat ? '2px solid var(--primary)' : '2px solid transparent',
-                                    }}
-                                >
-                                    {getCategoryIcon(cat, 20)}
-                                    <span style={{
-                                        fontWeight: category === cat ? '600' : '400',
-                                        color: 'var(--text-main)'
-                                    }}>{cat}</span>
-                                    {/* 선택된 카테고리에 체크 표시 */}
-                                    {category === cat && (
-                                        <Check size={18} color="var(--primary)" style={{ marginLeft: 'auto' }} />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* 애니메이션 스타일 정의 */}
-            <style jsx global>{`
-                @keyframes slideUp {
-                    from { transform: translateY(100%); }
-                    to { transform: translateY(0); }
-                }
-            `}</style>
+            <CategoryPickerSheet
+                isOpen={showCategoryPicker}
+                selectedCategory={category}
+                onSelect={setCategory}
+                onClose={() => setShowCategoryPicker(false)}
+                zIndex={2000}
+            />
         </div>
     );
 }
+
+const styles = {
+    container: {
+        paddingBottom: '1rem',
+    },
+    amountRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        marginBottom: '1.5rem',
+        cursor: 'pointer',
+    },
+    amountText: {
+        fontSize: '1.75rem',
+        fontWeight: '800',
+    },
+    amountHint: {
+        marginTop: '-1rem',
+        marginBottom: '1.25rem',
+        fontSize: '0.85rem',
+        color: 'var(--text-sub)',
+        lineHeight: 1.5,
+    },
+    pickerRow: {
+        display: 'flex',
+        gap: '0.75rem',
+        marginBottom: '1.5rem',
+    },
+    pickerCard: {
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
+        backgroundColor: 'white',
+        border: '1px solid #e2e8f0',
+        borderRadius: '12px',
+        padding: '0.875rem 1rem',
+        cursor: 'pointer',
+    },
+    pickerIcon: {
+        padding: '0.5rem',
+        borderRadius: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    pickerLabel: {
+        fontSize: '0.75rem',
+        color: 'var(--text-sub)',
+        marginBottom: '0.125rem',
+    },
+    pickerValue: {
+        fontSize: '0.9rem',
+        fontWeight: '600',
+        color: 'var(--text-main)',
+    },
+    fieldBlock: {
+        marginBottom: '1.25rem',
+    },
+    fieldLabel: {
+        display: 'block',
+        fontSize: '0.875rem',
+        fontWeight: '600',
+        color: 'var(--text-main)',
+        marginBottom: '0.5rem',
+    },
+    fieldInput: {
+        width: '100%',
+        padding: '0.5rem 0',
+        fontSize: '1rem',
+        fontWeight: '500',
+        color: 'var(--text-main)',
+        backgroundColor: 'transparent',
+        border: 'none',
+        borderBottom: '1px solid #e2e8f0',
+        outline: 'none',
+        boxSizing: 'border-box',
+    },
+    locationRow: {
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        gap: '12px',
+    },
+    locationInputWrapper: {
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        borderBottom: '1px solid #e2e8f0',
+        paddingBottom: '0.5rem',
+    },
+    locationInput: {
+        flex: 1,
+        fontSize: '1rem',
+        fontWeight: '500',
+        color: 'var(--text-main)',
+        backgroundColor: 'transparent',
+        border: 'none',
+        outline: 'none',
+        padding: 0,
+    },
+    locationClearButton: {
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        padding: '2px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--text-sub)',
+    },
+    minimapShell: {
+        width: '48px',
+        height: '48px',
+        borderRadius: '8px',
+        overflow: 'hidden',
+        flexShrink: 0,
+        cursor: 'pointer',
+        position: 'relative',
+        border: '1px solid #e2e8f0',
+        backgroundColor: '#f1f5f9',
+    },
+    minimapImage: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+    },
+    minimapFallback: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#e0f2f1',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+    },
+    locationHint: {
+        fontSize: '0.75rem',
+        color: 'var(--text-sub)',
+        marginTop: '0.5rem',
+    },
+    toggleRow: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '0.5rem 0',
+        marginBottom: '1rem',
+    },
+    toggleLabel: {
+        fontSize: '1rem',
+        fontWeight: '600',
+        color: 'var(--text-main)',
+    },
+    toggleTrack: {
+        width: '50px',
+        height: '28px',
+        borderRadius: '14px',
+        position: 'relative',
+        cursor: 'pointer',
+        transition: 'background-color 0.2s ease',
+    },
+    toggleThumb: {
+        width: '24px',
+        height: '24px',
+        backgroundColor: 'white',
+        borderRadius: '50%',
+        position: 'absolute',
+        top: '2px',
+        transition: 'left 0.2s ease',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+    },
+    saveButton: {
+        width: '100%',
+        padding: '1rem',
+        backgroundColor: 'var(--primary)',
+        color: 'white',
+        border: 'none',
+        borderRadius: '12px',
+        fontSize: '1.1rem',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        boxShadow: '0 4px 6px rgba(47, 133, 90, 0.2)',
+    },
+};

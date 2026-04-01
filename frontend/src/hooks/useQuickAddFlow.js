@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { parseTransaction, createTransaction } from '@/lib/api/transaction';
 import { scanReceipt } from '@/lib/api/ocr';
 import { analyzeStoreFromImage, resolveImageMatchPrice } from '@/lib/api/imageMatch';
+import { isRequestCanceled } from '@/lib/api/helpers';
 
 export const QUICK_ADD_STEPS = {
     INPUT: 'input',
@@ -24,7 +25,6 @@ const createInitialImageMatchState = () => ({
     imageFile: null,
     imagePreviewUrl: '',
     menuName: '',
-    sessionId: '',
     analyzedStoreName: '',
     manualStoreName: '',
     showManualStoreInput: false,
@@ -37,6 +37,22 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
     const [parsedData, setParsedData] = useState(null);
     const [confirmSource, setConfirmSource] = useState('text');
     const [imageMatchState, setImageMatchState] = useState(createInitialImageMatchState);
+    const isMountedRef = useRef(false);
+    const requestGenerationRef = useRef(0);
+    const loadingTypeRef = useRef(null);
+    const activeRequestControllerRef = useRef(null);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+
+        return () => {
+            isMountedRef.current = false;
+            requestGenerationRef.current += 1;
+            activeRequestControllerRef.current?.abort();
+            activeRequestControllerRef.current = null;
+            loadingTypeRef.current = null;
+        };
+    }, []);
 
     useEffect(() => {
         return () => {
@@ -48,6 +64,49 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
 
     const isLoading = loadingType !== null;
     const confirmOriginalInput = confirmSource === 'text' ? inputText : '';
+    const isInactiveRequest = (requestGeneration) => {
+        return !isMountedRef.current || requestGeneration !== requestGenerationRef.current;
+    };
+    const setLoadingState = (nextLoadingType) => {
+        loadingTypeRef.current = nextLoadingType;
+
+        if (isMountedRef.current) {
+            setLoadingType(nextLoadingType);
+        }
+    };
+    const beginRequest = (nextLoadingType) => {
+        if (loadingTypeRef.current !== null) {
+            return null;
+        }
+
+        const controller = new AbortController();
+        const requestGeneration = requestGenerationRef.current;
+
+        activeRequestControllerRef.current = controller;
+        setLoadingState(nextLoadingType);
+
+        return {
+            requestGeneration,
+            signal: controller.signal,
+        };
+    };
+    const finishRequest = (requestGeneration) => {
+        activeRequestControllerRef.current = null;
+
+        if (isInactiveRequest(requestGeneration)) {
+            loadingTypeRef.current = null;
+            return;
+        }
+
+        setLoadingState(null);
+    };
+    const handleClose = () => {
+        requestGenerationRef.current += 1;
+        activeRequestControllerRef.current?.abort();
+        activeRequestControllerRef.current = null;
+        setLoadingState(null);
+        onClose?.();
+    };
 
     const openConfirmStep = (data, source) => {
         setParsedData(data);
@@ -71,31 +130,55 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
             return;
         }
 
-        setLoadingType(QUICK_ADD_LOADING.PARSE);
+        const request = beginRequest(QUICK_ADD_LOADING.PARSE);
+        if (!request) {
+            return;
+        }
 
         try {
-            const data = await parseTransaction(inputText);
+            const data = await parseTransaction(inputText, { signal: request.signal });
+
+            if (isInactiveRequest(request.requestGeneration)) {
+                return;
+            }
+
             openConfirmStep(data, 'text');
         } catch (error) {
+            if (isInactiveRequest(request.requestGeneration) || isRequestCanceled(error)) {
+                return;
+            }
+
             console.error('Failed to parse transaction:', error);
             alert(error.message || '분석에 실패했습니다. 다시 시도해주세요.');
         } finally {
-            setLoadingType(null);
+            finishRequest(request.requestGeneration);
         }
     };
 
     const handleReceiptScan = async (imageFile) => {
-        setLoadingType(QUICK_ADD_LOADING.OCR);
+        const request = beginRequest(QUICK_ADD_LOADING.OCR);
+        if (!request) {
+            return;
+        }
 
         try {
-            const data = await scanReceipt(imageFile);
+            const data = await scanReceipt(imageFile, { signal: request.signal });
+
+            if (isInactiveRequest(request.requestGeneration)) {
+                return;
+            }
+
             setInputText('');
             openConfirmStep(data, 'receipt');
         } catch (error) {
+            if (isInactiveRequest(request.requestGeneration) || isRequestCanceled(error)) {
+                return;
+            }
+
             console.error('Failed to scan receipt:', error);
             alert(error.message || '영수증 분석에 실패했습니다. 다시 시도해주세요.');
         } finally {
-            setLoadingType(null);
+            finishRequest(request.requestGeneration);
         }
     };
 
@@ -123,33 +206,46 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
     };
 
     const handleAnalyzeStore = async () => {
-        if (!imageMatchState.imageFile || !imageMatchState.menuName.trim()) {
+        const normalizedMenuName = imageMatchState.menuName.trim();
+
+        if (!imageMatchState.imageFile || !normalizedMenuName) {
             alert('사진과 메뉴명을 모두 입력해주세요.');
             return;
         }
 
-        setLoadingType(QUICK_ADD_LOADING.ANALYZE_STORE);
+        const request = beginRequest(QUICK_ADD_LOADING.ANALYZE_STORE);
+        if (!request) {
+            return;
+        }
 
         try {
             const result = await analyzeStoreFromImage({
                 imageFile: imageMatchState.imageFile,
-                menuName: imageMatchState.menuName.trim(),
+                menuName: normalizedMenuName,
+                signal: request.signal,
             });
+
+            if (isInactiveRequest(request.requestGeneration)) {
+                return;
+            }
 
             setImageMatchState((previousState) => ({
                 ...previousState,
-                sessionId: result.session_id || previousState.sessionId,
-                menuName: result.menu_name || previousState.menuName,
+                menuName: result.menu_name || normalizedMenuName,
                 analyzedStoreName: result.store_name || '',
                 manualStoreName: '',
-                showManualStoreInput: result.status === 'manual_store_required' || !result.store_name,
+                showManualStoreInput: !result.store_name,
             }));
             setStep(QUICK_ADD_STEPS.STORE_CONFIRM);
         } catch (error) {
+            if (isInactiveRequest(request.requestGeneration) || isRequestCanceled(error)) {
+                return;
+            }
+
             console.error('Failed to analyze store:', error);
             alert(error.message || '이미지 분석에 실패했습니다. 다시 시도해주세요.');
         } finally {
-            setLoadingType(null);
+            finishRequest(request.requestGeneration);
         }
     };
 
@@ -163,18 +259,43 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
 
     const startPriceResolution = async (confirmedStoreName, confirmationType) => {
         const normalizedStoreName = confirmedStoreName.trim();
+        const normalizedMenuName = imageMatchState.menuName.trim();
 
-        setLoadingType(QUICK_ADD_LOADING.RESOLVE_PRICE);
+        if (!normalizedMenuName) {
+            alert('메뉴명을 입력해주세요.');
+            setStep(QUICK_ADD_STEPS.IMAGE_MATCH_INPUT);
+            return;
+        }
+
+        const request = beginRequest(QUICK_ADD_LOADING.RESOLVE_PRICE);
+        if (!request) {
+            return;
+        }
 
         try {
             const result = await resolveImageMatchPrice({
-                sessionId: imageMatchState.sessionId,
                 confirmedStoreName: normalizedStoreName,
+                menuName: normalizedMenuName,
                 confirmationType,
+                signal: request.signal,
             });
 
-            openConfirmStep(result.prefill, 'imageMatch');
+            if (isInactiveRequest(request.requestGeneration)) {
+                return;
+            }
+
+            openConfirmStep(
+                {
+                    ...result.prefill,
+                    imageMatchStatus: result.status,
+                },
+                'imageMatch',
+            );
         } catch (error) {
+            if (isInactiveRequest(request.requestGeneration) || isRequestCanceled(error)) {
+                return;
+            }
+
             console.error('Failed to resolve price:', error);
             alert(error.message || '가격 검색에 실패했습니다. 다시 시도해주세요.');
             setStep(QUICK_ADD_STEPS.STORE_CONFIRM);
@@ -186,7 +307,7 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
                 }));
             }
         } finally {
-            setLoadingType(null);
+            finishRequest(request.requestGeneration);
         }
     };
 
@@ -209,22 +330,39 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
     };
 
     const handleSave = async (finalData) => {
-        setLoadingType(QUICK_ADD_LOADING.SAVE);
+        const request = beginRequest(QUICK_ADD_LOADING.SAVE);
+        if (!request) {
+            return;
+        }
 
         try {
-            await createTransaction(finalData);
+            await createTransaction(finalData, { signal: request.signal });
+
+            if (isInactiveRequest(request.requestGeneration)) {
+                onTransactionAdded?.();
+                return;
+            }
+
             alert('저장되었습니다!');
             onTransactionAdded?.();
-            onClose?.();
+            handleClose();
         } catch (error) {
+            if (isInactiveRequest(request.requestGeneration) || isRequestCanceled(error)) {
+                return;
+            }
+
             console.error('Failed to save transaction:', error);
             alert(error.message || '저장에 실패했습니다.');
         } finally {
-            setLoadingType(null);
+            finishRequest(request.requestGeneration);
         }
     };
 
     const handleBack = () => {
+        if (loadingTypeRef.current !== null) {
+            return;
+        }
+
         if (step === QUICK_ADD_STEPS.IMAGE_MATCH_INPUT) {
             setStep(QUICK_ADD_STEPS.INPUT);
             return;
@@ -253,6 +391,7 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
         handleConfirmAnalyzedStore,
         handleSubmitManualStore,
         handleSave,
+        handleClose,
         handleBack,
         setImageMatchMenuName: (menuName) => {
             setImageMatchState((previousState) => ({

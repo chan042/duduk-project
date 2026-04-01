@@ -1,12 +1,12 @@
 from collections import defaultdict
-from datetime import date, datetime, time, timedelta
+from datetime import date, timedelta
 
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
 from apps.battles.models import BattleMission, BattleParticipant, YuntaekBattle
-from apps.battles.services.mission_service import _normalize_category
+from apps.common.months import get_month_datetime_range
 from apps.battles.services.notification_service import (
     notify_battle_mission_won,
     notify_battle_zero_spend_restart,
@@ -28,21 +28,13 @@ def _battle_first_full_day(battle):
 
 
 def _battle_month_bounds(battle):
-    tz = timezone.get_current_timezone()
-    month_start = timezone.make_aware(
-        datetime.combine(date(battle.target_year, battle.target_month, 1), time.min),
-        tz,
+    return get_month_datetime_range(
+        battle.target_year,
+        battle.target_month,
     )
-    if battle.target_month == 12:
-        next_month = date(battle.target_year + 1, 1, 1)
-    else:
-        next_month = date(battle.target_year, battle.target_month + 1, 1)
-    month_end = timezone.make_aware(datetime.combine(next_month, time.min), tz)
-    return month_start, month_end
 
 
 def _daily_target_spend(user_id, battle, category, start_date, end_date):
-    normalized_category = _normalize_category(category)
     month_start, month_end = _battle_month_bounds(battle)
     spend_by_date = defaultdict(int)
 
@@ -57,7 +49,7 @@ def _daily_target_spend(user_id, battle, category, start_date, end_date):
     )
 
     for transaction_obj in transactions:
-        if _normalize_category(transaction_obj.category) != normalized_category:
+        if transaction_obj.category != category:
             continue
         local_date = timezone.localtime(transaction_obj.date).date()
         if start_date <= local_date <= end_date:

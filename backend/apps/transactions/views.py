@@ -2,45 +2,39 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from apps.challenges.services.daily_check_sync import sync_daily_check_log_with_confirmation
 
-from rest_framework import viewsets, status
+from rest_framework import status
 from rest_framework.generics import RetrieveUpdateDestroyAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
-from django.contrib.auth import get_user_model
-from collections import defaultdict
-import calendar
+from rest_framework.permissions import IsAuthenticated
 
-from .models import Transaction, MonthlyLog
-from .serializers import TransactionSerializer
+from .models import Transaction
+from apps.common.image_formats import IMAGE_FORMAT_MAP
+from .serializers import (
+    ImageMatchAnalyzeRequestSerializer,
+    ImageMatchAnalyzeResponseSerializer,
+    ImageMatchResolvePriceRequestSerializer,
+    ImageMatchResolvePriceResponseSerializer,
+    TransactionSerializer,
+)
+from .image_match_services import (
+    ImageStoreAnalyzerService,
+    MenuPriceCandidateService,
+    build_transaction_prefill,
+    score_candidates,
+)
 from external.ai.client import AIClient
 from external.clova.client import ClovaOCRClient
 
-User = get_user_model()
-
-
-IMAGE_FORMAT_MAP = {
-    'jpg': 'jpg',
-    'jpeg': 'jpg',
-    'png': 'png',
-    'gif': 'gif',
-    'bmp': 'bmp',
-    'tiff': 'tiff',
-    'tif': 'tiff',
-    'webp': 'webp',
-    'heic': 'heic',
-    'heif': 'heif',
-}
-
 
 def normalize_image_format(raw_format):
+    """검증된 이미지 포맷 문자열을 표준 포맷으로 정규화합니다."""
     normalized = str(raw_format or 'jpg').lower().strip()
-    return IMAGE_FORMAT_MAP.get(normalized, 'jpg')
+    return IMAGE_FORMAT_MAP[normalized]
 
 
 def normalize_parsed_transaction_data(parsed_data):
+    """AI 분석 결과를 Transaction 모델에 저장 가능한 형태로 정규화 (빈 값에 기본값 적용)"""
     return {
         "amount": parsed_data.get("amount") or 0,
         "store": parsed_data.get("store") or "",
@@ -51,6 +45,14 @@ def normalize_parsed_transaction_data(parsed_data):
         "memo": parsed_data.get("memo") or "",
         "is_fixed": bool(parsed_data.get("is_fixed") or False),
     }
+
+
+def build_image_match_service_unavailable_response():
+    """이미지 매칭 서비스 장애 시 503 응답을 생성하는 헬퍼 함수"""
+    return Response(
+        {"error": "이미지 분석 서버가 바쁩니다. 잠시 후 다시 시도해주세요."},
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
 
 
 class ParseTransactionView(APIView):
@@ -86,7 +88,13 @@ class ReceiptOCRView(APIView):
 
     def post(self, request):
         image_data = request.data.get('imageData')
-        image_format = normalize_image_format(request.data.get('format'))
+        try:
+            image_format = normalize_image_format(request.data.get('format'))
+        except KeyError:
+            return Response(
+                {"error": "지원하지 않는 이미지 형식입니다."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         if not image_data:
             return Response(
@@ -134,6 +142,76 @@ class ReceiptOCRView(APIView):
                 "rawText": extracted_text,
             }
         )
+
+
+class ImageMatchAnalyzeStoreView(APIView):
+    """
+    이미지 매칭 - 음식 이미지와 메뉴명을 받아 AI로 가게를 식별하는 뷰
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        request_serializer = ImageMatchAnalyzeRequestSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        validated_data = request_serializer.validated_data
+
+        ai_client = AIClient(purpose="analysis")
+        result = ImageStoreAnalyzerService(ai_client=ai_client).analyze_store(
+            image_data=validated_data["imageData"],
+            image_format=normalize_image_format(validated_data["format"]),
+            menu_name=validated_data["menu_name"],
+        )
+        if result is None:
+            return build_image_match_service_unavailable_response()
+
+        response_serializer = ImageMatchAnalyzeResponseSerializer(data=result)
+        response_serializer.is_valid(raise_exception=True)
+        return Response(response_serializer.data)
+
+
+class ImageMatchResolvePriceView(APIView):
+    """
+    이미지 매칭 - 확정된 가게명과 메뉴명으로 가격을 조회하는 뷰
+    후보 수집 → 점수 평가 → 지출 입력 데이터 생성
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        request_serializer = ImageMatchResolvePriceRequestSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        validated_data = request_serializer.validated_data
+
+        confirmed_store_name = validated_data["confirmed_store_name"]
+        menu_name = validated_data["menu_name"]
+
+        ai_client = AIClient(purpose="analysis")
+        candidates = MenuPriceCandidateService(ai_client=ai_client).collect_candidates(
+            confirmed_store_name=confirmed_store_name,
+            menu_name=menu_name,
+        )
+        if candidates is None:
+            return build_image_match_service_unavailable_response()
+
+        match_result = score_candidates(
+            confirmed_store_name=confirmed_store_name,
+            menu_name=menu_name,
+            candidates=candidates,
+        )
+        prefill = build_transaction_prefill(
+            confirmed_store_name=confirmed_store_name,
+            menu_name=menu_name,
+            amount=match_result.get("amount"),
+            category=match_result.get("category"),
+        )
+
+        response_payload = {
+            "status": match_result["status"],
+            "prefill": prefill,
+        }
+
+        response_serializer = ImageMatchResolvePriceResponseSerializer(data=response_payload)
+        response_serializer.is_valid(raise_exception=True)
+        return Response(response_serializer.data)
 
 class CreateTransactionView(APIView):
     """

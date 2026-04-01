@@ -10,6 +10,9 @@ from typing import Any, Dict, List, Optional
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from apps.common.categories import TRANSACTION_CATEGORIES
+from apps.common.image_formats import IMAGE_FORMAT_TO_MIME_TYPE, MENU_PRICE_SOURCE_TYPES
+from apps.common.months import get_month_datetime_range
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +20,7 @@ logger = logging.getLogger(__name__)
 # 상수 정의
 # ============================================================
 
-CATEGORIES = [
-    "식비", "생활", "카페/간식", "온라인 쇼핑", "패션/쇼핑", "뷰티/미용",
-    "교통", "자동차", "주거/통신", "의료/건강", "문화/여가", "여행/숙박",
-    "교육/학습", "자녀/육아", "반려동물", "경조/선물", "술/유흥", "기타",
-]
+CATEGORIES = list(TRANSACTION_CATEGORIES)
 
 DIFFICULTY_POINTS = {
     "easy": (100, 200),
@@ -319,6 +318,26 @@ class OnePlusOnePhotoResponse(AIBaseModel):
     confidence: float = 0.0
 
 
+class ImageStoreAnalysisResponse(AIBaseModel):
+    store_name: Optional[str] = None
+
+
+class MenuPriceCandidateResponse(AIBaseModel):
+    source_type: str = "unknown"
+    source_url: str = ""
+    observed_store_name: str = ""
+    observed_menu_name: str = ""
+    amount: Optional[int] = None
+    category: str = ""
+    option_tags: Dict[str, Optional[str]] = Field(default_factory=dict)
+    is_price_explicit: bool = False
+    evidence_text: str = ""
+
+
+class MenuPriceCandidateSearchResponse(AIBaseModel):
+    candidates: List[MenuPriceCandidateResponse] = Field(default_factory=list)
+
+
 class TransactionParseResponse(AIBaseModel):
     category: str = ""
     item: str = ""
@@ -566,6 +585,12 @@ class AIClient:
                 )
             )
         return parts
+
+    def _normalize_image_mime_type(self, image_format: str) -> str:
+        normalized = (image_format or "").strip().lower()
+        if "/" in normalized:
+            return normalized
+        return IMAGE_FORMAT_TO_MIME_TYPE.get(normalized, "image/jpeg")
 
     def _to_plain(self, value: Any) -> Any:
         if value is None:
@@ -882,6 +907,167 @@ class AIClient:
             },
         )
 
+    def _build_image_store_analysis_prompt(self, menu_name: Optional[str] = None) -> str:
+        menu_hint = (menu_name or "").strip() or "없음"
+        return f"""
+[역할]
+당신은 이미지 속 매장명을 식별하는 보조 AI입니다.
+업로드된 이미지에서 실제로 확인되는 가게명만 추출하세요.
+
+[입력]
+- 메뉴명 힌트: {menu_hint}
+
+[중요 규칙]
+- 이미지 전체를 분석해 가게명을 식별하세요.
+- 텍스트, 로고, 간판, 메뉴판, 컵/포장지, 브랜드 색상, 매장 인테리어의 특징적인 요소를 모두 근거로 사용할 수 있습니다.
+- 단, 일반적인 카페/패스트푸드점처럼 여러 브랜드에 공통적인 단서만으로는 특정 상호를 단정하지 마세요.
+- 텍스트나 로고가 명확하면 그것을 가장 우선 근거로 사용하세요.
+- 텍스트가 없더라도 브랜드를 강하게 식별할 수 있는 시각적 단서가 충분하면 브랜드/상호 수준의 store_name은 반환할 수 있습니다.
+- 가게명은 통용적으로 사용하는 명칭을 사용하세요. (예: 'Mom's Touch' -> '맘스터치', 'Starbucks' -> '스타벅스' )
+- 지점명은 이미지에서 명확히 확인되는 경우에만 포함하세요.
+- 메뉴명 힌트는 보조 정보일 뿐이며, 이미지 근거보다 우선하면 안 됩니다.
+- 확신이 낮으면 store_name은 null로 반환하세요.
+- 반드시 JSON 객체로 반환해야 합니다.
+
+[반환 형식]
+{{
+  "store_name": "실제로 식별된 가게명 또는 null"
+}}
+"""
+
+    def analyze_store_from_image(
+        self,
+        image_base64: str,
+        image_format: str,
+        menu_name: Optional[str] = None,
+    ) -> Optional[dict]:
+        if not image_base64:
+            return None
+
+        result = self.analyze_image(
+            self._build_image_store_analysis_prompt(menu_name=menu_name),
+            image_base64,
+            response_model=ImageStoreAnalysisResponse,
+            mime_type=self._normalize_image_mime_type(image_format),
+        )
+        if not result:
+            return None
+
+        raw_store_name = (result.get("store_name") or "").strip()
+
+        return {
+            "store_name": raw_store_name or None,
+        }
+
+    def _build_menu_price_candidate_prompt(
+        self,
+        store_name: str,
+        menu_name: str,
+        max_candidates: int,
+    ) -> str:
+        source_types = " | ".join(MENU_PRICE_SOURCE_TYPES)
+        categories = " | ".join(CATEGORIES)
+        return f"""
+[역할]
+당신은 메뉴 가격 근거를 수집하는 조사 AI입니다.
+최종 가격을 판정하지 말고, 검색으로 확인된 후보만 구조화해서 반환하세요.
+
+[입력]
+- confirmed_store_name: {store_name}
+- menu_name: {menu_name}
+- max_candidates: {max_candidates}
+
+[중요 규칙]
+- 웹 검색으로 실제 확인된 정보만 사용하세요.
+- 검색 근거가 없는 가격은 절대 생성하지 마세요.
+- 공식 메뉴 페이지와 공식 주문 페이지를 가장 우선하세요.
+- 공식 출처가 없으면 배달앱, 포털 메뉴, 블로그/커뮤니티 순으로만 고려하세요.
+- 같은 메뉴라도 아이스/핫, 사이즈, 세트/단품 차이를 구분하세요.
+- 옵션이 다르면 option_tags에 명시하고, 충돌이 크면 후보에서 제외하세요.
+- 가격이 텍스트로 명시되지 않으면 amount는 null, is_price_explicit는 false로 반환하세요.
+- category는 아래 허용 카테고리 중 하나만 반환하세요.
+- source_url은 실제 근거 페이지 URL이어야 합니다.
+- observed_store_name과 observed_menu_name은 검색 결과에서 확인된 표현을 짧게 요약하세요.
+- evidence_text는 가격 근거가 드러나는 짧은 문장으로 100자 이내입니다.
+- 확실한 후보가 없으면 candidates를 빈 배열로 반환하세요.
+- JSON 객체만 반환하고 다른 문장, 코드블록, 마크다운은 금지합니다.
+
+[source_type 허용값]
+{source_types}
+
+[category 허용값]
+{categories}
+
+[option_tags 권장 키]
+- temperature: ice | hot | ""
+- size: tall | regular | large | ""
+- set_type: single | set | combo | ""
+
+[반환 형식]
+{{
+  "candidates": [
+    {{
+      "source_type": "official_menu_page",
+      "source_url": "https://...",
+      "observed_store_name": "{store_name}",
+      "observed_menu_name": "{menu_name}",
+      "amount": 0,
+      "category": "식비",
+      "option_tags": {{
+        "temperature": "",
+        "size": "",
+        "set_type": "single"
+      }},
+      "is_price_explicit": true,
+      "evidence_text": "메뉴명과 가격이 함께 보이는 짧은 근거"
+    }}
+  ]
+}}
+"""
+
+    def search_menu_price_candidates(
+        self,
+        store_name: str,
+        menu_name: str,
+        max_candidates: int = 5,
+    ) -> Optional[dict]:
+        normalized_store_name = (store_name or "").strip()
+        normalized_menu_name = (menu_name or "").strip()
+        if not normalized_store_name or not normalized_menu_name:
+            return None
+
+        candidate_limit = max(1, min(int(max_candidates or 5), 5))
+        result, response = self._parse(
+            self._build_menu_price_candidate_prompt(
+                store_name=normalized_store_name,
+                menu_name=normalized_menu_name,
+                max_candidates=candidate_limit,
+            ),
+            MenuPriceCandidateSearchResponse,
+            use_web_search=True,
+            max_retries=1,
+        )
+        if not result:
+            return None
+
+        raw_response_text = ""
+        if response is not None:
+            raw_response_text = self._extract_response_text(response)
+        logger.info(
+            "Image match Gemini raw price candidate response | store=%s | menu=%s | raw=%s",
+            normalized_store_name,
+            normalized_menu_name,
+            raw_response_text or json.dumps(result, ensure_ascii=False),
+        )
+
+        parsed_candidates = []
+        for candidate in (result.get("candidates") or [])[:candidate_limit]:
+            plain_candidate = self._to_plain(candidate)
+            if isinstance(plain_candidate, dict):
+                parsed_candidates.append(plain_candidate)
+
+        return {"candidates": parsed_candidates}
+
     def analyze_text(self, text: str) -> Optional[dict]:
         today = datetime.date.today().strftime("%Y-%m-%d")
         categories_str = ", ".join(CATEGORIES)
@@ -1161,9 +1347,7 @@ AI 소비 코칭 분석 결과를 바탕으로 사용자가 실천할 수 있는
     def _get_transactions_summary(self, user_id: int, year: int, month: int) -> str:
         from apps.transactions.models import Transaction
         from django.db.models import Count, Sum
-        from datetime import datetime
         from django.contrib.auth import get_user_model
-        from django.utils import timezone
 
         User = get_user_model()
         try:
@@ -1171,11 +1355,7 @@ AI 소비 코칭 분석 결과를 바탕으로 사용자가 실천할 수 있는
         except User.DoesNotExist:
             return ""
 
-        start_date = timezone.make_aware(datetime(year, month, 1))
-        if month == 12:
-            end_date = timezone.make_aware(datetime(year + 1, 1, 1))
-        else:
-            end_date = timezone.make_aware(datetime(year, month + 1, 1))
+        start_date, end_date = get_month_datetime_range(year, month)
 
         transactions = Transaction.objects.filter(
             user=user,

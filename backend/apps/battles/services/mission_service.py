@@ -1,34 +1,10 @@
-import calendar
-from datetime import datetime
-
 from django.db import transaction
 from django.db.models import F, Q
-from django.utils import timezone
 
 from apps.battles.models import BattleMission, BattleParticipant, YuntaekBattle
 from apps.battles.services.notification_service import notify_battle_mission_won
 from apps.challenges.models import UserChallenge
 from apps.transactions.models import Transaction
-
-
-CATEGORY_ALIASES = {
-    "카페": "카페/간식",
-}
-
-
-def _normalize_category(category):
-    if not category:
-        return ""
-    return CATEGORY_ALIASES.get(category, category)
-
-
-def _battle_month_end(battle):
-    tz = timezone.get_current_timezone()
-    last_day = calendar.monthrange(battle.target_year, battle.target_month)[1]
-    return timezone.make_aware(
-        datetime(battle.target_year, battle.target_month, last_day, 23, 59, 59),
-        tz,
-    )
 
 
 def _get_active_battle_for_user(user_id):
@@ -54,7 +30,6 @@ def _ordered_category_transactions(user_id, battle, category, trigger_transactio
 
 
 def _filtered_category_transactions(user_id, battle, category, trigger_transaction_id=None):
-    normalized_category = _normalize_category(category)
     return [
         transaction_obj
         for transaction_obj in _ordered_category_transactions(
@@ -63,7 +38,7 @@ def _filtered_category_transactions(user_id, battle, category, trigger_transacti
             category,
             trigger_transaction_id=trigger_transaction_id,
         )
-        if _normalize_category(transaction_obj.category) == normalized_category
+        if transaction_obj.category == category
     ]
 
 

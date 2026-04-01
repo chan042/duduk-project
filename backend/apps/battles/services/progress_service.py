@@ -1,5 +1,4 @@
-import calendar
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from django.db.models import Q
 from django.utils import timezone
@@ -7,6 +6,7 @@ from rest_framework.exceptions import NotFound
 
 from apps.battles.models import BattleParticipant, YuntaekBattle
 from apps.battles.services.profile_service import get_battle_display_name
+from apps.common.months import get_month_end_datetime
 
 
 PROGRESS_VISIBLE_STATUSES = [
@@ -59,17 +59,9 @@ def _calculate_d_day(battle):
 
 
 def _battle_end_at(battle, tzinfo=None):
-    if tzinfo is None:
-        tzinfo = timezone.get_current_timezone()
-
-    last_day = calendar.monthrange(battle.target_year, battle.target_month)[1]
-    return datetime(
-        year=battle.target_year,
-        month=battle.target_month,
-        day=last_day,
-        hour=23,
-        minute=59,
-        second=59,
+    return get_month_end_datetime(
+        battle.target_year,
+        battle.target_month,
         tzinfo=tzinfo,
     )
 

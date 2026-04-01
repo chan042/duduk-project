@@ -22,3 +22,11 @@ export const extractApiErrorMessage = (error, fallbackMessage, options = {}) => 
 
     return fallbackMessage;
 };
+
+export const isRequestCanceled = (error) => {
+    return (
+        error?.code === 'ERR_CANCELED' ||
+        error?.name === 'CanceledError' ||
+        error?.message === 'canceled'
+    );
+};

@@ -37,6 +37,9 @@ def env_list(name, default=''):
     return [item.strip() for item in raw_value.split(',') if item.strip()]
 
 
+IMAGE_MATCH_LOG_LEVEL = os.environ.get('IMAGE_MATCH_LOG_LEVEL', 'INFO').upper()
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -262,3 +265,31 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Seoul'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s %(levelname)s %(name)s %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+    },
+    'loggers': {
+        'external.ai.client': {
+            'handlers': ['console'],
+            'level': IMAGE_MATCH_LOG_LEVEL,
+            'propagate': False,
+        },
+        'apps.transactions.image_match_services': {
+            'handlers': ['console'],
+            'level': IMAGE_MATCH_LOG_LEVEL,
+            'propagate': False,
+        },
+    },
+}

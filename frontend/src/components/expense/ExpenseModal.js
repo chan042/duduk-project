@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { X, Check, Trash2, Search, MapPin, ChevronRight } from 'lucide-react';
+import { X, Trash2, MapPin, ChevronRight } from 'lucide-react';
 import styles from './expense.module.css';
 import CalculatorInput from '../common/CalculatorInput';
+import CategoryPickerSheet from '../common/CategoryPickerSheet';
 import DateWheelPicker from '../common/DateWheelPicker';
 import KakaoLocationPicker from '../common/KakaoLocationPicker';
-import { getCategoryIcon, CATEGORIES } from '../common/CategoryIcons';
+import { getCategoryIcon } from '../common/CategoryIcons';
 
 export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, onDelete }) {
     const [memo, setMemo] = useState('');
@@ -319,83 +320,13 @@ export default function ExpenseModal({ isOpen, onClose, transaction, onUpdate, o
                 initialPlaceName={placeName || merchant}
             />
 
-            {/* Category Picker Modal */}
-            {showCategoryPicker && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                        display: 'flex',
-                        alignItems: 'flex-end',
-                        justifyContent: 'center',
-                        zIndex: 2001,
-                    }}
-                    onClick={() => setShowCategoryPicker(false)}
-                >
-                    <div
-                        style={{
-                            backgroundColor: 'white',
-                            borderTopLeftRadius: '24px',
-                            borderTopRightRadius: '24px',
-                            padding: '20px',
-                            width: '100%',
-                            maxWidth: '430px',
-                            maxHeight: '60vh',
-                            overflowY: 'auto',
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '16px'
-                        }}>
-                            <span style={{ fontSize: '1.125rem', fontWeight: '600' }}>카테고리 선택</span>
-                            <button
-                                onClick={() => setShowCategoryPicker(false)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {CATEGORIES.map((cat) => (
-                                <div
-                                    key={cat}
-                                    onClick={() => {
-                                        setCategory(cat);
-                                        setShowCategoryPicker(false);
-                                    }}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '12px',
-                                        padding: '12px 16px',
-                                        borderRadius: '12px',
-                                        backgroundColor: category === cat ? '#e6fffa' : '#f8f9fa',
-                                        cursor: 'pointer',
-                                        border: category === cat ? '2px solid var(--primary)' : '2px solid transparent',
-                                    }}
-                                >
-                                    {getCategoryIcon(cat, 20)}
-                                    <span style={{
-                                        fontWeight: category === cat ? '600' : '400',
-                                        color: 'var(--text-main)'
-                                    }}>{cat}</span>
-                                    {category === cat && (
-                                        <Check size={18} color="var(--primary)" style={{ marginLeft: 'auto' }} />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
+            <CategoryPickerSheet
+                isOpen={showCategoryPicker}
+                selectedCategory={category}
+                onSelect={setCategory}
+                onClose={() => setShowCategoryPicker(false)}
+                zIndex={2001}
+            />
         </div>
     );
 }

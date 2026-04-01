@@ -1,9 +1,7 @@
 "use client";
 
-import { useRef, useState } from 'react';
-import { Camera, ImagePlus, Loader2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { canUseNativeImagePrompt, pickImageWithPrompt } from '@/lib/capacitor/camera';
+import { Camera, ImagePlus, Info, Loader2 } from 'lucide-react';
+import useImagePicker from '@/hooks/useImagePicker';
 
 export default function ImageMatchEntry({
     previewUrl,
@@ -14,48 +12,16 @@ export default function ImageMatchEntry({
     disabled = false,
     isAnalyzing = false,
 }) {
-    const { isNativeApp } = useAuth();
-    const fileInputRef = useRef(null);
-    const [isPickingImage, setIsPickingImage] = useState(false);
-    const isBusy = disabled || isPickingImage;
+    const {
+        fileInputRef,
+        isBusy,
+        openImagePicker,
+        handleFileChange,
+    } = useImagePicker({
+        onSelect: onImageSelect,
+        disabled,
+    });
     const isReady = Boolean(previewUrl && menuName.trim());
-
-    const handleTriggerFileSelect = async () => {
-        if (isBusy) {
-            return;
-        }
-
-        if (isNativeApp && canUseNativeImagePrompt()) {
-            setIsPickingImage(true);
-
-            try {
-                const file = await pickImageWithPrompt();
-
-                if (file && onImageSelect) {
-                    onImageSelect(file);
-                }
-            } catch (error) {
-                console.error('네이티브 이미지 선택 실패:', error);
-                alert('이미지를 불러오지 못했습니다. 다시 시도해주세요.');
-            } finally {
-                setIsPickingImage(false);
-            }
-
-            return;
-        }
-
-        if (fileInputRef.current) {
-            fileInputRef.current?.click();
-        }
-    };
-
-    const handleFileChange = (event) => {
-        const file = event.target.files?.[0];
-        if (file && onImageSelect) {
-            onImageSelect(file);
-        }
-        event.target.value = '';
-    };
 
     return (
         <div style={styles.container}>
@@ -71,7 +37,7 @@ export default function ImageMatchEntry({
 
             <button
                 type="button"
-                onClick={handleTriggerFileSelect}
+                onClick={openImagePicker}
                 disabled={isBusy}
                 style={{
                     ...styles.previewButton,
@@ -113,6 +79,15 @@ export default function ImageMatchEntry({
                     style={styles.input}
                     disabled={isBusy}
                 />
+            </div>
+
+            <div style={styles.noticeBox}>
+                <div style={styles.noticeIcon}>
+                    <Info size={14} />
+                </div>
+                <p style={styles.noticeText}>
+                    분석한 결과는 정확하지 않을 수 있습니다. 반드시 결과를 확인해주세요.
+                </p>
             </div>
 
             <button
@@ -226,6 +201,27 @@ const styles = {
         fontSize: '1rem',
         fontWeight: '600',
         color: 'var(--text-main)',
+    },
+    noticeBox: {
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '0.55rem',
+    },
+    noticeIcon: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#dc2626',
+        flexShrink: 0,
+        marginTop: '0.1rem',
+    },
+    noticeText: {
+        margin: 0,
+        fontSize: '0.84rem',
+        fontWeight: '600',
+        lineHeight: 1.5,
+        color: '#dc2626',
+        wordBreak: 'keep-all',
     },
     primaryButton: {
         width: '100%',

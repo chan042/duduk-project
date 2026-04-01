@@ -3,6 +3,31 @@
  * 이미지 파일을 Base64로 변환, 포맷 추출, 유효성 검사 등
  */
 
+const IMAGE_MIME_TYPE_TO_FORMAT = {
+    'image/jpg': 'jpg',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/bmp': 'bmp',
+    'image/tiff': 'tiff',
+    'image/webp': 'webp',
+    'image/heic': 'heic',
+    'image/heif': 'heif',
+};
+
+const IMAGE_EXTENSION_TO_FORMAT = {
+    'jpg': 'jpg',
+    'jpeg': 'jpg',
+    'png': 'png',
+    'gif': 'gif',
+    'bmp': 'bmp',
+    'tiff': 'tiff',
+    'tif': 'tiff',
+    'webp': 'webp',
+    'heic': 'heic',
+    'heif': 'heif'
+};
+
 /**
  * 이미지 파일을 Base64로 변환
  * @param {File} file - 이미지 파일
@@ -26,20 +51,13 @@ export const fileToBase64 = (file) => {
  * @returns {string} 이미지 포맷 (jpg, png 등)
  */
 export const getImageFormat = (file) => {
-    const extension = file.name.split('.').pop().toLowerCase();
-    const formatMap = {
-        'jpg': 'jpg',
-        'jpeg': 'jpg',
-        'png': 'png',
-        'gif': 'gif',
-        'bmp': 'bmp',
-        'tiff': 'tiff',
-        'tif': 'tiff',
-        'webp': 'webp',
-        'heic': 'heic',
-        'heif': 'heif'
-    };
-    return formatMap[extension] || 'jpg';
+    const mimeType = (file?.type || '').toLowerCase();
+    if (mimeType && IMAGE_MIME_TYPE_TO_FORMAT[mimeType]) {
+        return IMAGE_MIME_TYPE_TO_FORMAT[mimeType];
+    }
+
+    const extension = (file?.name || '').split('.').pop().toLowerCase();
+    return IMAGE_EXTENSION_TO_FORMAT[extension] || '';
 };
 
 /**
@@ -54,7 +72,7 @@ export const validateImageFile = (file, maxSizeMB = 10) => {
     }
 
     // 파일 타입 검사
-    if (!file.type.startsWith('image/')) {
+    if (file.type && !file.type.startsWith('image/')) {
         return { valid: false, error: '이미지 파일만 업로드 가능합니다.' };
     }
 
@@ -81,6 +99,9 @@ export const prepareImagePayload = async (file, maxSizeMB = 10) => {
 
     const imageData = await fileToBase64(file);
     const format = getImageFormat(file);
+    if (!format) {
+        throw new Error('지원하지 않는 이미지 형식입니다.');
+    }
 
     return {
         imageData,

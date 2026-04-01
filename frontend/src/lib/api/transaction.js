@@ -1,11 +1,18 @@
 import client from './client';
-import { extractApiErrorMessage } from './helpers';
+import { extractApiErrorMessage, isRequestCanceled } from './helpers';
 
-export const parseTransaction = async (text) => {
+export const parseTransaction = async (text, options = {}) => {
     try {
-        const response = await client.post('/api/transactions/parse/', { text }, { timeout: 30000 });
+        const response = await client.post('/api/transactions/parse/', { text }, {
+            timeout: 30000,
+            signal: options.signal,
+        });
         return response.data;
     } catch (error) {
+        if (isRequestCanceled(error)) {
+            throw error;
+        }
+
         console.error('Parse Error:', error);
         throw new Error(extractApiErrorMessage(error, '분석에 실패했습니다. 다시 시도해주세요.', {
             timeoutMessage: 'AI 분석 서버가 바쁩니다. 잠시 후 다시 시도해주세요.',
@@ -17,11 +24,17 @@ export const parseTransaction = async (text) => {
     }
 };
 
-export const createTransaction = async (data) => {
+export const createTransaction = async (data, options = {}) => {
     try {
-        const response = await client.post('/api/transactions/create/', data);
+        const response = await client.post('/api/transactions/create/', data, {
+            signal: options.signal,
+        });
         return response.data;
     } catch (error) {
+        if (isRequestCanceled(error)) {
+            throw error;
+        }
+
         console.error('Create Error:', error);
         throw new Error(extractApiErrorMessage(error, '저장에 실패했습니다.'));
     }

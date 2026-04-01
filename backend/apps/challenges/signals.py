@@ -9,8 +9,8 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.db.models import Sum
-from datetime import timedelta, date
-from calendar import monthrange
+from datetime import timedelta
+from apps.common.months import get_month_date_bounds, get_next_month
 from apps.transactions.models import Transaction
 from .models import UserChallenge, ChallengeDailyLog
 from .constants import (
@@ -56,10 +56,6 @@ from .services.verification_helpers import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _normalize_target_categories(categories):
-    return list(categories) if categories else []
 
 
 def _iter_elapsed_dates(user_challenge, reference=None):
@@ -110,8 +106,7 @@ def _should_track_transaction(user_challenge, transaction):
     if not target_categories or 'all' in target_categories:
         return True
 
-    normalized_targets = _normalize_target_categories(target_categories)
-    return transaction.category in normalized_targets
+    return transaction.category in target_categories
 
 
 @receiver(post_save, sender=Transaction)
@@ -256,14 +251,13 @@ def _update_amount_progress(user_challenge, total_spent, success_conditions):
 def _update_zero_spend_progress(user_challenge, total_spent, success_conditions):
     """zero_spend 타입 progress 업데이트"""
     target_categories = success_conditions.get('categories', [])
-    normalized_targets = _normalize_target_categories(target_categories)
     
     # 대상 카테고리 지출 합계
     violation_amount = 0
     if target_categories and 'all' not in target_categories:
         for log in user_challenge.daily_logs.all():
             for cat, amt in (log.spent_by_category or {}).items():
-                if cat in normalized_targets:
+                if cat in target_categories:
                     violation_amount += amt
     else:
         violation_amount = total_spent
@@ -304,18 +298,6 @@ def _update_compare_progress(user_challenge, total_spent, success_conditions, re
     }
 
 
-def _month_bounds(year: int, month: int):
-    start = date(year, month, 1)
-    end = date(year, month, monthrange(year, month)[1])
-    return start, end
-
-
-def _next_month(year: int, month: int):
-    if month == 12:
-        return year + 1, 1
-    return year, month + 1
-
-
 def _build_future_compare_progress(user_challenge, success_conditions, reference=None):
     """
     미래의 나에게:
@@ -326,10 +308,10 @@ def _build_future_compare_progress(user_challenge, success_conditions, reference
     now = resolve_reference_date(reference or timezone.now())
     start_date = get_challenge_start_date(user_challenge) or now
     start_year, start_month = start_date.year, start_date.month
-    next_year, next_month = _next_month(start_year, start_month)
+    next_year, next_month = get_next_month(start_year, start_month)
 
-    start_month_start, start_month_end = _month_bounds(start_year, start_month)
-    next_month_start, next_month_end = _month_bounds(next_year, next_month)
+    start_month_start, start_month_end = get_month_date_bounds(start_year, start_month)
+    next_month_start, next_month_end = get_month_date_bounds(next_year, next_month)
 
     this_month_until = min(now, start_month_end)
     this_month_spent = Transaction.objects.filter(
