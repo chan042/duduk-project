@@ -27,14 +27,3 @@ IMAGE_FORMAT_TO_MIME_TYPE = {
     'heic': 'image/heic',
     'heif': 'image/heif',
 }
-
-# 이미지 매칭 가격 후보 출처 유형
-MENU_PRICE_SOURCE_TYPES = (
-    "official_menu_page",
-    "official_order_page",
-    "delivery_app",
-    "portal_menu",
-    "blog_review",
-    "community",
-    "unknown",
-)

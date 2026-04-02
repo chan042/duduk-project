@@ -19,9 +19,8 @@ from .serializers import (
 )
 from .image_match_services import (
     ImageStoreAnalyzerService,
-    MenuPriceCandidateService,
+    MenuPriceResolverService,
     build_transaction_prefill,
-    score_candidates,
 )
 from external.ai.client import AIClient
 from external.clova.client import ClovaOCRClient
@@ -146,7 +145,7 @@ class ReceiptOCRView(APIView):
 
 class ImageMatchAnalyzeStoreView(APIView):
     """
-    이미지 매칭 - 음식 이미지와 메뉴명을 받아 AI로 가게를 식별하는 뷰
+    이미지 매칭 - 이미지에서 가게명과 메뉴판 가격 여부를 함께 분석하는 뷰
     """
     permission_classes = [IsAuthenticated]
 
@@ -156,7 +155,7 @@ class ImageMatchAnalyzeStoreView(APIView):
         validated_data = request_serializer.validated_data
 
         ai_client = AIClient(purpose="analysis")
-        result = ImageStoreAnalyzerService(ai_client=ai_client).analyze_store(
+        result = ImageStoreAnalyzerService(ai_client=ai_client).analyze_image_match(
             image_data=validated_data["imageData"],
             image_format=normalize_image_format(validated_data["format"]),
             menu_name=validated_data["menu_name"],
@@ -171,8 +170,7 @@ class ImageMatchAnalyzeStoreView(APIView):
 
 class ImageMatchResolvePriceView(APIView):
     """
-    이미지 매칭 - 확정된 가게명과 메뉴명으로 가격을 조회하는 뷰
-    후보 수집 → 점수 평가 → 지출 입력 데이터 생성
+    이미지 매칭 - 확정된 가게명과 메뉴명으로 웹 검색 fallback 가격을 조회하는 뷰
     """
     permission_classes = [IsAuthenticated]
 
@@ -185,18 +183,12 @@ class ImageMatchResolvePriceView(APIView):
         menu_name = validated_data["menu_name"]
 
         ai_client = AIClient(purpose="analysis")
-        candidates = MenuPriceCandidateService(ai_client=ai_client).collect_candidates(
+        match_result = MenuPriceResolverService(ai_client=ai_client).resolve_price(
             confirmed_store_name=confirmed_store_name,
             menu_name=menu_name,
         )
-        if candidates is None:
+        if match_result is None:
             return build_image_match_service_unavailable_response()
-
-        match_result = score_candidates(
-            confirmed_store_name=confirmed_store_name,
-            menu_name=menu_name,
-            candidates=candidates,
-        )
         prefill = build_transaction_prefill(
             confirmed_store_name=confirmed_store_name,
             menu_name=menu_name,

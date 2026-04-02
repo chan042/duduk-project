@@ -86,6 +86,8 @@ export default function TransactionConfirm({
     const [showDatePicker, setShowDatePicker] = useState(false);      // 날짜 선택 모달
     const [showCategoryPicker, setShowCategoryPicker] = useState(false); // 카테고리 선택 모달
     const [showLocationPicker, setShowLocationPicker] = useState(false); // 장소 검색 모달
+    const [showAmountErrorOverlay, setShowAmountErrorOverlay] = useState(false);
+    const [amountErrorOverlayKey, setAmountErrorOverlayKey] = useState(0);
 
     // --------------------------------------------------------------------------------
     // 2. Helper Functions & Effects
@@ -106,6 +108,28 @@ export default function TransactionConfirm({
         }
     }, [initialData, selectedDate, originalInput]);
 
+    const hasValidAmount = typeof amount === 'number' && amount > 0;
+    const showImageMatchPriceFailureMessage = initialData?.imageMatchStatus === 'not_found' && !hasValidAmount;
+    const showAmountDash = showImageMatchPriceFailureMessage;
+
+    useEffect(() => {
+        if (hasValidAmount && showAmountErrorOverlay) {
+            setShowAmountErrorOverlay(false);
+        }
+    }, [hasValidAmount, showAmountErrorOverlay]);
+
+    useEffect(() => {
+        if (!showAmountErrorOverlay) {
+            return undefined;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            setShowAmountErrorOverlay(false);
+        }, 2500);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [showAmountErrorOverlay, amountErrorOverlayKey]);
+
 
 
 
@@ -122,16 +146,19 @@ export default function TransactionConfirm({
         return CATEGORY_COLORS[normalized] || '#f59e0b';
     };
 
-    const hasValidAmount = typeof amount === 'number' && amount > 0;
-    const showImageMatchPriceFailureMessage = initialData?.imageMatchStatus === 'not_found' && amount === 0;
     const handleSaveClick = () => {
         if (isSaving) {
             return;
         }
 
         if (!hasValidAmount) {
-            alert('금액을 입력해주세요.');
-            setShowCalculator(true);
+            if (showImageMatchPriceFailureMessage) {
+                alert('가격 분석에 실패했습니다. 금액을 직접 입력해주세요.');
+                return;
+            }
+
+            setAmountErrorOverlayKey((prev) => prev + 1);
+            setShowAmountErrorOverlay(true);
             return;
         }
 
@@ -162,15 +189,18 @@ export default function TransactionConfirm({
             >
                 <span style={{
                     ...styles.amountText,
-                    color: hasValidAmount ? 'var(--text-main)' : 'var(--primary)',
+                    color: hasValidAmount || showAmountDash ? 'var(--text-main)' : 'var(--primary)',
                 }}>
-                    {hasValidAmount ? `₩${amount.toLocaleString()}` : '금액을 입력해주세요'}
+                    {hasValidAmount ? `₩${amount.toLocaleString()}` : (showAmountDash ? '₩0' : '금액을 입력해주세요')}
                 </span>
                 <Edit2 size={18} color="var(--text-sub)" />
             </div>
 
             {!hasValidAmount && (
-                <p style={styles.amountHint}>
+                <p style={{
+                    ...styles.amountHint,
+                    ...(showImageMatchPriceFailureMessage ? styles.amountErrorHint : null),
+                }}>
                     {showImageMatchPriceFailureMessage
                         ? '가격 분석에 실패했습니다. 금액을 직접 입력해주세요.'
                         : '금액을 직접 입력해주세요.'}
@@ -372,6 +402,19 @@ export default function TransactionConfirm({
                 onClose={() => setShowCategoryPicker(false)}
                 zIndex={2000}
             />
+
+            {showAmountErrorOverlay && (
+                <div style={styles.amountErrorOverlay}>
+                    <div
+                        key={amountErrorOverlayKey}
+                        style={styles.amountErrorToast}
+                        role="alert"
+                        aria-live="assertive"
+                    >
+                        금액을 입력해주세요
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -397,6 +440,9 @@ const styles = {
         fontSize: '0.85rem',
         color: 'var(--text-sub)',
         lineHeight: 1.5,
+    },
+    amountErrorHint: {
+        color: '#dc2626',
     },
     pickerRow: {
         display: 'flex',
@@ -559,5 +605,29 @@ const styles = {
         fontWeight: 'bold',
         cursor: 'pointer',
         boxShadow: '0 4px 6px rgba(47, 133, 90, 0.2)',
+    },
+    amountErrorOverlay: {
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 'calc(16px + var(--safe-area-bottom))',
+        display: 'flex',
+        justifyContent: 'center',
+        padding: '0 1rem',
+        zIndex: 2100,
+        pointerEvents: 'none',
+    },
+    amountErrorToast: {
+        width: '100%',
+        maxWidth: '398px',
+        backgroundColor: '#dc2626',
+        color: '#ffffff',
+        borderRadius: '14px',
+        padding: '0.95rem 1rem',
+        fontSize: '0.95rem',
+        fontWeight: '700',
+        textAlign: 'center',
+        boxShadow: '0 14px 30px rgba(220, 38, 38, 0.28)',
+        animation: 'sheet-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
     },
 };
