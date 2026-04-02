@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { DoorClosed } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserInventory, getEquippedItems, saveEquippedItems } from '@/lib/api/shop';
+import { getCharacterPreviewLayers } from '@/lib/characterPreview';
 
 export default function ClosetPage() {
     const router = useRouter();
@@ -130,30 +131,13 @@ export default function ClosetPage() {
     };
 
     const isWearingSelected = selectedItem && wearingItems[selectedItem.category] === selectedItem.id;
-
-    // 캐릭터 이미지 경로 생성 (image_key 사용) - Room 페이지 로직 재사용
-    const getCharacterImagePath = () => {
-        const clothingItem = inventory.find(i => i.id === wearingItems.clothing);
-        const accessoryItem = inventory.find(i => i.id === wearingItems.item);
-
-        // 기본 이미지
-        if (!clothingItem && !accessoryItem) {
-            return `/images/characters/${characterType}/body.png`;
-        }
-
-        // 의상만 착용
-        if (clothingItem && !accessoryItem) {
-            return `/images/characters/${characterType}/${clothingItem.image_key}.png`;
-        }
-
-        // 아이템만 착용
-        if (!clothingItem && accessoryItem) {
-            return `/images/characters/${characterType}/${accessoryItem.image_key}.png`;
-        }
-
-        // 둘 다 착용
-        return `/images/characters/${characterType}/${clothingItem.image_key}_${accessoryItem.image_key}.png`;
-    };
+    const clothingItem = inventory.find(i => i.id === wearingItems.clothing) || null;
+    const accessoryItem = inventory.find(i => i.id === wearingItems.item) || null;
+    const previewLayers = getCharacterPreviewLayers({
+        characterType,
+        clothing: clothingItem,
+        item: accessoryItem,
+    });
 
     // 배경 이미지 경로
     const getBackgroundStyle = () => {
@@ -166,7 +150,7 @@ export default function ClosetPage() {
             };
         }
         return {
-            backgroundImage: 'url("/images/room_background.png")',
+            backgroundImage: 'url("/images/backgrounds/basic_room.png")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
         };
@@ -207,14 +191,25 @@ export default function ClosetPage() {
 
                 {/* Character Image */}
                 <div style={styles.characterContainer}>
-                    {characterType && (
-                        <Image
-                            src={getCharacterImagePath()}
-                            alt="Character"
-                            fill
-                            style={{ objectFit: 'contain', objectPosition: 'center bottom', paddingBottom: '40px' }}
-                            priority
-                        />
+                    {previewLayers.baseSrc && (
+                        <>
+                            <Image
+                                src={previewLayers.baseSrc}
+                                alt="Character"
+                                fill
+                                style={{ objectFit: 'contain', objectPosition: 'center bottom', paddingBottom: '40px' }}
+                                priority
+                            />
+                            {previewLayers.overlaySrc && (
+                                <Image
+                                    src={previewLayers.overlaySrc}
+                                    alt=""
+                                    fill
+                                    aria-hidden
+                                    style={{ objectFit: 'contain', objectPosition: 'center bottom', paddingBottom: '40px', pointerEvents: 'none' }}
+                                />
+                            )}
+                        </>
                     )}
                 </div>
             </div>
@@ -334,7 +329,7 @@ const styles = {
         position: 'relative',
         width: '100%',
         backgroundColor: '#e6e0d4', // Similar to shop BG
-        backgroundImage: 'url("/images/room_background.png")', // If there is a room bg
+        backgroundImage: 'url("/images/backgrounds/basic_room.png")',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
     },

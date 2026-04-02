@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEquippedItems } from '@/lib/api/shop';
+import { getCharacterPreviewLayers } from '@/lib/characterPreview';
 import CoinRain from '@/components/room/CoinRain';
 
 const LOCALSTORAGE_KEY = 'room_last_visit_date';
@@ -124,36 +125,18 @@ export default function RoomPage() {
         loadEquipped();
     }, []);
 
-    // 캐릭터 이미지 경로 생성 (image_key 사용)
-    const getCharacterImagePath = () => {
-        const clothing = equippedItems.clothing;
-        const item = equippedItems.item;
-
-        // 기본 이미지
-        if (!clothing && !item) {
-            return `/images/characters/${characterType}/body.png`;
-        }
-
-        // 의상만 착용
-        if (clothing && !item) {
-            return `/images/characters/${characterType}/${clothing.image_key}.png`;
-        }
-
-        // 아이템만 착용
-        if (!clothing && item) {
-            return `/images/characters/${characterType}/${item.image_key}.png`;
-        }
-
-        // 둘 다 착용
-        return `/images/characters/${characterType}/${clothing.image_key}_${item.image_key}.png`;
-    };
+    const previewLayers = getCharacterPreviewLayers({
+        characterType,
+        clothing: equippedItems.clothing,
+        item: equippedItems.item,
+    });
 
     // 배경 이미지 경로
     const getBackgroundPath = () => {
         if (equippedItems.background) {
             return equippedItems.background.image || equippedItems.background.image_url;
         }
-        return '/images/room_background.png'; // 기본 배경
+        return '/images/backgrounds/basic_room.png'; // 기본 배경
     };
 
     if (isLoading) {
@@ -236,8 +219,8 @@ export default function RoomPage() {
             <div style={{
                 ...styles.backgroundContainer,
                 backgroundImage: `url("${getBackgroundPath()}")`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
+                backgroundSize: 'auto 120%',
+                backgroundPosition: 'center 86%',
             }} />
 
             {/* 상단 뒤로가기 */}
@@ -271,15 +254,25 @@ export default function RoomPage() {
                 style={styles.characterContainer}
                 onClick={handleCharacterClick}
             >
-                {characterType && (
-                    <Image
-                        src={getCharacterImagePath()}
-                        alt="Character"
-                        width={290}
-                        height={290}
-                        style={{ objectFit: 'contain' }}
-                        priority
-                    />
+                {previewLayers.baseSrc && (
+                    <div style={styles.characterImageStack}>
+                        <Image
+                            src={previewLayers.baseSrc}
+                            alt="Character"
+                            fill
+                            style={{ objectFit: 'contain' }}
+                            priority
+                        />
+                        {previewLayers.overlaySrc && (
+                            <Image
+                                src={previewLayers.overlaySrc}
+                                alt=""
+                                fill
+                                aria-hidden
+                                style={{ objectFit: 'contain', pointerEvents: 'none' }}
+                            />
+                        )}
+                    </div>
                 )}
             </div>
 
@@ -287,7 +280,7 @@ export default function RoomPage() {
             {transitionSpeech && (
                 <div style={{
                     position: 'absolute',
-                    bottom: '30px',
+                    bottom: '40px',
                     left: '20px',
                     right: '20px',
                     backgroundColor: '#fdf6e3',
@@ -326,7 +319,7 @@ export default function RoomPage() {
             {characterSpeech && !transitionSpeechVisible && (
                 <div style={{
                     position: 'absolute',
-                    bottom: '30px',
+                    bottom: '60px',
                     left: '20px',
                     right: '20px',
                     backgroundColor: '#fdf6e3',
@@ -414,10 +407,15 @@ const styles = {
     },
     characterContainer: {
         position: 'absolute',
-        bottom: '120px',
+        bottom: '140px',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 5,
+    },
+    characterImageStack: {
+        position: 'relative',
+        width: '290px',
+        height: '290px',
     },
     loading: {
         display: 'flex',
