@@ -39,7 +39,7 @@ export const analyzeStoreFromImage = async ({ imageFile, menuName, signal }) => 
     }
 };
 
-export const resolveImageMatchPrice = async ({ confirmedStoreName, menuName, confirmationType, signal }) => {
+export const resolveImageMatchPrice = async ({ confirmedStoreName, menuName, signal }) => {
     if (!confirmedStoreName?.trim()) {
         throw new Error('가게명을 입력해주세요.');
     }
@@ -54,7 +54,6 @@ export const resolveImageMatchPrice = async ({ confirmedStoreName, menuName, con
             {
                 confirmed_store_name: confirmedStoreName.trim(),
                 menu_name: menuName.trim(),
-                confirmation_type: confirmationType,
             },
             {
                 signal,

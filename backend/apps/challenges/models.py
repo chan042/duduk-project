@@ -8,7 +8,10 @@ from django.conf import settings
 from django.utils import timezone
 from apps.challenges.services.failure_reason import infer_failure_reason
 from apps.challenges.services.lifecycle import get_remaining_days
-from apps.challenges.services.progress import merge_elapsed_day_progress
+from apps.challenges.services.progress import (
+    build_initial_progress_for_user_challenge,
+    merge_elapsed_day_progress,
+)
 from apps.challenges.services.safe_formula import FormulaEvaluationError, evaluate_formula
 
 
@@ -262,6 +265,42 @@ class UserChallenge(models.Model):
         """진행 상황 업데이트"""
         self.progress = progress_data
         self.save(update_fields=['progress', 'updated_at'])
+
+    def revert_to_saved(self):
+        """진행 중인 custom/coaching 챌린지를 저장 상태로 되돌린다."""
+        with transaction.atomic():
+            locked = UserChallenge.objects.select_for_update().get(pk=self.pk)
+            if locked.status != 'active':
+                self.refresh_from_db()
+                return False
+
+            locked.status = 'saved'
+            locked.started_at = None
+            locked.ends_at = None
+            locked.final_spent = None
+            locked.completed_at = None
+            locked.earned_points = 0
+            locked.penalty_points = 0
+            locked.bonus_earned = False
+            locked.reward_claimed_at = None
+            locked.progress = build_initial_progress_for_user_challenge(locked)
+            locked.daily_logs.all().delete()
+            locked.save(update_fields=[
+                'status',
+                'started_at',
+                'ends_at',
+                'final_spent',
+                'completed_at',
+                'earned_points',
+                'penalty_points',
+                'bonus_earned',
+                'reward_claimed_at',
+                'progress',
+                'updated_at',
+            ])
+
+        self.refresh_from_db()
+        return True
 
     def complete_challenge(self, is_success: bool, final_spent: int = None, failure_reason: str = None):
         """챌린지 완료 처리"""

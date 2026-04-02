@@ -13,12 +13,6 @@ IMAGE_MATCH_RESOLVE_STATUSES = (
     'not_found',
 )
 
-# 사용자 가게 확인 방식
-IMAGE_MATCH_CONFIRMATION_TYPES = (
-    'candidate_confirmed',
-    'manual_store_input',
-)
-
 
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -61,9 +55,20 @@ class ImageMatchAnalyzeRequestSerializer(serializers.Serializer):
         return normalized
 
 
-# 메뉴명, 식별된 가게명 반환
+class ImagePriceMatchSerializer(serializers.Serializer):
+    found = serializers.BooleanField()
+    amount = serializers.IntegerField(required=False, allow_null=True)
+    category = serializers.ChoiceField(choices=TRANSACTION_CATEGORIES)
+    observed_menu_name = serializers.CharField(
+        max_length=100,
+        trim_whitespace=True,
+        allow_blank=True,
+        required=False,
+    )
+
+
+# 메뉴명, 식별된 가게명, 이미지 가격 확인 결과 반환
 class ImageMatchAnalyzeResponseSerializer(serializers.Serializer):
-    menu_name = serializers.CharField(max_length=100, trim_whitespace=True)
     store_name = serializers.CharField(
         max_length=100,
         trim_whitespace=True,
@@ -71,13 +76,13 @@ class ImageMatchAnalyzeResponseSerializer(serializers.Serializer):
         allow_blank=True,
         required=False,
     )
+    image_price_match = ImagePriceMatchSerializer()
 
 
-# 확정된 가게명 + 메뉴명 + 확인 방식을 전송하여 가격 조회
+# 확정된 가게명 + 메뉴명으로 가격 조회
 class ImageMatchResolvePriceRequestSerializer(serializers.Serializer):
     confirmed_store_name = serializers.CharField(max_length=100, trim_whitespace=True)
     menu_name = serializers.CharField(max_length=100, trim_whitespace=True)
-    confirmation_type = serializers.ChoiceField(choices=IMAGE_MATCH_CONFIRMATION_TYPES)
 
     # 가게명 공백 제거 후 빈 값 여부 검증
     def validate_confirmed_store_name(self, value):

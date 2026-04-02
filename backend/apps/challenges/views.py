@@ -428,7 +428,7 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
-        """챌린지 취소 - 레코드 삭제"""
+        """챌린지 취소"""
         user_challenge = self.get_object()
         
         if user_challenge.status != 'active':
@@ -436,9 +436,12 @@ class UserChallengeViewSet(viewsets.ModelViewSet):
                 {'error': '진행 중인 챌린지만 취소할 수 있습니다.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # 취소 시 레코드 삭제
-        user_challenge.delete()
+
+        if user_challenge.source_type in {'custom', 'coaching'}:
+            user_challenge.revert_to_saved()
+        else:
+            # 템플릿 기반 챌린지는 기존처럼 취소 시 레코드 삭제
+            user_challenge.delete()
         
         return Response({'message': '챌린지가 취소되었습니다.'})
 

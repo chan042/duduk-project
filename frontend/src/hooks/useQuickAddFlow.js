@@ -28,6 +28,12 @@ const createInitialImageMatchState = () => ({
     analyzedStoreName: '',
     manualStoreName: '',
     showManualStoreInput: false,
+    imagePriceMatch: {
+        found: false,
+        amount: null,
+        category: '기타',
+        observedMenuName: '',
+    },
 });
 
 export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
@@ -231,10 +237,16 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
 
             setImageMatchState((previousState) => ({
                 ...previousState,
-                menuName: result.menu_name || normalizedMenuName,
+                menuName: normalizedMenuName,
                 analyzedStoreName: result.store_name || '',
                 manualStoreName: '',
                 showManualStoreInput: !result.store_name,
+                imagePriceMatch: {
+                    found: Boolean(result.image_price_match?.found),
+                    amount: result.image_price_match?.amount ?? null,
+                    category: result.image_price_match?.category || '기타',
+                    observedMenuName: result.image_price_match?.observed_menu_name || '',
+                },
             }));
             setStep(QUICK_ADD_STEPS.STORE_CONFIRM);
         } catch (error) {
@@ -257,7 +269,24 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
         }));
     };
 
-    const startPriceResolution = async (confirmedStoreName, confirmationType) => {
+    const openImagePriceMatchConfirm = (confirmedStoreName) => {
+        const normalizedStoreName = confirmedStoreName.trim();
+        const normalizedMenuName = imageMatchState.menuName.trim();
+        const imagePriceMatch = imageMatchState.imagePriceMatch || {};
+
+        openConfirmStep(
+            {
+                store: normalizedStoreName,
+                item: imagePriceMatch.observedMenuName || normalizedMenuName,
+                amount: imagePriceMatch.amount,
+                category: imagePriceMatch.category || '기타',
+                imageMatchStatus: 'matched',
+            },
+            'imageMatch',
+        );
+    };
+
+    const startPriceResolution = async (confirmedStoreName) => {
         const normalizedStoreName = confirmedStoreName.trim();
         const normalizedMenuName = imageMatchState.menuName.trim();
 
@@ -276,7 +305,6 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
             const result = await resolveImageMatchPrice({
                 confirmedStoreName: normalizedStoreName,
                 menuName: normalizedMenuName,
-                confirmationType,
                 signal: request.signal,
             });
 
@@ -299,34 +327,37 @@ export default function useQuickAddFlow({ onClose, onTransactionAdded } = {}) {
             console.error('Failed to resolve price:', error);
             alert(error.message || '가격 검색에 실패했습니다. 다시 시도해주세요.');
             setStep(QUICK_ADD_STEPS.STORE_CONFIRM);
-
-            if (confirmationType === 'manual_store_input') {
-                setImageMatchState((previousState) => ({
-                    ...previousState,
-                    showManualStoreInput: true,
-                }));
-            }
         } finally {
             finishRequest(request.requestGeneration);
         }
     };
 
-    const handleConfirmAnalyzedStore = () => {
-        if (!imageMatchState.analyzedStoreName.trim()) {
-            handleRejectAnalyzedStore();
+    const proceedWithConfirmedStore = (storeName, { onEmpty } = {}) => {
+        const normalizedStoreName = storeName.trim();
+
+        if (!normalizedStoreName) {
+            onEmpty?.();
             return;
         }
 
-        startPriceResolution(imageMatchState.analyzedStoreName, 'candidate_confirmed');
+        if (imageMatchState.imagePriceMatch?.found && imageMatchState.imagePriceMatch?.amount > 0) {
+            openImagePriceMatchConfirm(normalizedStoreName);
+            return;
+        }
+
+        startPriceResolution(normalizedStoreName);
+    };
+
+    const handleConfirmAnalyzedStore = () => {
+        proceedWithConfirmedStore(imageMatchState.analyzedStoreName, {
+            onEmpty: handleRejectAnalyzedStore,
+        });
     };
 
     const handleSubmitManualStore = () => {
-        if (!imageMatchState.manualStoreName.trim()) {
-            alert('가게명을 입력해주세요.');
-            return;
-        }
-
-        startPriceResolution(imageMatchState.manualStoreName, 'manual_store_input');
+        proceedWithConfirmedStore(imageMatchState.manualStoreName, {
+            onEmpty: () => alert('가게명을 입력해주세요.'),
+        });
     };
 
     const handleSave = async (finalData) => {
