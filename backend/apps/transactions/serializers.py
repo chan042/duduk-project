@@ -104,7 +104,6 @@ class ImageMatchAnalyzeResponseSerializer(serializers.Serializer):
     item_matches = ImageItemMatchSerializer(many=True, required=False)
     parsed_items = ParsedMenuItemSerializer(many=True, required=False)
     parse_mode = serializers.ChoiceField(choices=IMAGE_MATCH_PARSE_MODES, required=False)
-    debug_price_analysis = serializers.JSONField(required=False, allow_null=True)
 
 
 # 확정된 가게명 + 메뉴명으로 가격 조회
@@ -143,4 +142,3 @@ class ImageMatchPrefillSerializer(serializers.Serializer):
 class ImageMatchResolvePriceResponseSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=IMAGE_MATCH_RESOLVE_STATUSES)
     prefill = ImageMatchPrefillSerializer()
-    debug_price_analysis = serializers.JSONField(required=False, allow_null=True)

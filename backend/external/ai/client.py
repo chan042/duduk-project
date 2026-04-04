@@ -16,6 +16,7 @@ from apps.common.image_formats import IMAGE_FORMAT_TO_MIME_TYPE
 from apps.common.menu_options import has_conflicting_menu_option_tokens
 from apps.common.months import get_month_datetime_range
 from apps.common.store_names import build_store_lookup_names
+from external.diningcode.client import DiningCodeClient
 
 logger = logging.getLogger(__name__)
 
@@ -25,15 +26,9 @@ logger = logging.getLogger(__name__)
 
 CATEGORIES = list(TRANSACTION_CATEGORIES)
 RESOLVED_WEB_PRICE_SOURCE_TYPES = (
-    "diningcode",
     "official_menu_page",
     "official_order_page",
     "web_search",
-)
-LOOKUP_TRACE_STATUSES = (
-    "success",
-    "failed",
-    "skipped",
 )
 DEFAULT_GEMINI_API_VERSION = "v1beta"
 GEMINI_TASK_PRESETS = {
@@ -337,11 +332,6 @@ class AIBaseModel(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
-class SearchSource(AIBaseModel):
-    title: str = ""
-    url: str = ""
-
-
 class CashDenomination(AIBaseModel):
     value: int = 0
     count: int = 0
@@ -405,24 +395,6 @@ class ImageMatchAnalysisResponse(AIBaseModel):
     )
 
 
-class PriceLookupTraceResponse(AIBaseModel):
-    diningcode: str = Field(
-        default="failed",
-        description="Lookup status for the DiningCode step.",
-        json_schema_extra={"enum": LOOKUP_TRACE_STATUSES},
-    )
-    official_page: str = Field(
-        default="failed",
-        description="Lookup status for the official menu or order page step.",
-        json_schema_extra={"enum": LOOKUP_TRACE_STATUSES},
-    )
-    web_search: str = Field(
-        default="failed",
-        description="Lookup status for the broader web search step.",
-        json_schema_extra={"enum": LOOKUP_TRACE_STATUSES},
-    )
-
-
 class ResolvedMenuPriceResponse(AIBaseModel):
     found: bool = Field(
         default=False,
@@ -451,21 +423,26 @@ class ResolvedMenuPriceResponse(AIBaseModel):
         description="One transaction category for the grounded menu price.",
         json_schema_extra={"enum": CATEGORIES},
     )
-    lookup_trace: PriceLookupTraceResponse = Field(default_factory=PriceLookupTraceResponse)
 
 
-class DiningCodeProfileLookupResponse(AIBaseModel):
+class DiningCodeMenuMatchResponse(AIBaseModel):
     found: bool = Field(
         default=False,
-        description="True only when a specific DiningCode store profile URL is confidently identified.",
+        description="True only when the requested menu is confidently matched in the provided menu list.",
     )
-    profile_url: str = Field(
+    observed_menu_name: str = Field(
         default="",
-        description="Exact DiningCode store profile URL in profile.php?rid=... form.",
+        description="Menu name exactly as shown in the provided menu list.",
     )
-    observed_store_name: str = Field(
-        default="",
-        description="Store name exactly as seen on the DiningCode profile page or search result.",
+    amount: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="KRW integer price of the matched menu item.",
+    )
+    category: str = Field(
+        default="기타",
+        description="One transaction category for the matched menu.",
+        json_schema_extra={"enum": CATEGORIES},
     )
 
 
@@ -657,6 +634,7 @@ class AIClient:
         else:
             self.model = os.environ.get("GEMINI_MODEL_ANALYSIS", self.default_model)
         self.model = (self.model or self.default_model).strip()
+        self.diningcode_client = DiningCodeClient()
 
         self.client = None
         if self.api_key:
@@ -706,7 +684,6 @@ class AIClient:
         model: Optional[str] = None,
         response_model: Optional[type[AIBaseModel]] = None,
         use_web_search: bool = False,
-        allowed_domains: Optional[List[str]] = None,
         system_instruction: Optional[str] = None,
     ) -> types.GenerateContentConfig:
         preset = self._get_task_preset(task_name)
@@ -726,8 +703,6 @@ class AIClient:
 
         if use_web_search:
             config_kwargs["tools"] = [types.Tool(google_search=types.GoogleSearch())]
-            if allowed_domains:
-                logger.info("Gemini Google Search는 allowed_domains 필터를 지원하지 않아 무시합니다.")
         elif response_model is not None:
             config_kwargs["response_mime_type"] = "application/json"
             config_kwargs["response_json_schema"] = self._sanitize_schema(
@@ -862,29 +837,149 @@ class AIClient:
         match_keys = {value for value in (full_url, no_query_url) if value}
         return match_keys
 
-    def _is_diningcode_profile_url(self, url: Any) -> bool:
-        normalized_url = self._normalize_public_url(url)
-        if not normalized_url:
-            return False
+    def _build_diningcode_menu_match_prompt(
+        self,
+        *,
+        store_name: str,
+        menu_name: str,
+        menu_data_text: str,
+    ) -> str:
+        categories = " | ".join(CATEGORIES)
+        return f"""
+다이닝코드 후보 메뉴만 보고 요청 메뉴의 가격을 JSON으로 반환하세요.
 
-        parsed = urlsplit(normalized_url)
-        domain = self._extract_url_domain(normalized_url)
-        query = parsed.query or ""
-        return (
-            domain.endswith("diningcode.com")
-            and parsed.path == "/profile.php"
-            and "rid=" in query
+[입력]
+- 매장명: {store_name}
+- 요청 메뉴명: {menu_name}
+
+[후보 메뉴]
+{menu_data_text}
+
+[규칙]
+- 후보 목록 안에서만 찾으세요.
+- 상표 기호, 띄어쓰기, 숫자 표기 차이는 무시해도 됩니다.
+- `세트`, `콤보`, `라지`, `미디엄`, `스몰` 같은 옵션은 후보 메뉴도 같아야 합니다.
+- `단품`은 기본 메뉴명만 적힌 기본 가격이면 일치로 볼 수 있습니다.
+- 가격이 `변동`, `가격변동`, `시가`, `문의`, 빈 값이면 found는 false입니다.
+- 확실히 일치하지 않으면 found는 false입니다.
+- amount는 명시된 원화 정수만 사용하세요. 추정·계산 금지.
+- category 허용값: {categories}
+
+JSON만 반환:
+{{
+  "found": false,
+  "observed_menu_name": "",
+  "amount": null,
+  "category": "기타"
+}}
+"""
+
+    def _resolve_diningcode_price(
+        self,
+        *,
+        store_name: str,
+        menu_name: str,
+    ) -> Optional[dict]:
+        normalized_store_name = (store_name or "").strip()
+        normalized_menu_name = (menu_name or "").strip()
+        if not normalized_store_name or not normalized_menu_name:
+            return self._build_grounded_web_lookup_failure()
+
+        lookup_result = self.diningcode_client.lookup_menu_candidates(
+            store_name=normalized_store_name,
+            menu_name=normalized_menu_name,
+            candidate_limit=8,
+        )
+        profile_url = self._normalize_public_url(lookup_result.get("profile_url"))
+        menu_candidates = lookup_result.get("candidates") or []
+        total_menu_count = int(lookup_result.get("menu_count") or 0)
+
+        if not self.diningcode_client.is_profile_url(profile_url) or not menu_candidates:
+            logger.info(
+                "다이닝코드 후보 추출 실패 | store=%s | menu=%s | total=%s | candidates=%s | url=%s",
+                normalized_store_name,
+                normalized_menu_name,
+                total_menu_count,
+                len(menu_candidates),
+                profile_url,
+            )
+            return self._build_grounded_web_lookup_failure()
+
+        menu_lines = []
+        for candidate in menu_candidates:
+            if not isinstance(candidate, dict):
+                continue
+            name = str(candidate.get("name") or "").strip()
+            price = str(candidate.get("price_text") or "").strip()
+            if name:
+                menu_lines.append(f"{name} | {price}" if price else name)
+
+        if not menu_lines:
+            return self._build_grounded_web_lookup_failure()
+
+        menu_data_text = "\n".join(menu_lines)
+
+        result, _ = self._parse(
+            self._build_diningcode_menu_match_prompt(
+                store_name=normalized_store_name,
+                menu_name=normalized_menu_name,
+                menu_data_text=menu_data_text,
+            ),
+            DiningCodeMenuMatchResponse,
+            use_web_search=False,
+            max_retries=1,
+            task_name="menu_parse",
         )
 
-    def _normalize_store_name_for_match(self, store_name: Any) -> str:
-        return re.sub(r"\s+", "", str(store_name or "").strip()).lower()
+        if result is None:
+            return None
 
-    def _store_names_match_for_profile_lookup(self, requested_store_name: str, observed_store_name: Any) -> bool:
-        requested = self._normalize_store_name_for_match(requested_store_name)
-        observed = self._normalize_store_name_for_match(observed_store_name)
-        if not requested or not observed:
-            return False
-        return requested in observed or observed in requested
+        found = bool(result.get("found"))
+        amount = result.get("amount")
+        observed_menu_name = str(result.get("observed_menu_name") or "").strip()
+
+        if found and has_conflicting_menu_option_tokens(
+            normalized_menu_name,
+            observed_menu_name,
+            allow_optional_single=True,
+        ):
+            logger.warning(
+                "다이닝코드 메뉴 매칭 결과의 옵션 토큰이 요청과 불일치 | menu=%s | observed=%s",
+                normalized_menu_name,
+                observed_menu_name,
+            )
+            found = False
+
+        if found and (amount is None or amount <= 0):
+            found = False
+
+        diningcode_result = {
+            "found": found,
+            "source_type": "diningcode" if found else "",
+            "source_url": profile_url if found else "",
+            "observed_menu_name": observed_menu_name if found else "",
+            "amount": amount if found else None,
+            "category": str(result.get("category") or "기타").strip() or "기타",
+            "lookup_trace": {
+                "diningcode": "success" if found else "failed",
+                "official_page": "skipped" if found else "failed",
+                "web_search": "skipped" if found else "failed",
+            },
+            "grounded_sources": [],
+            "web_search_queries": [],
+        }
+
+        logger.info(
+            "다이닝코드 후보 기반 매칭 결과 | store=%s | menu=%s | total=%s | candidates=%s | found=%s | amount=%s | url=%s",
+            normalized_store_name,
+            normalized_menu_name,
+            total_menu_count,
+            len(menu_lines),
+            found,
+            amount if found else None,
+            profile_url,
+        )
+        return diningcode_result
 
     def _extract_grounding_metadata_nodes(self, response: Any) -> List[Dict[str, Any]]:
         response_data = self._to_plain(response) or {}
@@ -1033,28 +1128,7 @@ class AIClient:
             "web_search_queries": web_search_queries or [],
         }
 
-    def _build_diningcode_profile_lookup_failure(
-        self,
-        *,
-        grounded_sources: Optional[List[Dict[str, str]]] = None,
-        web_search_queries: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        return {
-            "found": False,
-            "profile_url": "",
-            "observed_store_name": "",
-            "grounded_sources": grounded_sources or [],
-            "web_search_queries": web_search_queries or [],
-        }
-
     def _build_lookup_trace_for_grounded_source(self, source_type: str) -> Dict[str, str]:
-        if source_type == "diningcode":
-            return {
-                "diningcode": "success",
-                "official_page": "skipped",
-                "web_search": "skipped",
-            }
-
         if source_type in {"official_menu_page", "official_order_page"}:
             return {
                 "diningcode": "failed",
@@ -1074,50 +1148,6 @@ class AIClient:
             "official_page": "failed",
             "web_search": "failed",
         }
-
-    def _validate_diningcode_profile_lookup_result(
-        self,
-        result: Dict[str, Any],
-        response: Any,
-        *,
-        requested_store_name: str,
-    ) -> Dict[str, Any]:
-        grounded_sources = self._extract_grounded_sources(response)
-        web_search_queries = self._extract_web_search_queries(response)
-        validated_result = dict(result)
-        validated_result["grounded_sources"] = grounded_sources
-        validated_result["web_search_queries"] = web_search_queries
-
-        if not validated_result.get("found"):
-            return validated_result
-
-        profile_url = self._normalize_public_url(validated_result.get("profile_url"))
-        observed_store_name = str(validated_result.get("observed_store_name") or "").strip()
-
-        if not self._is_diningcode_profile_url(profile_url):
-            logger.warning(
-                "Gemini 다이닝코드 프로필 탐색 응답의 profile_url이 유효한 다이닝코드 프로필 URL이 아니라 결과를 폐기합니다. profile_url=%s",
-                validated_result.get("profile_url"),
-            )
-            return self._build_diningcode_profile_lookup_failure(
-                grounded_sources=grounded_sources,
-                web_search_queries=web_search_queries,
-            )
-
-        if not self._store_names_match_for_profile_lookup(requested_store_name, observed_store_name):
-            logger.warning(
-                "Gemini 다이닝코드 프로필 탐색 응답의 지점명이 요청과 일치하지 않아 결과를 폐기합니다. requested=%s observed=%s",
-                requested_store_name,
-                observed_store_name,
-            )
-            return self._build_diningcode_profile_lookup_failure(
-                grounded_sources=grounded_sources,
-                web_search_queries=web_search_queries,
-            )
-
-        validated_result["profile_url"] = profile_url
-        validated_result["observed_store_name"] = observed_store_name
-        return validated_result
 
     def _match_grounded_source(
         self,
@@ -1185,49 +1215,36 @@ class AIClient:
             web_search_queries=web_search_queries,
         )
 
-        if source_type in {"official_menu_page", "official_order_page"}:
-            if source_domain.endswith("diningcode.com"):
-                logger.warning(
-                    "Gemini 웹 가격 응답의 source_type은 공식 페이지지만 source_url 도메인이 다이닝코드라 결과를 폐기합니다. source_url=%s",
-                    source_url,
-                )
-                return failure()
-            validated_result["source_url"] = source_url
+        if source_domain.endswith("diningcode.com"):
+            logger.warning(
+                "Gemini 웹 가격 응답의 source_url 도메인이 다이닝코드라 결과를 폐기합니다. source_url=%s",
+                source_url,
+            )
+            return failure()
 
-        elif source_type == "diningcode" and not grounded_sources:
-            if not source_domain.endswith("diningcode.com"):
-                logger.warning(
-                    "Gemini 웹 가격 응답의 source_type은 diningcode지만 source_url 도메인이 다이닝코드가 아니라 결과를 폐기합니다. source_url=%s",
-                    source_url,
-                )
-                return failure()
-            validated_result["source_url"] = source_url
+        if not grounded_sources:
+            logger.warning("Gemini 웹 가격 응답을 검증할 grounding source가 없어 결과를 폐기합니다.")
+            return failure()
 
-        else:
-            if not grounded_sources:
-                logger.warning("Gemini 웹 가격 응답을 검증할 grounding source가 없어 결과를 폐기합니다.")
-                return failure()
+        matched_source = self._match_grounded_source(source_url, grounded_sources)
+        if matched_source is None:
+            logger.warning(
+                "Gemini 웹 가격 응답의 source_url이 grounding source와 일치하지 않아 결과를 폐기합니다. source_url=%s grounded=%s",
+                validated_result.get("source_url"),
+                [source.get("url") for source in grounded_sources],
+            )
+            return failure()
 
-            matched_source = self._match_grounded_source(source_url, grounded_sources)
-            if matched_source is None:
-                logger.warning(
-                    "Gemini 웹 가격 응답의 source_url이 grounding source와 일치하지 않아 결과를 폐기합니다. source_url=%s grounded=%s",
-                    validated_result.get("source_url"),
-                    [source.get("url") for source in grounded_sources],
-                )
-                return failure()
-
-            matched_url = matched_source.get("url") or ""
-            matched_domain = matched_source.get("domain") or self._extract_url_domain(matched_url)
-            if matched_domain.endswith("diningcode.com"):
-                source_type = "diningcode"
-            elif source_type == "diningcode":
-                logger.warning(
-                    "Gemini 웹 가격 응답의 source_type이 diningcode지만 grounding domain이 다릅니다. domain=%s",
-                    matched_domain,
-                )
-                return failure()
-            validated_result["source_url"] = matched_url
+        matched_url = matched_source.get("url") or ""
+        matched_domain = matched_source.get("domain") or self._extract_url_domain(matched_url)
+        if matched_domain.endswith("diningcode.com"):
+            logger.warning(
+                "Gemini 웹 가격 응답의 grounding source 도메인이 다이닝코드라 결과를 폐기합니다. source_url=%s grounded=%s",
+                validated_result.get("source_url"),
+                matched_url,
+            )
+            return failure()
+        validated_result["source_url"] = matched_url
 
         validated_result["source_type"] = source_type
         validated_result["lookup_trace"] = self._build_lookup_trace_for_grounded_source(source_type)
@@ -1373,7 +1390,6 @@ class AIClient:
         *,
         images: Optional[List[Dict[str, str]]] = None,
         use_web_search: bool = False,
-        allowed_domains: Optional[List[str]] = None,
         max_retries: int = 1,
         model: Optional[str] = None,
         task_name: str = "default",
@@ -1388,7 +1404,6 @@ class AIClient:
             model=selected_model,
             response_model=None if use_web_search else response_model,
             use_web_search=use_web_search,
-            allowed_domains=allowed_domains,
         )
         contents = self._build_contents(prompt, images=images)
 
@@ -1585,7 +1600,6 @@ class AIClient:
         menu_name: Optional[str] = None,
         menu_items: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
-        menu_hint = (menu_name or "").strip() or "없음"
         normalized_menu_items: List[Dict[str, Any]] = []
         for raw_item in menu_items or []:
             if not isinstance(raw_item, dict):
@@ -1603,24 +1617,25 @@ class AIClient:
                     "quantity": quantity if quantity > 0 else 1,
                 }
             )
-        menu_items_hint = json.dumps(normalized_menu_items, ensure_ascii=False) if normalized_menu_items else "[]"
+        if normalized_menu_items:
+            request_hint = f"- 요청 메뉴 목록(JSON): {json.dumps(normalized_menu_items, ensure_ascii=False)}"
+        else:
+            request_hint = f"- 원본 메뉴 입력: {(menu_name or '').strip() or '없음'}"
         categories = " | ".join(CATEGORIES)
         return f"""
-[역할]
-이미지에서 매장명과 요청 메뉴별 단가 확인 여부를 구조화해 반환합니다.
+이미지 안 근거만 보고 매장명과 요청 메뉴별 단가 확인 결과를 JSON으로 반환하세요.
 
 [입력]
-- 원본 메뉴 입력: {menu_hint}
-- 요청 메뉴 목록(JSON): {menu_items_hint}
+{request_hint}
 
 [규칙]
-- `store_name`은 이미지 안 실제 근거가 있을 때만 반환하고, 확신이 낮으면 null로 둡니다.
-- `item_matches`에는 요청 메뉴를 빠짐없이 1번씩 넣습니다.
-- `requested_name`은 입력 JSON의 `name` 값을 그대로 사용합니다.
-- `unit_amount`는 1개 기준 원화 정수입니다. 예: `9.0` -> `9000`
-- 메뉴와 단가가 이미지에서 명확히 대응될 때만 `found=true`입니다.
-- 가격이 추정이거나 옵션/사이즈 때문에 모호하면 `found=false`입니다.
-- 총액 계산, 추정, 이미지 밖 정보 사용은 금지입니다.
+- `store_name`은 이미지에서 확실할 때만, 아니면 null
+- `store_name`은 흔히 사용하는 정식 명칭을 사용합니다. ('starbucks' X -> '스타벅스' O)
+- `item_matches`에는 요청 메뉴마다 결과를 1개씩 넣고 `requested_name`은 입력값을 그대로 사용합니다.
+- 메뉴명과 1개 가격이 이미지에서 명확히 대응될 때만 `found=true`입니다.
+- 총액, 추정값, 옵션/사이즈가 모호한 가격이면 `found=false`입니다.
+- `unit_amount`는 1개 기준 원화 정수입니다.
+- 이미지 밖 정보 사용, 추정, 계산은 금지합니다.
 - category 허용값: {categories}
 """
 
@@ -1645,91 +1660,6 @@ class AIClient:
             task_name="image_match_extract",
         )
 
-    def _build_diningcode_profile_lookup_prompt(self, store_name: str) -> str:
-        return f"""
-[역할]
-당신은 다이닝코드에서 특정 지점의 개별 프로필 URL만 찾는 AI입니다.
-
-[입력]
-- 매장명: {store_name}
-
-[작업]
-웹 검색을 사용해 다이닝코드 개별 지점 프로필 URL만 찾고 JSON만 반환하세요.
-
-[규칙]
-- 가격이나 메뉴는 찾지 말고, 지점 프로필 URL 식별에만 집중하세요.
-- 반드시 다이닝코드 개별 지점 프로필 URL(`https://www.diningcode.com/profile.php?rid=...`)만 반환하세요.
-- 검색 결과 목록, 지역 목록, 리뷰 모음, 블로그, 지도, 광고 페이지는 반환하지 마세요.
-- 검색 리디렉트 URL이 아니라 실제 다이닝코드 프로필 URL만 `profile_url`에 넣으세요.
-- 프로필 제목이나 본문에서 확인한 실제 지점명을 `observed_store_name`에 넣으세요.
-- 요청 지점과 같은 지점이라고 확인할 수 있을 때만 found를 true로 반환하세요.
-- 확신이 낮거나 여러 지점이 섞이면 found를 false로 반환하세요.
-- URL을 추측해서 만들지 마세요.
-
-[반환 형식]
-{{
-  "found": false,
-  "profile_url": "",
-  "observed_store_name": ""
-}}
-"""
-
-    def _build_diningcode_profile_menu_resolution_prompt(
-        self,
-        *,
-        store_name: str,
-        menu_name: str,
-        profile_url: str,
-    ) -> str:
-        categories = " | ".join(CATEGORIES)
-        option_matching_rule = (
-            "- `세트`, `콤보`, `라지`, `미디엄`, `스몰` 같은 옵션은 페이지 메뉴명도 같은 옵션을 포함해야만 found를 true로 반환합니다.\n"
-            "- `단품`은 페이지에서 기본 메뉴명만 쓰는 경우가 많으므로, 동일 메뉴의 기본 가격이 명시되어 있으면 found를 true로 반환할 수 있습니다."
-        )
-        return f"""
-[역할]
-당신은 다이닝코드 프로필 페이지에서 메뉴 가격을 판정하는 AI입니다.
-
-[입력]
-- 매장명: {store_name}
-- 메뉴명: {menu_name}
-- 확인할 다이닝코드 프로필 URL: {profile_url}
-
-[작업]
-반드시 위 프로필 URL의 다이닝코드 페이지를 기준으로만 메뉴 가격을 확인하고 JSON만 반환하세요.
-
-[규칙]
-- 반드시 입력된 다이닝코드 프로필 URL만 기준으로 확인하세요.
-- 다른 다이닝코드 페이지, 공식 페이지, 일반 웹 검색 결과를 섞지 마세요.
-- 다이닝코드 프로필 페이지의 `메뉴정보` 섹션을 최우선으로 확인하세요.
-- 메뉴 목록이 길거나 `메뉴 더보기` 형태여도, 페이지의 `메뉴정보`에 요청 메뉴와 가격이 보이면 found를 true로 반환하세요.
-- 사용자 리뷰/후기 본문에 적힌 과거 가격은 사용하지 마세요.
-- 요청 메뉴와 그 가격이 `메뉴정보`에서 명시적으로 확인될 때만 found를 true로 반환합니다.
-- 가격이 추정이거나, 세트·옵션·사이즈 차이로 어느 가격인지 모호하면 found는 false입니다.
-{option_matching_rule}
-- `source_type`은 `diningcode`로만 반환하세요.
-- `source_url`은 반드시 입력된 프로필 URL과 동일하게 반환하세요.
-- 아래 `lookup_trace`는 JSON 형식을 맞추기 위한 필드이며, found=true면 `diningcode=success`, 아니면 `diningcode=failed`로 작성하세요.
-
-[category 허용값]
-{categories}
-
-[반환 형식]
-{{
-  "found": false,
-  "source_type": "diningcode",
-  "source_url": "{profile_url}",
-  "observed_menu_name": "",
-  "amount": null,
-  "category": "기타",
-  "lookup_trace": {{
-    "diningcode": "failed",
-    "official_page": "skipped",
-    "web_search": "skipped"
-  }}
-}}
-"""
-
     def _build_web_price_resolution_prompt(
         self,
         store_name: str,
@@ -1744,166 +1674,39 @@ class AIClient:
             "- `세트`, `콤보`, `라지`, `미디엄`, `스몰` 같은 옵션은 페이지 메뉴명도 같은 옵션을 포함해야만 found를 true로 반환합니다.\n"
             "- `단품`은 페이지에서 기본 메뉴명만 쓰는 경우가 많으므로, 동일 메뉴의 기본 가격이 명시되어 있으면 found를 true로 반환할 수 있습니다."
         )
-        if normalized_allowed_source_types == ("diningcode",):
-            source_scope_hint = "이번 호출에서는 다이닝코드 페이지에서만 가격을 확인하세요."
-            source_specific_rules = """
-- 다이닝코드 호출에서는 개별 식당 프로필 페이지(예: `https://www.diningcode.com/profile.php?rid=...`)를 확인하세요.
-- 다이닝코드 프로필 페이지의 `메뉴정보` 섹션에 요청 메뉴와 가격이 보이면 found를 true로 반환하세요.
-- `source_url`에는 실제 다이닝코드 프로필 페이지 URL을 넣고, 검색 리디렉트 URL은 넣지 마세요.
-"""
-        elif normalized_allowed_source_types == ("official_menu_page", "official_order_page"):
-            source_scope_hint = "이번 호출에서는 브랜드 공식 메뉴 페이지 또는 공식 주문 페이지에서만 가격을 확인하세요."
-            source_specific_rules = ""
+        if normalized_allowed_source_types == ("official_menu_page", "official_order_page"):
+            source_scope_hint = "공식 메뉴 페이지 또는 공식 주문 페이지에서만 확인하세요."
         elif normalized_allowed_source_types == ("web_search",):
-            source_scope_hint = "이번 호출에서는 일반 웹 검색 결과에서만 가격을 확인하세요."
-            source_specific_rules = ""
+            source_scope_hint = "일반 웹 검색 결과에서만 확인하세요."
         else:
-            source_scope_hint = "이번 호출에서는 허용된 출처 범위 안에서만 가격을 확인하세요."
-            source_specific_rules = ""
+            source_scope_hint = "허용된 출처 범위 안에서만 확인하세요."
         return f"""
-[역할]
-당신은 웹 검색 결과를 바탕으로 매장 메뉴 가격을 판정하는 AI입니다.
+웹 검색으로 메뉴 가격을 확인하고 JSON만 반환하세요.
 
 [입력]
 - 매장명: {store_name}
 - 메뉴명: {menu_name}
-
-[작업]
-허용된 출처 범위 안에서만 가격을 찾고 JSON만 반환하세요.
-{source_scope_hint}
+- 출처 범위: {source_scope_hint}
 
 [규칙]
-- 반드시 웹 검색으로 실제 페이지를 확인한 뒤에만 결과를 반환합니다.
-- 허용되지 않은 출처는 사용하지 마세요.
-- 요청 메뉴와 그 가격이 페이지에서 명시적으로 확인될 때만 found를 true로 반환합니다.
-- 허용된 출처에서 요청 메뉴 가격을 확인할 수 없으면 found를 false로 반환합니다.
-- 가격이 추정이거나, 세트·옵션·사이즈 차이로 어느 가격인지 모호하면 found는 false입니다.
-- 검색 도중 본 중간 redirect URL이 아니라, 실제 메뉴 가격을 확인한 최종 페이지 URL을 `source_url`에 넣으세요.
+- 실제 페이지에서 메뉴명과 가격이 함께 확인될 때만 found=true입니다.
+- 허용되지 않은 출처, 추정, 모호한 옵션/사이즈 가격은 사용하지 마세요.
+- 중간 redirect가 아니라 가격을 확인한 최종 공개 URL을 `source_url`에 넣으세요.
 {option_matching_rule}
-- `source_url`은 가격이 확인된 실제 페이지 URL만 넣습니다.
-- 아래 `lookup_trace`는 JSON 형식을 맞추기 위한 필드이며, 이번 호출에서 실제 확인한 출처 기준으로만 채우세요.
-- 상태 허용값은 `success`, `failed`, `skipped` 입니다.
-{source_specific_rules}
+- amount는 확인된 원화 정수만 사용하세요.
+- source_type 허용값: {source_types}
+- category 허용값: {categories}
 
-[source_type 허용값]
-{source_types}
-
-[category 허용값]
-{categories}
-
-[반환 형식]
+JSON만 반환:
 {{
   "found": false,
-  "source_type": "",             // 허용값: {source_types}
+  "source_type": "",
   "source_url": "",
   "observed_menu_name": "",
   "amount": null,
-  "category": "기타",            // 허용값: {categories}
-  "lookup_trace": {{
-    "diningcode": "failed",
-    "official_page": "failed",
-    "web_search": "failed"
-  }}
+  "category": "기타"
 }}
 """
-
-    def _find_diningcode_profile_url(self, *, store_name: str) -> Optional[dict]:
-        normalized_store_name = (store_name or "").strip()
-        if not normalized_store_name:
-            return None
-
-        result, response = self._parse(
-            self._build_diningcode_profile_lookup_prompt(normalized_store_name),
-            DiningCodeProfileLookupResponse,
-            use_web_search=True,
-            allowed_domains=["diningcode.com"],
-            max_retries=1,
-            task_name="grounded_web_lookup",
-        )
-        if not result:
-            return None
-
-        result = self._validate_diningcode_profile_lookup_result(
-            result,
-            response,
-            requested_store_name=normalized_store_name,
-        )
-
-        raw_response_text = ""
-        if response is not None:
-            raw_response_text = self._extract_response_text(response)
-        logger.info(
-            "Image match Gemini diningcode profile attempt | store=%s | validated=%s | grounded=%s | queries=%s | raw=%s",
-            normalized_store_name,
-            json.dumps(result, ensure_ascii=False),
-            json.dumps(result.get("grounded_sources") or [], ensure_ascii=False),
-            json.dumps(result.get("web_search_queries") or [], ensure_ascii=False),
-            raw_response_text or json.dumps(result, ensure_ascii=False),
-        )
-        return result
-
-    def _resolve_diningcode_price_from_profile(
-        self,
-        *,
-        store_name: str,
-        menu_name: str,
-        profile_url: str,
-    ) -> Optional[dict]:
-        normalized_store_name = (store_name or "").strip()
-        normalized_menu_name = (menu_name or "").strip()
-        normalized_profile_url = self._normalize_public_url(profile_url)
-        if not normalized_store_name or not normalized_menu_name or not self._is_diningcode_profile_url(normalized_profile_url):
-            return None
-
-        result, response = self._parse(
-            self._build_diningcode_profile_menu_resolution_prompt(
-                store_name=normalized_store_name,
-                menu_name=normalized_menu_name,
-                profile_url=normalized_profile_url,
-            ),
-            ResolvedMenuPriceResponse,
-            use_web_search=True,
-            allowed_domains=["diningcode.com"],
-            max_retries=1,
-            task_name="grounded_web_lookup",
-        )
-        if not result:
-            return None
-
-        result = self._validate_grounded_web_result(
-            result,
-            response,
-            requested_menu_name=normalized_menu_name,
-        )
-
-        if result.get("found"):
-            matched_profile_url = self._normalize_public_url(result.get("source_url"))
-            if not (self._build_url_match_keys(normalized_profile_url) & self._build_url_match_keys(matched_profile_url)):
-                logger.warning(
-                    "Gemini 다이닝코드 메뉴 가격 응답의 source_url이 요청한 프로필 URL과 일치하지 않아 결과를 폐기합니다. requested=%s source_url=%s",
-                    normalized_profile_url,
-                    result.get("source_url"),
-                )
-                result = self._build_grounded_web_lookup_failure(
-                    category=result.get("category"),
-                    grounded_sources=result.get("grounded_sources"),
-                    web_search_queries=result.get("web_search_queries"),
-                )
-
-        raw_response_text = ""
-        if response is not None:
-            raw_response_text = self._extract_response_text(response)
-        logger.info(
-            "Image match Gemini diningcode menu attempt | store=%s | menu=%s | profile_url=%s | validated=%s | grounded=%s | queries=%s | raw=%s",
-            normalized_store_name,
-            normalized_menu_name,
-            normalized_profile_url,
-            json.dumps(result, ensure_ascii=False),
-            json.dumps(result.get("grounded_sources") or [], ensure_ascii=False),
-            json.dumps(result.get("web_search_queries") or [], ensure_ascii=False),
-            raw_response_text or json.dumps(result, ensure_ascii=False),
-        )
-        return result
 
     def _resolve_price_from_web_search_attempt(
         self,
@@ -1970,22 +1773,20 @@ class AIClient:
         input_lines.append(f"- 주문 문장: {menu_name}")
         input_hint = "\n".join(input_lines)
         return f"""
-[역할]
-사용자가 입력한 주문 문장을 실제 메뉴 단위로만 분해합니다.
+주문 문장을 실제 메뉴 단위로만 분해해 JSON으로 반환하세요.
 
 [입력]
 {input_hint}
 
 [규칙]
 - 가격, 카테고리, 매장명은 추정하지 마세요.
-- 주문 문장에는 여러 메뉴가 쉼표 없이 공백만으로 이어질 수 있습니다.
-- 여러 메뉴일 가능성이 높으면 메뉴 단위로 분해하고, 단일 메뉴일 가능성이 높으면 원문 표현을 유지하세요.
+- 여러 메뉴 가능성이 높으면 분해하고, 단일 메뉴 같으면 원문 표현을 유지하세요.
 - 메뉴명은 입력 원문 표현을 최대한 보존하세요.
-- 확신이 낮으면 메뉴를 임의로 합치거나 나누지 말고 `is_ambiguous`를 true로 반환하세요.
+- 확신이 낮으면 임의로 합치거나 나누지 말고 `is_ambiguous=true`로 반환하세요.
 - 수량 표현이 없으면 quantity는 1입니다.
 - quantity는 1 이상의 정수만 반환하세요.
 
-[반환 형식]
+JSON만 반환:
 {{
   "items": [
     {{
@@ -2016,58 +1817,30 @@ class AIClient:
         aggregated_grounded_sources: List[Dict[str, str]] = []
         aggregated_web_search_queries: List[str] = []
         fallback_category: Any = "기타"
-        diningcode_profile_result = self._find_diningcode_profile_url(
+
+        diningcode_result = self._resolve_diningcode_price(
             store_name=store_lookup_names["full"],
+            menu_name=normalized_menu_name,
         )
-        if diningcode_profile_result is None:
+        if diningcode_result is None:
             return None
 
-        aggregated_grounded_sources = self._merge_grounded_sources(
-            aggregated_grounded_sources,
-            diningcode_profile_result.get("grounded_sources"),
-        )
-        aggregated_web_search_queries = self._merge_web_search_queries(
-            aggregated_web_search_queries,
-            diningcode_profile_result.get("web_search_queries"),
-        )
+        fallback_category = diningcode_result.get("category") or fallback_category
 
-        if diningcode_profile_result.get("found"):
-            diningcode_result = self._resolve_diningcode_price_from_profile(
-                store_name=store_lookup_names["full"],
-                menu_name=normalized_menu_name,
-                profile_url=diningcode_profile_result.get("profile_url") or "",
+        if diningcode_result.get("found"):
+            aggregated_lookup_trace["diningcode"] = "success"
+            aggregated_lookup_trace["official_page"] = "skipped"
+            aggregated_lookup_trace["web_search"] = "skipped"
+            final_result = dict(diningcode_result)
+            final_result["lookup_trace"] = aggregated_lookup_trace
+
+            logger.info(
+                "Image match web price response | requested_store=%s | menu=%s | result=%s",
+                normalized_store_name,
+                normalized_menu_name,
+                json.dumps(final_result, ensure_ascii=False),
             )
-            if diningcode_result is None:
-                return None
-
-            aggregated_grounded_sources = self._merge_grounded_sources(
-                aggregated_grounded_sources,
-                diningcode_result.get("grounded_sources"),
-            )
-            aggregated_web_search_queries = self._merge_web_search_queries(
-                aggregated_web_search_queries,
-                diningcode_result.get("web_search_queries"),
-            )
-            fallback_category = diningcode_result.get("category") or fallback_category
-
-            if diningcode_result.get("found"):
-                aggregated_lookup_trace["diningcode"] = "success"
-                aggregated_lookup_trace["official_page"] = "skipped"
-                aggregated_lookup_trace["web_search"] = "skipped"
-                final_result = dict(diningcode_result)
-                final_result["lookup_trace"] = aggregated_lookup_trace
-                final_result["grounded_sources"] = aggregated_grounded_sources
-                final_result["web_search_queries"] = aggregated_web_search_queries
-
-                logger.info(
-                    "Image match Gemini web price response | requested_store=%s | menu=%s | validated=%s | grounded=%s | queries=%s",
-                    normalized_store_name,
-                    normalized_menu_name,
-                    json.dumps(final_result, ensure_ascii=False),
-                    json.dumps(aggregated_grounded_sources, ensure_ascii=False),
-                    json.dumps(aggregated_web_search_queries, ensure_ascii=False),
-                )
-                return final_result
+            return final_result
 
         lookup_attempts = [
             {
@@ -2123,7 +1896,7 @@ class AIClient:
             final_result["lookup_trace"] = aggregated_lookup_trace
 
         logger.info(
-            "Image match Gemini web price response | requested_store=%s | menu=%s | validated=%s | grounded=%s | queries=%s",
+            "Image match web price response | requested_store=%s | menu=%s | result=%s | grounded=%s | queries=%s",
             normalized_store_name,
             normalized_menu_name,
             json.dumps(final_result, ensure_ascii=False),

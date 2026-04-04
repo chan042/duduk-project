@@ -29,7 +29,6 @@ const normalizeAnalyzeStoreResponse = (data = {}) => ({
     itemMatches: Array.isArray(data?.item_matches) ? data.item_matches.map(normalizeItemMatch) : [],
     parsedItems: Array.isArray(data?.parsed_items) ? data.parsed_items.map(normalizeParsedItem) : [],
     parseMode: data?.parse_mode || '',
-    debugPriceAnalysis: data?.debug_price_analysis || null,
 });
 
 const normalizeResolvePriceResponse = (data = {}) => ({
@@ -41,7 +40,6 @@ const normalizeResolvePriceResponse = (data = {}) => ({
         category: data?.prefill?.category || '기타',
         date: data?.prefill?.date || '',
     },
-    debugPriceAnalysis: data?.debug_price_analysis || null,
 });
 
 const serializeItemMatch = (itemMatch = {}) => ({

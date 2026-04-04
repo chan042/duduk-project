@@ -358,47 +358,6 @@ def _resolve_parse_result(
         confirmed_store_name=confirmed_store_name,
     )
 
-
-def _build_debug_step(
-    key: str,
-    label: str,
-    status: str,
-    detail: str,
-) -> Dict[str, str]:
-    normalized_status = status if status in DEBUG_STAGE_STATUS_SET else "failed"
-    return {
-        "key": key,
-        "label": label,
-        "status": normalized_status,
-        "detail": detail,
-    }
-
-
-def _build_menu_parse_debug_step(parse_mode: str) -> Dict[str, str]:
-    if parse_mode == "ai_fallback":
-        return _build_debug_step(
-            "menu_expression_parse",
-            "가격 분해",
-            "success",
-            "AI 보조로 복합 메뉴 분해 성공",
-        )
-
-    if parse_mode == "ambiguous":
-        return _build_debug_step(
-            "menu_expression_parse",
-            "가격 분해",
-            "failed",
-            "복합 메뉴 분해가 모호하여 자동 계산 불가",
-        )
-
-    return _build_debug_step(
-        "menu_expression_parse",
-        "가격 분해",
-        "skipped",
-        "단일 메뉴 또는 구분자 기반 처리",
-    )
-
-
 def _build_common_category(categories: List[str]) -> str:
     normalized_categories = [_normalize_category_value(category) for category in categories if category]
     if not normalized_categories:
@@ -490,66 +449,6 @@ def _build_image_price_summary(
         "observed_menu_name": observed_menu_name,
     }
 
-
-def _build_image_match_debug_payload(
-    *,
-    parse_mode: str,
-    item_matches: List[Dict[str, Any]],
-    summary_match: Dict[str, Any],
-) -> Dict[str, Any]:
-    found_count = sum(1 for item_match in item_matches if item_match.get("found"))
-    total_count = len(item_matches)
-    if total_count and found_count == total_count:
-        image_step = _build_debug_step(
-            "image_price_match",
-            "이미지 가격 매칭",
-            "success",
-            "이미지에서 모든 요청 메뉴의 단가 확인 성공",
-        )
-    elif found_count > 0:
-        image_step = _build_debug_step(
-            "image_price_match",
-            "이미지 가격 매칭",
-            "failed",
-            "일부 메뉴만 이미지에서 확인되어 누락 항목은 웹 검색 필요",
-        )
-    else:
-        image_step = _build_debug_step(
-            "image_price_match",
-            "이미지 가격 매칭",
-            "failed",
-            "이미지에서 요청 메뉴의 단가를 확인하지 못함",
-        )
-
-    debug_items = []
-    for item_match in item_matches:
-        debug_items.append(
-            {
-                "menu_name": item_match["requested_name"],
-                "quantity": item_match["quantity"],
-                "source": "image",
-                "steps": [
-                    _build_debug_step(
-                        "image_item_match",
-                        "이미지 항목 확인",
-                        "success" if item_match.get("found") else "failed",
-                        "단가 확인 성공" if item_match.get("found") else "단가 확인 실패",
-                    )
-                ],
-            }
-        )
-
-    return {
-        "flow": "image_match_analyze",
-        "overall_status": "success" if summary_match.get("found") else "failed",
-        "steps": [
-            _build_menu_parse_debug_step(parse_mode),
-            image_step,
-        ],
-        "items": debug_items,
-    }
-
-
 def _build_default_lookup_trace() -> Dict[str, str]:
     return {
         "diningcode": "failed",
@@ -569,30 +468,6 @@ def _normalize_lookup_trace(raw_lookup_trace: Any) -> Dict[str, str]:
             normalized_lookup_trace[key] = raw_status
 
     return normalized_lookup_trace
-
-
-def _build_lookup_debug_steps(lookup_trace: Dict[str, str]) -> List[Dict[str, str]]:
-    return [
-        _build_debug_step(
-            "diningcode_lookup",
-            "다이닝코드 조회",
-            lookup_trace.get("diningcode", "failed"),
-            "다이닝코드 메뉴 가격 확인",
-        ),
-        _build_debug_step(
-            "official_page_lookup",
-            "공식 페이지 조회",
-            lookup_trace.get("official_page", "failed"),
-            "공식 메뉴 또는 주문 페이지 확인",
-        ),
-        _build_debug_step(
-            "web_search_lookup",
-            "웹 검색 조회",
-            lookup_trace.get("web_search", "failed"),
-            "웹 검색 기반 가격 확인",
-        ),
-    ]
-
 
 def _build_lookup_trace_from_source_type(source_type: str) -> Dict[str, str]:
     if source_type == "diningcode":
@@ -617,24 +492,6 @@ def _build_lookup_trace_from_source_type(source_type: str) -> Dict[str, str]:
         }
 
     return _build_default_lookup_trace()
-
-
-def _mark_lookup_trace_failed(
-    lookup_trace: Any,
-    *,
-    source_type: Any,
-) -> Dict[str, str]:
-    normalized_lookup_trace = _normalize_lookup_trace(lookup_trace)
-    normalized_source_type = _normalize_web_source_type(source_type)
-
-    if normalized_source_type == "diningcode":
-        normalized_lookup_trace["diningcode"] = "failed"
-    elif normalized_source_type in {"official_menu_page", "official_order_page"}:
-        normalized_lookup_trace["official_page"] = "failed"
-    elif normalized_source_type == "web_search":
-        normalized_lookup_trace["web_search"] = "failed"
-
-    return normalized_lookup_trace
 
 
 def _normalize_web_lookup_result(result: Any) -> Dict[str, Any]:
@@ -680,13 +537,11 @@ def _normalize_web_lookup_result(result: Any) -> Dict[str, Any]:
 def _build_failed_result(
     *,
     category: Optional[str] = None,
-    debug_price_analysis: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     return {
         "status": "failed",
         "amount": 0,
         "category": _normalize_category_value(category),
-        "debug_price_analysis": debug_price_analysis,
     }
 
 
@@ -694,60 +549,11 @@ def _build_matched_result(
     *,
     amount: Optional[int],
     category: Optional[str],
-    debug_price_analysis: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     return {
         "status": "matched",
         "amount": _normalize_amount(amount),
         "category": _normalize_category_value(category),
-        "debug_price_analysis": debug_price_analysis,
-    }
-
-
-def _build_resolve_debug_payload(
-    *,
-    parse_mode: str,
-    resolved_items: List[Dict[str, Any]],
-    overall_status: str,
-    detail: str,
-) -> Dict[str, Any]:
-    debug_items = []
-    for item in resolved_items:
-        item_steps = [
-            _build_debug_step(
-                "image_item_reuse",
-                "이미지 항목 재사용",
-                item.get("image_step_status", "failed"),
-                item.get("image_step_detail", ""),
-            )
-        ]
-        item_steps.extend(_build_lookup_debug_steps(item.get("lookup_trace") or _build_default_lookup_trace()))
-        debug_items.append(
-            {
-                "menu_name": item.get("menu_name") or "",
-                "quantity": _normalize_quantity(item.get("quantity")),
-                "source": item.get("source") or "",
-                "resolved_amount": item.get("resolved_amount"),
-                "source_url": item.get("source_url") or "",
-                "grounded_sources": item.get("grounded_sources") or [],
-                "web_search_queries": item.get("web_search_queries") or [],
-                "steps": item_steps,
-            }
-        )
-
-    return {
-        "flow": "image_match_resolve",
-        "overall_status": overall_status if overall_status in DEBUG_STAGE_STATUS_SET else "failed",
-        "steps": [
-            _build_menu_parse_debug_step(parse_mode),
-            _build_debug_step(
-                "hybrid_price_resolution",
-                "하이브리드 가격 계산",
-                overall_status,
-                detail,
-            ),
-        ],
-        "items": debug_items,
     }
 
 
@@ -757,7 +563,6 @@ def _resolve_menu_items_once(
     confirmed_store_name: str,
     menu_name: str,
     parsed_items: List[Dict[str, Any]],
-    parse_mode: str,
     item_matches: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[Dict[str, Any]]:
     normalized_image_item_matches = _normalize_image_item_matches(parsed_items, item_matches)
@@ -766,7 +571,6 @@ def _resolve_menu_items_once(
         for item_match in normalized_image_item_matches
     }
 
-    resolved_items = []
     total_amount = 0
     resolved_categories = []
 
@@ -781,22 +585,6 @@ def _resolve_menu_items_once(
             resolved_amount = cached_unit_amount * quantity
             resolved_categories.append(cached_image_item.get("category"))
             total_amount += resolved_amount
-            resolved_items.append(
-                {
-                    "menu_name": menu_item_name,
-                    "quantity": quantity,
-                    "source": "image",
-                    "resolved_amount": resolved_amount,
-                    "source_url": "",
-                    "lookup_trace": {
-                        "diningcode": "skipped",
-                        "official_page": "skipped",
-                        "web_search": "skipped",
-                    },
-                    "image_step_status": "success",
-                    "image_step_detail": "이미지에서 확인된 단가 재사용",
-                }
-            )
             continue
 
         raw_web_result = ai_client.resolve_price_from_web_search(
@@ -807,7 +595,6 @@ def _resolve_menu_items_once(
             return None
 
         normalized_web_result = _normalize_web_lookup_result(raw_web_result)
-        failure_detail = f"{menu_item_name} 가격을 확인하지 못함"
         if normalized_web_result.get("found") and has_conflicting_menu_option_tokens(
             menu_item_name,
             normalized_web_result.get("observed_menu_name"),
@@ -819,65 +606,25 @@ def _resolve_menu_items_once(
                 "amount": None,
                 "source_type": "",
                 "source_url": "",
-                "lookup_trace": _mark_lookup_trace_failed(
-                    normalized_web_result.get("lookup_trace"),
-                    source_type=normalized_web_result.get("source_type"),
-                ),
             }
-            failure_detail = f"{menu_item_name} 가격 후보의 메뉴 옵션이 요청값과 일치하지 않음"
-        resolved_item = {
-            "menu_name": menu_item_name,
-            "quantity": quantity,
-            "source": normalized_web_result.get("source_type") or "web",
-            "resolved_amount": None,
-            "source_url": normalized_web_result.get("source_url") or "",
-            "lookup_trace": normalized_web_result.get("lookup_trace") or _build_default_lookup_trace(),
-            "grounded_sources": normalized_web_result.get("grounded_sources") or [],
-            "web_search_queries": normalized_web_result.get("web_search_queries") or [],
-            "image_step_status": "failed",
-            "image_step_detail": "이미지에서 해당 메뉴 단가를 재사용하지 못함",
-        }
 
         if not normalized_web_result.get("found"):
-            resolved_items.append(resolved_item)
             return {
                 "ok": False,
-                "failed_menu_name": menu_item_name,
-                "resolved_items": resolved_items,
                 "result": _build_failed_result(
                     category=normalized_web_result.get("category"),
-                    debug_price_analysis=_build_resolve_debug_payload(
-                        parse_mode=parse_mode,
-                        resolved_items=resolved_items,
-                        overall_status="failed",
-                        detail=failure_detail,
-                    ),
                 ),
             }
 
         resolved_amount = int(normalized_web_result["amount"]) * quantity
-        resolved_item["resolved_amount"] = resolved_amount
-        resolved_item["source"] = normalized_web_result["source_type"]
-        resolved_item["source_url"] = normalized_web_result["source_url"]
-        resolved_items.append(resolved_item)
         total_amount += resolved_amount
         resolved_categories.append(normalized_web_result.get("category"))
 
-    image_count = sum(1 for item in resolved_items if item.get("source") == "image")
-    web_count = len(resolved_items) - image_count
     return {
         "ok": True,
-        "failed_menu_name": "",
-        "resolved_items": resolved_items,
         "result": _build_matched_result(
             amount=total_amount,
             category=_build_common_category(resolved_categories),
-            debug_price_analysis=_build_resolve_debug_payload(
-                parse_mode=parse_mode,
-                resolved_items=resolved_items,
-                overall_status="success",
-                detail=f"이미지 {image_count}건 재사용, 웹 {web_count}건 검색 성공",
-            ),
         ),
     }
 
@@ -968,11 +715,6 @@ class ImageStoreAnalyzerService:
             "item_matches": normalized_item_matches,
             "parsed_items": requested_menu_items,
             "parse_mode": _normalize_parse_mode(parse_result.get("parse_mode")),
-            "debug_price_analysis": _build_image_match_debug_payload(
-                parse_mode=parse_result.get("parse_mode") or "ambiguous",
-                item_matches=normalized_item_matches,
-                summary_match=summary_match,
-            ),
         }
         _log_analyze_result(normalized_menu_name, normalized_result)
         return normalized_result
@@ -994,14 +736,7 @@ class MenuPriceResolverService:
         normalized_store_name = _normalize_text(confirmed_store_name)
         normalized_menu_name = _normalize_text(menu_name)
         if not normalized_store_name or not normalized_menu_name:
-            result = _build_failed_result(
-                debug_price_analysis=_build_resolve_debug_payload(
-                    parse_mode="ambiguous",
-                    resolved_items=[],
-                    overall_status="failed",
-                    detail="가게명 또는 메뉴명이 비어 있어 자동 계산 불가",
-                ),
-            )
+            result = _build_failed_result()
             _log_resolve_result(normalized_store_name, normalized_menu_name, result)
             return result
 
@@ -1017,14 +752,7 @@ class MenuPriceResolverService:
         ai_parse_attempted = bool(parse_result.get("ai_attempted"))
 
         if parse_mode == "ambiguous" or not parsed_items:
-            result = _build_failed_result(
-                debug_price_analysis=_build_resolve_debug_payload(
-                    parse_mode=parse_mode,
-                    resolved_items=[],
-                    overall_status="failed",
-                    detail="메뉴 분해가 모호하여 자동 가격 계산을 중단함",
-                ),
-            )
+            result = _build_failed_result()
             _log_resolve_result(normalized_store_name, normalized_menu_name, result)
             return result
 
@@ -1033,7 +761,6 @@ class MenuPriceResolverService:
             confirmed_store_name=normalized_store_name,
             menu_name=normalized_menu_name,
             parsed_items=parsed_items,
-            parse_mode=parse_mode,
             item_matches=item_matches,
         )
         if resolution_outcome is None:
@@ -1059,7 +786,6 @@ class MenuPriceResolverService:
                     confirmed_store_name=normalized_store_name,
                     menu_name=normalized_menu_name,
                     parsed_items=retry_items,
-                    parse_mode="ai_fallback",
                     item_matches=item_matches,
                 )
                 if retry_outcome is None:

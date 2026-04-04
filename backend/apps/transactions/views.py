@@ -202,7 +202,6 @@ class ImageMatchResolvePriceView(APIView):
         response_payload = {
             "status": match_result["status"],
             "prefill": prefill,
-            "debug_price_analysis": match_result.get("debug_price_analysis"),
         }
 
         response_serializer = ImageMatchResolvePriceResponseSerializer(data=response_payload)
