@@ -6,7 +6,7 @@
 
 export default function AuthLayout({ children }) {
     return (
-        <div style={{
+        <div suppressHydrationWarning style={{
             backgroundColor: '#FFFFFF',
             minHeight: '100vh',
             width: '100%'
