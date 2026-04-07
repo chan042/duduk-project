@@ -114,11 +114,59 @@ class PurchaseItemView(APIView):
 class GachaView(APIView):
     """
     가챠(랜덤 뽑기)를 실행하는 뷰입니다.
-    500포인트를 소모하며, 20% 확률로 레어 아이템을 획득합니다.
+    500포인트를 소모하며, 가격대/레어 여부에 따라 가중치를 적용해 아이템을 획득합니다.
     """
     permission_classes = [IsAuthenticated]
     GACHA_PRICE = 500
-    RARE_PROBABILITY = 20  # 20%
+    CHEAP_MAX_PRICE = 500
+    TWO_THOUSAND_MIN_PRICE = 2000
+    BUCKET_WEIGHTS = {
+        "cheap": 82,          # 500포인트급
+        "thousand": 10,       # 1000포인트급
+        "two_thousand": 4,    # 2000포인트급
+        "rare": 4,            # 레어템
+    }
+
+    def _build_weighted_buckets(self, items):
+        cheap_items = [
+            item for item in items
+            if not item.is_rare and item.price <= self.CHEAP_MAX_PRICE
+        ]
+        thousand_items = [
+            item for item in items
+            if not item.is_rare and self.CHEAP_MAX_PRICE < item.price < self.TWO_THOUSAND_MIN_PRICE
+        ]
+        two_thousand_items = [
+            item for item in items
+            if not item.is_rare and item.price >= self.TWO_THOUSAND_MIN_PRICE
+        ]
+        rare_items = [item for item in items if item.is_rare]
+
+        return [
+            ("cheap", cheap_items, self.BUCKET_WEIGHTS["cheap"]),
+            ("thousand", thousand_items, self.BUCKET_WEIGHTS["thousand"]),
+            ("two_thousand", two_thousand_items, self.BUCKET_WEIGHTS["two_thousand"]),
+            ("rare", rare_items, self.BUCKET_WEIGHTS["rare"]),
+        ]
+
+    def _choose_gacha_item(self, items):
+        available_buckets = [
+            (bucket_name, bucket_items, weight)
+            for bucket_name, bucket_items, weight in self._build_weighted_buckets(items)
+            if bucket_items
+        ]
+
+        if not available_buckets:
+            return None
+
+        selected_bucket_name, selected_bucket_items, _ = random.choices(
+            available_buckets,
+            weights=[weight for _, _, weight in available_buckets],
+            k=1,
+        )[0]
+
+        chosen_item = random.choice(selected_bucket_items)
+        return selected_bucket_name, chosen_item
 
     def post(self, request):
         user = request.user
@@ -127,26 +175,17 @@ class GachaView(APIView):
         if user.points < self.GACHA_PRICE:
             return Response({"message": "가챠를 위한 포인트가 부족합니다. (500P 필요)"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. 가챠 로직 실행 (랜덤 선택)
-        # 판매 중인 모든 아이템 로드
-        all_items = ShopItem.objects.filter(is_active=True)
-        rare_items = [item for item in all_items if item.is_rare]
-        normal_items = [item for item in all_items if not item.is_rare]
+        # 2. 가챠 로직 실행 (가중치 버킷 선택 후 버킷 내 랜덤 선택)
+        all_items = list(ShopItem.objects.filter(is_active=True))
 
         if not all_items:
              return Response({"message": "가챠 데이터가 없습니다."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # 확률 계산
-        is_lucky = random.randint(1, 100) <= self.RARE_PROBABILITY
-        
-        if is_lucky and rare_items:
-            chosen_item = random.choice(rare_items)
-        elif normal_items:
-            chosen_item = random.choice(normal_items)
-        else:
-            # 예외 상황: 일반템이 없는데 꽝 걸렸거나 레어템이 없는데 당첨된 경우 등
-            # 있는 것 중에서 아무거나 선택
-            chosen_item = random.choice(all_items)
+        selected_bucket = self._choose_gacha_item(all_items)
+        if selected_bucket is None:
+            return Response({"message": "가챠 데이터가 없습니다."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        _, chosen_item = selected_bucket
 
         # 3. 트랜잭션 처리 (포인트 차감 + 아이템 지급)
         try:
