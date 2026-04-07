@@ -18,7 +18,7 @@ export default function ChatbotFloatingButton() {
             `}} />
             <div style={{
                 position: 'fixed',
-                bottom: '100px',
+                bottom: '170px',
                 right: 'max(16px, calc(50vw - 195px))',
                 zIndex: 50,
                 animation: isHovered ? 'none' : 'floatingBot 3s ease-in-out infinite',

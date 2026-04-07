@@ -65,7 +65,7 @@ export default function BottomNavigation({ onQuickAddClick }) {
                     alignItems: "center",
                     height: "100%",
                     position: "relative",
-                    padding: "10px 0.5rem 18px",
+                    padding: "4px 0.5rem 26px",
                 }}
             >
                 <Link
@@ -107,23 +107,28 @@ export default function BottomNavigation({ onQuickAddClick }) {
                 </Link>
 
                 {isHome ? (
-                    <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", position: "relative", width: "100%", height: "40px" }}>
                         <button
                             onClick={onQuickAddClick}
                             style={{
-                                width: "40px",
-                                height: "40px",
+                                position: "absolute",
+                                width: "60px",
+                                height: "60px",
                                 borderRadius: "50%",
-                                backgroundColor: "var(--primary)",
+                                background: "linear-gradient(135deg, #14b8a6, #0d9488)",
                                 color: "white",
                                 border: "none",
                                 display: "flex",
+                                flexDirection: "column",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 cursor: "pointer",
+                                boxShadow: "0 6px 16px rgba(20, 184, 166, 0.4)",
+                                zIndex: 10,
+                                transform: "translateY(-24px)",
                             }}
                         >
-                            <Plus size={22} />
+                            <Plus size={32} strokeWidth={2.5} />
                         </button>
                     </div>
                 ) : (
