@@ -319,10 +319,23 @@ export default function FlappyGame({ onClose }) {
 
             // 스크롤 오프셋을 이미지 폭으로 나눈 나머지
             const offsetX = data.bgScrollX % drawWidth;
+            let startIndex = Math.floor(data.bgScrollX / drawWidth);
 
             // 배경을 여러 장 이어 그려서 루프 효과
             for (let x = -offsetX; x < canvas.width; x += drawWidth) {
-                ctx.drawImage(images.gameBg, x, 0, drawWidth, canvas.height);
+                const isFlipped = (startIndex % 2 !== 0);
+
+                if (isFlipped) {
+                    ctx.save();
+                    ctx.translate(x + drawWidth, 0); // 우측 끝으로 이동 후 반전
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(images.gameBg, 0, 0, drawWidth, canvas.height);
+                    ctx.restore();
+                } else {
+                    ctx.drawImage(images.gameBg, x, 0, drawWidth, canvas.height);
+                }
+                
+                startIndex++;
             }
         }
 
