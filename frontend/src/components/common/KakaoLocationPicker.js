@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Search, MapPin, Check } from 'lucide-react';
 
+import { withLoadedKakaoMaps } from '../../lib/kakaoMaps';
+
 /**
  * KakaoLocationPicker - 카카오맵을 사용한 위치 선택 컴포넌트
  * 
@@ -24,6 +26,7 @@ export default function KakaoLocationPicker({
     const markerRef = useRef(null);
     const geocoderRef = useRef(null);
     const placesRef = useRef(null);
+    const initAttemptRef = useRef(0);
 
     const [searchQuery, setSearchQuery] = useState(initialPlaceName || initialAddress || '');
     const [searchResults, setSearchResults] = useState([]);
@@ -35,73 +38,7 @@ export default function KakaoLocationPicker({
     });
     const [isMapLoaded, setIsMapLoaded] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
-
-    // 카카오맵 초기화 (SDK 로드 대기 포함)
-    const initializeMap = useCallback(() => {
-        // SDK 로드 대기 함수
-        const waitForKakaoSDK = (callback, maxRetries = 50, retryCount = 0) => {
-            if (window.kakao && window.kakao.maps) {
-                callback();
-            } else if (retryCount < maxRetries) {
-                // 100ms 간격으로 재시도 (최대 5초)
-                setTimeout(() => waitForKakaoSDK(callback, maxRetries, retryCount + 1), 100);
-            } else {
-                console.error('Kakao Maps SDK failed to load after 5 seconds');
-            }
-        };
-
-        waitForKakaoSDK(() => {
-            // SDK가 로드되었으면 load 함수로 초기화
-            window.kakao.maps.load(() => {
-                if (!mapContainerRef.current) return;
-
-                // 기본 좌표 (서울 시청)
-                const defaultLat = 37.5665;
-                const defaultLng = 126.9780;
-
-                const options = {
-                    center: new window.kakao.maps.LatLng(defaultLat, defaultLng),
-                    level: 3
-                };
-
-                const map = new window.kakao.maps.Map(mapContainerRef.current, options);
-                mapRef.current = map;
-
-                // 마커 생성
-                const marker = new window.kakao.maps.Marker({
-                    position: map.getCenter(),
-                    draggable: true
-                });
-                marker.setMap(map);
-                markerRef.current = marker;
-
-                // Geocoder 초기화
-                geocoderRef.current = new window.kakao.maps.services.Geocoder();
-
-                // Places 초기화
-                placesRef.current = new window.kakao.maps.services.Places();
-
-                // 마커 드래그 이벤트
-                window.kakao.maps.event.addListener(marker, 'dragend', () => {
-                    const position = marker.getPosition();
-                    updateAddressFromCoords(position.getLat(), position.getLng());
-                });
-
-                // 지도 클릭 이벤트
-                window.kakao.maps.event.addListener(map, 'click', (mouseEvent) => {
-                    const latlng = mouseEvent.latLng;
-                    marker.setPosition(latlng);
-                    updateAddressFromCoords(latlng.getLat(), latlng.getLng());
-                });
-
-                setIsMapLoaded(true);
-
-                if (initialPlaceName || initialAddress) {
-                    searchPlaces(initialPlaceName || initialAddress, true);
-                }
-            });
-        });
-    }, [initialAddress, initialPlaceName]);
+    const [mapLoadError, setMapLoadError] = useState('');
 
     // 좌표로 주소만 업데이트 (placeName은 유지, 검색으로만 변경 가능)
     const updateAddressFromCoords = useCallback((lat, lng) => {
@@ -180,6 +117,69 @@ export default function KakaoLocationPicker({
         });
     }, [handleSelectResult]);
 
+    // 카카오맵 초기화 (SDK 로드 대기 포함)
+    const initializeMap = useCallback(async () => {
+        const initAttempt = ++initAttemptRef.current;
+        setMapLoadError('');
+        setIsMapLoaded(false);
+
+        try {
+            await withLoadedKakaoMaps((maps) => {
+                if (initAttemptRef.current !== initAttempt || !mapContainerRef.current) {
+                    return;
+                }
+
+                const defaultLat = 37.5665;
+                const defaultLng = 126.9780;
+                const options = {
+                    center: new maps.LatLng(defaultLat, defaultLng),
+                    level: 3
+                };
+
+                const map = new maps.Map(mapContainerRef.current, options);
+                mapRef.current = map;
+
+                const marker = new maps.Marker({
+                    position: map.getCenter(),
+                    draggable: true
+                });
+                marker.setMap(map);
+                markerRef.current = marker;
+
+                geocoderRef.current = new maps.services.Geocoder();
+                placesRef.current = new maps.services.Places();
+
+                maps.event.addListener(marker, 'dragend', () => {
+                    const position = marker.getPosition();
+                    updateAddressFromCoords(position.getLat(), position.getLng());
+                });
+
+                maps.event.addListener(map, 'click', (mouseEvent) => {
+                    const latlng = mouseEvent.latLng;
+                    marker.setPosition(latlng);
+                    updateAddressFromCoords(latlng.getLat(), latlng.getLng());
+                });
+            });
+
+            if (initAttemptRef.current !== initAttempt) {
+                return;
+            }
+
+            setIsMapLoaded(true);
+
+            if (initialPlaceName || initialAddress) {
+                searchPlaces(initialPlaceName || initialAddress, true);
+            }
+        } catch (error) {
+            if (initAttemptRef.current !== initAttempt) {
+                return;
+            }
+
+            console.error('Kakao Maps SDK failed to initialize:', error);
+            setMapLoadError('지도를 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+        }
+    }, [initialAddress, initialPlaceName, searchPlaces, updateAddressFromCoords]);
+
     // 확인 버튼 클릭
     const handleConfirm = () => {
         onConfirm(selectedLocation);
@@ -212,8 +212,14 @@ export default function KakaoLocationPicker({
             return () => clearTimeout(timer);
         } else {
             // 모달이 닫힐 때 상태 초기화
+            initAttemptRef.current += 1;
+            mapRef.current = null;
+            markerRef.current = null;
+            geocoderRef.current = null;
+            placesRef.current = null;
             setIsMapLoaded(false);
             setSearchResults([]);
+            setMapLoadError('');
         }
     }, [isOpen, initializeMap]);
 
@@ -369,7 +375,7 @@ export default function KakaoLocationPicker({
                             justifyContent: 'center',
                             color: '#718096'
                         }}>
-                            지도 로딩 중...
+                            {mapLoadError || '지도 로딩 중...'}
                         </div>
                     )}
                 </div>

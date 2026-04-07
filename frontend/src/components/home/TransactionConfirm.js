@@ -6,6 +6,7 @@
 import { Edit2, MapPin, Calendar, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
+import KakaoStaticMapPreview from '../common/KakaoStaticMapPreview';
 import CalculatorInput from '../common/CalculatorInput';       // 금액 계산기 모달
 import CategoryPickerSheet from '../common/CategoryPickerSheet';
 import DateWheelPicker from '../common/DateWheelPicker';       // 날짜 휠 선택 모달
@@ -109,6 +110,7 @@ export default function TransactionConfirm({
     }, [initialData, selectedDate, originalInput]);
 
     const hasValidAmount = typeof amount === 'number' && amount > 0;
+    const hasLocationCoordinates = Number.isFinite(location.lat) && Number.isFinite(location.lng);
     const showAmountAnalysisFailureMessage = initialData?.amountAnalysisStatus === 'failed' && !hasValidAmount;
     const showAmountDash = showAmountAnalysisFailureMessage;
 
@@ -309,20 +311,18 @@ export default function TransactionConfirm({
                         onClick={() => setShowLocationPicker(true)}
                         style={styles.minimapShell}
                     >
-                        {location.lat && location.lng ? (
-                            <img
-                                src={`https://dapi.kakao.com/v2/local/map/staticmap.png?appkey=${process.env.NEXT_PUBLIC_KAKAO_JS_KEY}&center=${location.lng},${location.lat}&level=3&w=96&h=96&marker=color:red|pos:${location.lng},${location.lat}`}
-                                alt="위치 미리보기"
-                                style={styles.minimapImage}
-                                onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    e.target.nextSibling.style.display = 'flex';
-                                }}
-                            />
+                        {hasLocationCoordinates ? (
+                            <div style={styles.minimapImage}>
+                                <KakaoStaticMapPreview
+                                    lat={location.lat}
+                                    lng={location.lng}
+                                    level={3}
+                                />
+                            </div>
                         ) : null}
                         <div style={{
                             ...styles.minimapFallback,
-                            display: location.lat && location.lng ? 'none' : 'flex',
+                            display: hasLocationCoordinates ? 'none' : 'flex',
                         }}>
                             <MapPin size={24} color="var(--primary)" />
                         </div>
