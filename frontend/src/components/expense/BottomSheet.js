@@ -1,38 +1,40 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import styles from './expense.module.css';
 
 // 지출 내역 BottomSheet
 export default function BottomSheet({ isOpen, onClose, children }) {
-    const sheetRef = useRef(null);
 
     useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (sheetRef.current && !sheetRef.current.contains(event.target)) {
-                onClose();
-            }
-        };
-
         if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-            document.addEventListener('touchstart', handleClickOutside);
             // 배경 스크롤 방지
             document.body.style.overflow = 'hidden';
         }
 
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-            document.removeEventListener('touchstart', handleClickOutside);
             // 배경 스크롤 복구
             document.body.style.overflow = 'unset';
         };
-    }, [isOpen, onClose]);
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
+    const handleOverlayClick = (event) => {
+        event.stopPropagation();
+        onClose();
+    };
+
+    const handleContentClick = (event) => {
+        event.stopPropagation();
+    };
+
     return (
-        <div className={styles.bottomSheetOverlay}>
-            <div className={styles.bottomSheetContent} ref={sheetRef}>
+        <div
+            className={styles.bottomSheetOverlay}
+            onClick={handleOverlayClick}
+            onTouchStart={(e) => e.stopPropagation()}
+        >
+            <div className={styles.bottomSheetContent} onClick={handleContentClick}>
                 <div className={styles.bottomSheetHandle} />
                 {children}
             </div>

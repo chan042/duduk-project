@@ -10,6 +10,15 @@ export default function useImagePicker({ onSelect, disabled = false } = {}) {
     const [isPickingImage, setIsPickingImage] = useState(false);
     const isBusy = disabled || isPickingImage;
 
+    const openSystemChooser = () => {
+        if (!fileInputRef.current) {
+            return;
+        }
+
+        fileInputRef.current.removeAttribute('capture');
+        fileInputRef.current.click();
+    };
+
     const openImagePicker = async () => {
         if (isBusy) {
             return;
@@ -34,9 +43,7 @@ export default function useImagePicker({ onSelect, disabled = false } = {}) {
             return;
         }
 
-        if (fileInputRef.current) {
-            fileInputRef.current.click();
-        }
+        openSystemChooser();
     };
 
     const handleFileChange = (event) => {
@@ -51,6 +58,7 @@ export default function useImagePicker({ onSelect, disabled = false } = {}) {
         fileInputRef,
         isBusy,
         isPickingImage,
+        openSystemChooser,
         openImagePicker,
         handleFileChange,
     };

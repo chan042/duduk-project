@@ -5,7 +5,7 @@ import useImagePicker from '@/hooks/useImagePicker';
 
 /**
  * 영수증 스캔 버튼 컴포넌트
- * 모바일: 카메라 앱 직접 실행 (capture="environment")
+ * 모바일: 시스템 이미지 선택지 노출
  * 데스크톱: 파일 선택 다이얼로그
  * 
  * @param {Object} props
@@ -30,7 +30,6 @@ export default function ReceiptScan({ onImageSelect, disabled = false }) {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                capture="environment"  // 모바일
                 onChange={handleFileChange}
                 style={{ display: 'none' }}
                 disabled={isBusy}
