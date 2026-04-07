@@ -4,7 +4,6 @@ import { extractApiErrorMessage, isRequestCanceled } from './helpers';
 export const parseTransaction = async (text, options = {}) => {
     try {
         const response = await client.post('/api/transactions/parse/', { text }, {
-            timeout: 30000,
             signal: options.signal,
         });
         return response.data;

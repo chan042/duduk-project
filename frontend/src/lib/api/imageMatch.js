@@ -73,7 +73,6 @@ export const analyzeStoreFromImage = async ({ imageFile, menuName, signal }) => 
             },
             {
                 signal,
-                timeout: 30000,
             }
         );
 
@@ -121,7 +120,6 @@ export const resolveImageMatchPrice = async ({
             },
             {
                 signal,
-                timeout: 30000,
             }
         );
 
