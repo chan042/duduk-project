@@ -316,21 +316,29 @@ export default function CalendarView({
             </div>
 
             <div className={styles.insightRow}>
+                {/* 일일 권장 예산 카드 (좌측 절반) */}
+                <div className={styles.insightCard} style={{ justifyContent: 'center' }}>
+                    <h4 className={styles.insightTitle}>일일 권장 예산</h4>
+                    {Number(dailyBudget) < 0 ? (
+                        <span className={styles.insightWarningLarge}>
+                            예산 초과<br />
+                            {Math.abs(Number(dailyBudget)).toLocaleString()}원
+                        </span>
+                    ) : (
+                        <span className={styles.insightHighlightLarge}>{Number(dailyBudget).toLocaleString()}원</span>
+                    )}
+                </div>
+
+                {/* 성공 여부 카드 (우측 절반) */}
                 <div className={styles.insightCard}>
                     <div className={styles.insightItem}>
-                        <div className={styles.insightIcon} style={{ backgroundColor: '#e6fffa', color: '#2f855a' }}>
-                            <CheckCircle size={20} />
-                        </div>
                         <h4 className={styles.insightTitle}>목표 달성</h4>
                         <span className={styles.insightHighlight}>{successDays}일</span>
                     </div>
 
-                    <div className={styles.insightSeparator}></div>
+                    <div className={styles.insightHorizontalSeparator}></div>
 
                     <div className={styles.insightItem}>
-                        <div className={styles.insightIcon} style={{ backgroundColor: '#fff5f5', color: '#c53030' }}>
-                            <XCircle size={20} />
-                        </div>
                         <h4 className={styles.insightTitle}>권장 예산 초과</h4>
                         <span className={styles.insightWarning}>{failDays}일</span>
                     </div>

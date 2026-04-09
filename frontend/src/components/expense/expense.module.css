@@ -28,8 +28,7 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
   position: sticky;
   /* Negative top allows headerTop to scroll out while headerBottom stays at top */
-  /* Increased to 150px to fit all content comfortably without cutting off */
-  top: -150px;
+  top: -140px;
   z-index: 50;
   overflow: hidden;
   /* visual cleanup */
@@ -42,8 +41,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  height: 150px;
-  /* Increased height to fit content */
+  height: 140px;
+  /* Adjusted height to fit content */
   box-sizing: border-box;
   background-color: white;
   overflow: hidden;
@@ -159,7 +158,8 @@
   flex-direction: column;
   align-items: center;
   gap: 0;
-  margin-top: 0.5rem;
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .totalLabel {
@@ -358,65 +358,53 @@
 /* Status Background Bubbles */
 .spendingLevelGreen {
   background-color: #f0fdf4;
-  border: 1px solid #dcfce7;
+  border: none;
 }
 
 .spendingLevelRed {
   background-color: #fef2f2;
-  border: 1px solid #fee2e2;
+  border: none;
 }
 
 .spendingLevelYellow {
   background-color: #fefce8;
-  border: 1px solid #fef9c3;
+  border: none;
 }
 
 /* Insight Cards */
 .insightRow {
   display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
   padding: 0;
   margin-bottom: 0.5rem;
   width: 100%;
 }
 
 .insightCard {
+  flex: 1;
   background-color: white;
-  border-radius: 16px;
-  padding: 1rem;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.02);
+}
+
+.insightItem {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  border: 1px solid rgba(0, 0, 0, 0.02);
 }
 
-.insightItem {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-}
-
-.insightSeparator {
-  width: 1px;
-  height: 40px;
+.insightHorizontalSeparator {
+  height: 1px;
+  width: 100%;
   background-color: #f1f5f9;
-  margin: 0 1rem;
-}
-
-.insightIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  margin-bottom: 0.25rem;
 }
 
 .insightTitle {
@@ -429,13 +417,28 @@
 .insightHighlight {
   color: var(--primary);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
 
 .insightWarning {
   color: #e53e3e;
   font-weight: 700;
+  font-size: 1rem;
+}
+
+.insightHighlightLarge {
+  color: var(--text-main);
+  font-weight: 700;
   font-size: 1.1rem;
+  margin-top: 0.25rem;
+}
+
+.insightWarningLarge {
+  color: #e53e3e;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-top: 0.25rem;
+  line-height: 1.3;
 }
 
 /* Modal */

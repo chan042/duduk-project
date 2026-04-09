@@ -86,7 +86,7 @@ export default function TotalSpending() {
                 borderRadius: '24px',
                 padding: '24px 28px',
                 boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
-                marginBottom: '16px',
+                marginBottom: '0.75rem',
                 textAlign: 'center',
                 border: '1px solid rgba(0,0,0,0.02)'
             }}>
@@ -144,7 +144,7 @@ export default function TotalSpending() {
             borderRadius: '24px',
             padding: '24px 28px',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
-            marginBottom: '16px',
+            marginBottom: '0.75rem',
             position: 'relative',
             overflow: 'hidden',
             border: '1px solid rgba(0,0,0,0.02)'

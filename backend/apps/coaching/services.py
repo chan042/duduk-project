@@ -2,7 +2,7 @@ import logging
 import os
 
 from django.db import IntegrityError, transaction
-from django.db.models import Max
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.transactions.models import Transaction
@@ -47,6 +47,86 @@ def _build_user_coaching_context(user):
     }
 
 
+def _get_boundary_transaction(user_id, transaction_id):
+    if not transaction_id:
+        return None
+
+    return (
+        Transaction.objects.filter(user_id=user_id, id=transaction_id)
+        .only("id", "created_at")
+        .first()
+    )
+
+
+def _filter_transactions_after_boundary(queryset, user_id, boundary_transaction_id):
+    boundary_transaction = _get_boundary_transaction(user_id, boundary_transaction_id)
+    if boundary_transaction:
+        return queryset.filter(
+            Q(created_at__gt=boundary_transaction.created_at)
+            | Q(created_at=boundary_transaction.created_at, id__gt=boundary_transaction.id)
+        )
+
+    if boundary_transaction_id:
+        return queryset.filter(id__gt=boundary_transaction_id)
+
+    return queryset
+
+
+def _filter_transactions_up_to_boundary(queryset, user_id, boundary_transaction_id):
+    boundary_transaction = _get_boundary_transaction(user_id, boundary_transaction_id)
+    if boundary_transaction:
+        return queryset.filter(
+            Q(created_at__lt=boundary_transaction.created_at)
+            | Q(created_at=boundary_transaction.created_at, id__lte=boundary_transaction.id)
+        )
+
+    if boundary_transaction_id:
+        return queryset.filter(id__lte=boundary_transaction_id)
+
+    return queryset
+
+
+def _get_registration_ordered_transactions(
+    user_id,
+    *,
+    start_after_transaction_id=None,
+    end_transaction_id=None,
+):
+    queryset = Transaction.objects.filter(user_id=user_id)
+    queryset = _filter_transactions_after_boundary(
+        queryset,
+        user_id,
+        start_after_transaction_id,
+    )
+    queryset = _filter_transactions_up_to_boundary(
+        queryset,
+        user_id,
+        end_transaction_id,
+    )
+    return queryset.order_by("created_at", "id")
+
+
+def _has_boundary_advanced(user_id, previous_boundary_transaction_id, refreshed_boundary_transaction_id):
+    if not refreshed_boundary_transaction_id:
+        return False
+
+    previous_boundary = _get_boundary_transaction(user_id, previous_boundary_transaction_id)
+    refreshed_boundary = _get_boundary_transaction(user_id, refreshed_boundary_transaction_id)
+    if previous_boundary and refreshed_boundary:
+        return (
+            refreshed_boundary.created_at,
+            refreshed_boundary.id,
+        ) > (
+            previous_boundary.created_at,
+            previous_boundary.id,
+        )
+
+    if previous_boundary_transaction_id is None:
+        return True
+
+    return refreshed_boundary_transaction_id > previous_boundary_transaction_id
+
+
 def _cleanup_old_coachings(user_id, keep=MAX_COACHINGS_PER_USER):
     coaching_ids_to_keep = list(
         Coaching.objects.filter(user_id=user_id)
@@ -65,24 +145,38 @@ def _get_fallback_boundary_transaction_id(user_id):
         return 0
 
     return (
-        Transaction.objects.filter(
-            user_id=user_id,
-            created_at__lte=last_coaching.created_at,
-        )
-        .order_by("-id")
+        Transaction.objects.filter(user_id=user_id, created_at__lte=last_coaching.created_at)
+        .order_by("-created_at", "-id")
         .values_list("id", flat=True)
         .first()
         or 0
     )
 
 
-def get_last_claimed_transaction_id(user_id):
-    queued_boundary = (
-        CoachingGenerationRequest.objects.filter(user_id=user_id).aggregate(
-            max_end_transaction_id=Max("end_transaction_id")
-        )["max_end_transaction_id"]
-        or 0
+def _get_latest_request_boundary_transaction_id(user_id):
+    boundary_transaction_ids = list(
+        CoachingGenerationRequest.objects.filter(user_id=user_id).values_list(
+            "end_transaction_id",
+            flat=True,
+        )
     )
+    if not boundary_transaction_ids:
+        return 0
+
+    latest_boundary_transaction_id = (
+        Transaction.objects.filter(user_id=user_id, id__in=boundary_transaction_ids)
+        .order_by("-created_at", "-id")
+        .values_list("id", flat=True)
+        .first()
+    )
+    if latest_boundary_transaction_id:
+        return latest_boundary_transaction_id
+
+    return max(boundary_transaction_ids)
+
+
+def get_last_claimed_transaction_id(user_id):
+    queued_boundary = _get_latest_request_boundary_transaction_id(user_id)
     if queued_boundary:
         return queued_boundary
 
@@ -98,11 +192,10 @@ def schedule_coaching_generation_requests(
     while True:
         last_claimed_transaction_id = get_last_claimed_transaction_id(user_id)
         next_batch_transaction_ids = list(
-            Transaction.objects.filter(
-                user_id=user_id,
-                id__gt=last_claimed_transaction_id,
+            _get_registration_ordered_transactions(
+                user_id,
+                start_after_transaction_id=last_claimed_transaction_id,
             )
-            .order_by("id")
             .values_list("id", flat=True)[:threshold]
         )
 
@@ -121,7 +214,11 @@ def schedule_coaching_generation_requests(
                 )
         except IntegrityError:
             refreshed_boundary = get_last_claimed_transaction_id(user_id)
-            if refreshed_boundary <= last_claimed_transaction_id:
+            if not _has_boundary_advanced(
+                user_id,
+                last_claimed_transaction_id or None,
+                refreshed_boundary,
+            ):
                 logger.info(
                     "Coaching generation request creation raced without boundary advance "
                     "(user_id=%s, end_transaction_id=%s)",
@@ -159,7 +256,7 @@ def _claim_next_pending_request(user_id):
                     user_id=user_id,
                     status=CoachingGenerationRequest.Status.PENDING,
                 )
-                .order_by("end_transaction_id", "id")
+                .order_by("created_at", "id")
                 .first()
             )
             if not generation_request:
@@ -181,14 +278,12 @@ def _claim_next_pending_request(user_id):
 
 
 def _generate_coaching_for_request(generation_request):
-    window_start_id = generation_request.start_after_transaction_id or 0
     context_transactions = list(
-        Transaction.objects.filter(
-            user_id=generation_request.user_id,
-            id__gt=window_start_id,
-            id__lte=generation_request.end_transaction_id,
+        _get_registration_ordered_transactions(
+            generation_request.user_id,
+            start_after_transaction_id=generation_request.start_after_transaction_id,
+            end_transaction_id=generation_request.end_transaction_id,
         )
-        .order_by("id")
     )
 
     if len(context_transactions) < generation_request.transaction_count:

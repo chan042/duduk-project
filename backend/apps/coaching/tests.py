@@ -1,3 +1,4 @@
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -213,6 +214,40 @@ class CoachingGenerationQueueTests(TestCase):
         self.assertEqual(generation_requests[1].end_transaction_id, transactions[5].id)
         mock_delay.assert_called_once_with(self.user.id)
 
+    @patch("apps.coaching.tasks.run_coaching_generation_queue.delay")
+    def test_schedule_uses_transaction_created_at_order_for_batches(self, mock_delay):
+        base_time = timezone.now()
+        transactions = [
+            Transaction.objects.create(
+                user=self.user,
+                category="카페/간식",
+                item=f"정렬 확인 {index + 1}",
+                store="테스트카페",
+                amount=4500,
+                date=timezone.now(),
+            )
+            for index in range(6)
+        ]
+        created_at_offsets = [0, 40, 10, 50, 20, 60]
+
+        for transaction, offset in zip(transactions, created_at_offsets):
+            Transaction.objects.filter(pk=transaction.pk).update(
+                created_at=base_time + timedelta(seconds=offset)
+            )
+
+        created_request_ids = schedule_coaching_generation_requests(self.user.id)
+        generation_requests = list(
+            CoachingGenerationRequest.objects.filter(user=self.user).order_by("id")
+        )
+
+        self.assertEqual(len(created_request_ids), 2)
+        self.assertEqual(len(generation_requests), 2)
+        self.assertEqual(generation_requests[0].start_after_transaction_id, None)
+        self.assertEqual(generation_requests[0].end_transaction_id, transactions[4].id)
+        self.assertEqual(generation_requests[1].start_after_transaction_id, transactions[4].id)
+        self.assertEqual(generation_requests[1].end_transaction_id, transactions[5].id)
+        mock_delay.assert_called_once_with(self.user.id)
+
     @patch("apps.coaching.services.AIClient")
     @patch("apps.coaching.tasks.run_coaching_generation_queue.delay")
     def test_processes_queued_requests_sequentially_without_duplicates(
@@ -273,6 +308,54 @@ class CoachingGenerationQueueTests(TestCase):
             )
         )
         self.assertEqual(mock_ai_client.get_advice.call_count, 2)
+        mock_delay.assert_called_once_with(self.user.id)
+
+    @patch("apps.coaching.services.AIClient")
+    @patch("apps.coaching.tasks.run_coaching_generation_queue.delay")
+    def test_process_uses_transaction_created_at_order_for_context(
+        self,
+        mock_delay,
+        mock_ai_client_class,
+    ):
+        base_time = timezone.now()
+        transactions = [
+            Transaction.objects.create(
+                user=self.user,
+                category="식비",
+                item=f"생성순서 {index + 1}",
+                store="배달앱",
+                amount=18000,
+                date=timezone.now(),
+            )
+            for index in range(3)
+        ]
+        created_at_offsets = [0, 20, 10]
+
+        for transaction, offset in zip(transactions, created_at_offsets):
+            Transaction.objects.filter(pk=transaction.pk).update(
+                created_at=base_time + timedelta(seconds=offset)
+            )
+
+        schedule_coaching_generation_requests(self.user.id)
+
+        mock_ai_client = mock_ai_client_class.return_value
+        mock_ai_client.get_advice.return_value = {
+            "subject": "행동 변화 제안",
+            "title": "정렬 점검",
+            "coaching_content": "등록 순서대로 코칭합니다.",
+            "analysis": "등록 시간 순 3건을 분석했어요.",
+            "estimated_savings": 1000,
+            "sources": [],
+        }
+
+        result = process_pending_coaching_generation_requests(self.user.id)
+        prompt = mock_ai_client.get_advice.call_args.args[0]
+        generation_request = CoachingGenerationRequest.objects.get(user=self.user)
+
+        self.assertEqual(len(result["processed_request_ids"]), 1)
+        self.assertEqual(generation_request.end_transaction_id, transactions[1].id)
+        self.assertLess(prompt.index("생성순서 1"), prompt.index("생성순서 3"))
+        self.assertLess(prompt.index("생성순서 3"), prompt.index("생성순서 2"))
         mock_delay.assert_called_once_with(self.user.id)
 
     @patch("apps.coaching.services.AIClient")
